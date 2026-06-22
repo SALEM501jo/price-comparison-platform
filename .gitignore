@@ -1,0 +1,4 @@
+# Root ignores
+*.pem
+*.key
+secrets/
