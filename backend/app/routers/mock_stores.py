@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query
 from typing import List, Optional
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/mock", tags=["mock stores"])
+router = APIRouter()
 
 
 class MockProductResponse(BaseModel):

@@ -12,7 +12,7 @@ from app.models.price import WishlistItem, PriceAlert
 from app.models.product import Product
 from app.schemas.price import PriceAlertCreate, PriceAlertResponse
 
-router = APIRouter(prefix="/prices", tags=["prices"])
+router = APIRouter()
 
 
 @router.post("/wishlist/{product_id}", status_code=status.HTTP_201_CREATED)

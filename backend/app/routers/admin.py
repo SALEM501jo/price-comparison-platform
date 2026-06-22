@@ -18,7 +18,7 @@ from app.models.alias import ProductAlias
 from app.schemas.auth import UserResponse
 from app.logging_config import get_security_logger
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter()
 logger = get_security_logger("app.admin")
 
 
