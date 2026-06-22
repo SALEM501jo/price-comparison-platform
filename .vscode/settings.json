@@ -1,0 +1,9 @@
+{
+    "python.defaultInterpreterPath": "G:\\Downloads\\price-comparison-platform\\backend\\.venv\\Scripts\\python.exe",
+    "python.analysis.extraPaths": [
+        "backend"
+    ],
+    "python.analysis.include": [
+        "backend"
+    ]
+}
