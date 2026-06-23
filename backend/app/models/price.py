@@ -16,7 +16,7 @@ class Price(Base):
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     alias = relationship("ProductAlias", back_populates="prices")
-    store = relationship("Store", back_populates="prices")
+    
 
 
 class PriceHistory(Base):

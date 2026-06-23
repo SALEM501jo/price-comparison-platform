@@ -2,9 +2,9 @@
 Product search and comparison routes.
 """
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, asc
+from sqlalchemy import func
 from typing import Optional, List
 from app.database import get_db
 from app.dependencies import get_current_user_optional, get_rate_limited
@@ -49,11 +49,6 @@ async def search(
 ):
     """
     Search products with price comparison.
-    
-    PERFORMANCE:
-    - Redis cache for 5 minutes
-    - Database indexes on canonical_name, brand, category
-    - Pagination prevents loading thousands of rows
     """
     # Try cache first
     cache_key = f"search:{q}:{category}:{sort_by}:{page}:{limit}"
@@ -64,7 +59,6 @@ async def search(
         if cached:
             return json.loads(cached)
     except Exception:
-        # Cache failure: fail open, continue to DB
         pass
     
     # Build query
@@ -83,11 +77,11 @@ async def search(
     
     results = []
     for product in products:
-        # Get all prices for this product
+        # Get all prices for this product (Price -> ProductAlias -> Store)
         prices = (
-            db.query(Price, Store)
+            db.query(Price, ProductAlias, Store)
             .join(ProductAlias, Price.alias_id == ProductAlias.id)
-            .join(Store, Price.store_id == Store.id)
+            .join(Store, ProductAlias.store_id == Store.id)
             .filter(ProductAlias.product_id == product.id)
             .all()
         )
@@ -96,19 +90,19 @@ async def search(
             continue
         
         # Calculate stats
-        price_values = [p.Price.price for p in prices if p.Price.availability]
+        price_values = [price.price for price, alias, store in prices if price.availability]
         lowest = min(price_values) if price_values else 0
         highest = max(price_values) if price_values else 0
         
         # Find best deal (lowest total cost = price + delivery)
         best_deal = None
         best_total = float('inf')
-        for p, s in prices:
-            if p.availability:
-                total = p.price + p.delivery_cost
+        for price, alias, store in prices:
+            if price.availability:
+                total = price.price + price.delivery_cost
                 if total < best_total:
                     best_total = total
-                    best_deal = s.name
+                    best_deal = store.name
         
         results.append({
             "id": product.id,
@@ -151,7 +145,7 @@ async def get_product(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    # Get all prices with store info
+    # Get all prices with store info (Price -> ProductAlias -> Store)
     prices = (
         db.query(Price, ProductAlias, Store)
         .join(ProductAlias, Price.alias_id == ProductAlias.id)
