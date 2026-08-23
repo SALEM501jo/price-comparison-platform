@@ -1,0 +1,63 @@
+"""
+Response models for tiered product search.
+
+The shape is deliberately grouped rather than a flat ranked list: the whole
+point of the feature is that an exact match and a 75% match are qualitatively
+different answers, and the UI should be able to say so without re-deriving the
+thresholds itself.
+"""
+
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class MatchedProduct(BaseModel):
+    id: int
+    canonical_name: str
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    attributes: Optional[Dict[str, str]] = None
+
+    # Price comparison
+    lowest_price: Optional[float] = None
+    highest_price: Optional[float] = None
+    lowest_total_cost: Optional[float] = Field(
+        None, description="Lowest price + delivery, which is what a buyer pays"
+    )
+    store_count: int = Field(0, description="Stores currently listing it in stock")
+    best_deal_store: Optional[str] = None
+
+    # Match explanation
+    match_score: float = Field(..., description="0-100, weighted attribute agreement")
+    match_tier: str = Field(..., description="exact | close | similar")
+    differences: List[str] = Field(
+        default_factory=list,
+        description="Why this is not exact, e.g. 'different colour (blue, not black)'",
+    )
+
+
+class SearchInterpretation(BaseModel):
+    """What the server understood the query to mean.
+
+    Surfacing this is what lets the UI explain a surprising result set, and it
+    makes the matching debuggable from the outside.
+    """
+
+    query: str
+    category: Optional[str] = None
+    attributes: Dict[str, str] = Field(default_factory=dict)
+    structured: bool = Field(
+        ...,
+        description="True when the query parsed into attributes; False means "
+        "results came from a plain name search instead.",
+    )
+
+
+class TieredSearchResponse(BaseModel):
+    interpretation: SearchInterpretation
+    exact: List[MatchedProduct] = Field(default_factory=list)
+    close: List[MatchedProduct] = Field(default_factory=list)
+    similar: List[MatchedProduct] = Field(default_factory=list)
+    total: int = 0

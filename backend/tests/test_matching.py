@@ -204,3 +204,53 @@ class TestGateExplainability:
         result = score_match(parse("iPhone 15 Pro"), parse("MacBook Pro M3"))
         assert result.tier == EXCLUDED
         assert result.differences == []
+
+
+class TestColourSynonyms:
+    def test_apple_midnight_is_the_black_colourway(self):
+        """The scraper docstring's own example: three names, one product."""
+        assert parse("Apple iPhone 15 128GB 5G - Midnight").get("color") == "black"
+        assert parse("Apple iPhone 15 128GB Black").get("color") == "black"
+
+    def test_midnight_listing_matches_the_black_listing_exactly(self):
+        result = score_match(
+            parse("Apple iPhone 15 128GB 5G Smartphone - Black"),
+            parse("Apple iPhone 15 128GB 5G - Midnight"),
+        )
+        assert result.tier == EXACT
+
+    def test_midnight_green_stays_a_distinct_colour(self):
+        """Longest match wins, so the iPhone 11 Pro colour is not swallowed."""
+        assert parse("iPhone 11 Pro 128GB Midnight Green").get("color") == "midnight green"
+
+    def test_grey_and_gray_are_the_same_colour(self):
+        assert parse("MacBook Air M3 Space Grey").get("color") == "space gray"
+        assert parse("MacBook Air M3 Space Gray").get("color") == "space gray"
+
+
+class TestUnrecognisedInput:
+    """
+    Regression guards. detect_category() used to fall back to a default, so
+    anything unrecognised was parsed with the phone rules -- and because
+    `variant` defaults to "base", a query of "%%%%" produced a non-empty
+    attribute set and scored 100% EXACT against a real handset.
+    """
+
+    @pytest.mark.parametrize("junk", ["%%%%", "____", "zzzz", "!!!", "12345"])
+    def test_junk_input_yields_no_category_and_no_attributes(self, junk):
+        parsed = parse(junk)
+        assert parsed.category is None
+        assert parsed.specified == {}
+
+    def test_junk_never_scores_against_a_real_product(self):
+        result = score_match(parse("%%%%"), parse("Apple iPhone 11 Pro 128GB Black"))
+        assert result.tier == EXCLUDED
+        assert result.score == 0.0
+
+    def test_unknown_category_is_not_forced_into_phones(self):
+        """A console is not a phone just because nothing else matched."""
+        assert parse("Sony PlayStation 5 Standard Edition").category is None
+
+    def test_a_recognised_product_still_parses(self):
+        assert parse("Apple iPhone 11 Pro 128GB Black").category == "phones"
+        assert parse("MacBook Air M3 256GB Silver").category == "laptops"

@@ -1,0 +1,208 @@
+"""
+Tiered product search.
+
+Two stages, deliberately separated:
+
+  1. CANDIDATE GENERATION -- cheap, in the database, narrows thousands of rows
+     to a few hundred using indexed columns.
+  2. RERANKING -- expensive, in Python, scores each candidate on weighted
+     attribute agreement and assigns it a tier.
+
+Doing the scoring in SQL is not possible (the weights live in the category
+rules), and doing the filtering in Python is what made the old engine load the
+entire table on every request.
+"""
+
+from __future__ import annotations
+
+from typing import Iterable
+
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
+
+from app.matching import CLOSE, EXACT, SIMILAR, parse, score_match
+from app.models.alias import ProductAlias
+from app.models.price import Price
+from app.models.product import Product
+from app.models.store import Store
+from app.schemas.search import (
+    MatchedProduct,
+    SearchInterpretation,
+    TieredSearchResponse,
+)
+
+# Cap on rows pulled into Python for reranking. Scoring is microseconds per
+# candidate, so this is generous; it exists to bound worst-case memory.
+CANDIDATE_LIMIT = 500
+
+
+def escape_like(term: str) -> str:
+    r"""
+    Neutralise LIKE wildcards in user input.
+
+    SQLAlchemy parameterises the value, so this is not SQL injection -- but an
+    unescaped "%" or "_" is still interpreted as a wildcard. A query of "%%%%"
+    matches every row in the table, which is a cheap denial-of-service against
+    an unindexed ILIKE scan.
+    """
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _candidates(db: Session, parsed, raw_query: str) -> list[Product]:
+    """
+    Narrow the catalogue before scoring.
+
+    Prefers the indexed (match_category, brand) pair. Falls back to a name
+    search when the query did not parse into anything structured -- a search
+    for "playstation" should still return something.
+    """
+    query = db.query(Product)
+
+    if parsed.specified:
+        filters = [Product.match_category == parsed.category]
+        brand = parsed.get("brand")
+        if brand:
+            filters.append(Product.brand == brand)
+        structured = query.filter(*filters).limit(CANDIDATE_LIMIT).all()
+        if structured:
+            return structured
+
+    # Fallback: plain name search.
+    term = f"%{escape_like(raw_query)}%"
+    return (
+        db.query(Product)
+        .filter(
+            or_(
+                Product.canonical_name.ilike(term, escape="\\"),
+                Product.brand.ilike(term, escape="\\"),
+            )
+        )
+        .limit(CANDIDATE_LIMIT)
+        .all()
+    )
+
+
+def _price_summary(db: Session, product_ids: Iterable[int]) -> dict[int, dict]:
+    """
+    Aggregate prices for many products in ONE query.
+
+    The previous implementation ran a three-table join per product inside the
+    result loop -- 20 results meant 21 round trips.
+    """
+    ids = list(product_ids)
+    if not ids:
+        return {}
+
+    rows = (
+        db.query(
+            ProductAlias.product_id.label("product_id"),
+            Price.price,
+            Price.delivery_cost,
+            Price.availability,
+            Store.name.label("store_name"),
+        )
+        .join(Price, Price.alias_id == ProductAlias.id)
+        .join(Store, Store.id == ProductAlias.store_id)
+        .filter(ProductAlias.product_id.in_(ids))
+        .all()
+    )
+
+    summary: dict[int, dict] = {}
+    for row in rows:
+        # Out-of-stock listings are excluded from every statistic. Counting
+        # them in store_count while excluding them from the price range (the
+        # old behaviour) reported "4 stores" for a product buyable at one.
+        if not row.availability:
+            continue
+
+        bucket = summary.setdefault(
+            row.product_id,
+            {"prices": [], "totals": [], "stores": set(), "best": None,
+             "best_total": None},
+        )
+        total = (row.price or 0.0) + (row.delivery_cost or 0.0)
+        bucket["prices"].append(row.price)
+        bucket["totals"].append(total)
+        bucket["stores"].add(row.store_name)
+        if bucket["best_total"] is None or total < bucket["best_total"]:
+            bucket["best_total"] = total
+            bucket["best"] = row.store_name
+
+    return summary
+
+
+def _to_response(product: Product, result, prices: dict | None) -> MatchedProduct:
+    prices = prices or {}
+    price_values = prices.get("prices") or []
+    return MatchedProduct(
+        id=product.id,
+        canonical_name=product.canonical_name,
+        brand=product.brand,
+        category=product.category,
+        image_url=product.image_url,
+        attributes=product.match_attributes or None,
+        lowest_price=min(price_values) if price_values else None,
+        highest_price=max(price_values) if price_values else None,
+        lowest_total_cost=prices.get("best_total"),
+        store_count=len(prices.get("stores") or ()),
+        best_deal_store=prices.get("best"),
+        match_score=result.score,
+        match_tier=result.tier,
+        differences=result.differences,
+    )
+
+
+def search_products(db: Session, raw_query: str) -> TieredSearchResponse:
+    """Run a tiered search and return results grouped by match quality."""
+    parsed = parse(raw_query)
+
+    interpretation = SearchInterpretation(
+        query=raw_query,
+        category=parsed.category if parsed.specified else None,
+        attributes=parsed.specified,
+        structured=bool(parsed.specified),
+    )
+
+    candidates = _candidates(db, parsed, raw_query)
+    if not candidates:
+        return TieredSearchResponse(interpretation=interpretation, total=0)
+
+    scored = []
+    for candidate in candidates:
+        other = parse(candidate.canonical_name, category=candidate.match_category)
+        result = score_match(parsed, other)
+        if result.is_usable:
+            scored.append((candidate, result))
+
+    if not scored and not parsed.specified:
+        # Unstructured query (e.g. "playstation"): the scorer has nothing to
+        # work with, so surface the name matches rather than nothing at all.
+        scored = [(c, _unscored()) for c in candidates]
+
+    price_map = _price_summary(db, (c.id for c, _ in scored))
+
+    buckets: dict[str, list[MatchedProduct]] = {EXACT: [], CLOSE: [], SIMILAR: []}
+    for candidate, result in scored:
+        item = _to_response(candidate, result, price_map.get(candidate.id))
+        buckets.setdefault(result.tier, []).append(item)
+
+    for items in buckets.values():
+        # Within a tier the cheapest total cost wins -- that is what the user
+        # came for. Products with no in-stock price sort last rather than
+        # first, which a naive `or 0` would invert.
+        items.sort(key=lambda i: (i.lowest_total_cost is None, i.lowest_total_cost))
+
+    return TieredSearchResponse(
+        interpretation=interpretation,
+        exact=buckets[EXACT],
+        close=buckets[CLOSE],
+        similar=buckets[SIMILAR],
+        total=sum(len(v) for v in buckets.values()),
+    )
+
+
+def _unscored():
+    """Placeholder result for name-only matches, reported in the lowest tier."""
+    from app.matching.scorer import MatchResult
+
+    return MatchResult(score=0.0, tier=SIMILAR, comparisons=())

@@ -121,15 +121,49 @@ def main() -> int:
     wrong_type = client.post("/auth/refresh", json={"refresh_token": tokens["access_token"]})
     check("access token rejected as refresh token", wrong_type.status_code == 401, wrong_type.text)
 
-    # --- Products ----------------------------------------------------------
-    section("Products")
-    search = client.get("/products/search", params={"q": "iphone"})
-    check("search returns 200", search.status_code == 200, search.text)
-    results = search.json() if search.status_code == 200 else []
-    check("search found seeded products", len(results) > 0,
-          "run: python -m app.services.scraper")
+    # --- Tiered search (the core feature) ----------------------------------
+    section("Tiered search")
+    search = client.get("/products/search", params={"q": "iPhone 15 128GB Black"})
+    if not check("search returns 200", search.status_code == 200, search.text):
+        return report()
 
-    product_id = results[0]["id"] if results else None
+    body = search.json()
+    interpretation = body.get("interpretation", {})
+    check("search reports what it understood", interpretation.get("structured") is True,
+          str(interpretation))
+    check("query parsed into attributes",
+          interpretation.get("attributes", {}).get("storage") == "128gb",
+          str(interpretation))
+
+    exact = body.get("exact", [])
+    check("exact match found", len(exact) == 1,
+          f"got {len(exact)} -- run: python -m app.services.scraper")
+    if exact:
+        check("exact match scores 100", exact[0]["match_score"] == 100.0)
+        check("exact match has no differences", exact[0]["differences"] == [])
+        check("exact match aggregates several stores", exact[0]["store_count"] >= 2,
+              str(exact[0].get("store_count")))
+        check("exact match names a best-deal store", bool(exact[0]["best_deal_store"]))
+
+    # A different storage size is a DIFFERENT product, and must not be exact.
+    other = client.get("/products/search", params={"q": "iPhone 15 512GB Black"})
+    if other.status_code == 200:
+        tiers = other.json()
+        check("wrong storage is not an exact match", len(tiers.get("exact", [])) == 0)
+        demoted = tiers.get("close", []) + tiers.get("similar", [])
+        check("wrong storage is demoted, not dropped", len(demoted) > 0)
+        if demoted:
+            check("demotion is explained in words",
+                  any("storage" in d for d in demoted[0]["differences"]),
+                  str(demoted[0]["differences"]))
+
+    # Junk input must not match anything.
+    junk = client.get("/products/search", params={"q": "%%%%"})
+    check("wildcard query returns nothing",
+          junk.status_code == 200 and junk.json().get("total") == 0,
+          junk.text[:200])
+
+    product_id = exact[0]["id"] if exact else None
     if product_id:
         detail = client.get(f"/products/{product_id}")
         check("product detail returns 200", detail.status_code == 200, detail.text)

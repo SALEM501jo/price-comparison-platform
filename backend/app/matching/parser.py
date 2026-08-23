@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from app.matching.rules import CATEGORY_RULES, DEFAULT_CATEGORY, CategoryRules
+from app.matching.rules import CATEGORY_RULES, CategoryRules
 
 
 def normalize(text: str) -> str:
@@ -31,10 +31,18 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def detect_category(text: str) -> str:
-    """Pick the category whose detector words appear most often in the name."""
+def detect_category(text: str) -> str | None:
+    """
+    Pick the category whose detector words appear most often in the name.
+
+    Returns None when nothing matches, rather than falling back to a default.
+    Defaulting silently mislabelled every unrecognised string as a phone: a
+    search for "playstation" was parsed with the phone rules, and a search for
+    "%%%%" picked up the phone variant default and came back as a 100% EXACT
+    match against a real handset.
+    """
     normalized = normalize(text)
-    best, best_hits = DEFAULT_CATEGORY, 0
+    best, best_hits = None, 0
     for name, rules in CATEGORY_RULES.items():
         hits = sum(
             1
@@ -52,7 +60,7 @@ class ParsedProduct:
 
     raw: str
     normalized: str
-    category: str
+    category: str | None
     attributes: dict[str, str | None] = field(default_factory=dict)
 
     def get(self, name: str) -> str | None:
@@ -73,9 +81,15 @@ def parse(text: str, category: str | None = None) -> ParsedProduct:
     """
     normalized = normalize(text)
     category = category or detect_category(text)
-    rules: CategoryRules = CATEGORY_RULES.get(
-        category, CATEGORY_RULES[DEFAULT_CATEGORY]
-    )
+    rules: CategoryRules | None = CATEGORY_RULES.get(category) if category else None
+
+    if rules is None:
+        # Nothing recognised this text. Return it unparsed rather than forcing
+        # it through an arbitrary rule set -- callers treat an empty attribute
+        # set as "fall back to a plain name search".
+        return ParsedProduct(
+            raw=text, normalized=normalized, category=None, attributes={}
+        )
 
     attributes: dict[str, str | None] = {}
     for attribute in rules.attributes:

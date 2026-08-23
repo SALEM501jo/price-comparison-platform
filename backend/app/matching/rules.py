@@ -55,6 +55,13 @@ COLORS = Keyword(
         "space grey": "space gray",
         "jet black": "black",
         "matte black": "black",
+        # Apple's "Midnight" is the dark colourway that replaced Black on the
+        # iPhone 13-15 lineup, and Jordanian stores use the two names for the
+        # same handset. Without this, Carrefour's "iPhone 15 128GB Midnight"
+        # became its own product instead of joining the other three stores.
+        # "Midnight Green" (iPhone 11 Pro) is a genuinely different colour and
+        # stays distinct -- Keyword matches the longest value first.
+        "midnight": "black",
     },
 )
 
@@ -143,7 +150,7 @@ LAPTOPS = CategoryRules(
             )),
         ),
         Attribute(
-            "variant", "variant", 20,
+            "variant", "variant", 15,
             Keyword(values=("air", "pro", "plus", "max")),
             default="base",
         ),
@@ -156,6 +163,10 @@ LAPTOPS = CategoryRules(
         ),
         Attribute("storage", "storage", 20, STORAGE),
         Attribute("ram", "memory", 10, RAM),
+        # Space Gray and Silver are different SKUs at different prices, so
+        # colour belongs here too -- weighted low, as on phones, because it is
+        # the least identity-defining attribute.
+        Attribute("color", "colour", 5, COLORS),
     ),
 )
 

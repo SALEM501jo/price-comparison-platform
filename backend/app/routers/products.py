@@ -13,15 +13,16 @@ from app.models.alias import ProductAlias
 from app.models.price import Price, PriceHistory
 from app.models.store import Store
 from app.schemas.product import (
-    ProductSearchResponse, 
-    ProductDetailResponse, 
+    ProductDetailResponse,
     StorePriceResponse,
     PriceHistoryResponse,
     PriceHistoryPoint
 )
+from app.schemas.search import TieredSearchResponse
+from app.services.search import search_products
 from app.config import get_settings
 import redis.asyncio as aioredis
-import json
+import hashlib
 
 router = APIRouter()
 settings = get_settings()
@@ -36,102 +37,38 @@ async def get_cache():
     return _cache
 
 
-@router.get("/search", response_model=List[ProductSearchResponse])
+@router.get("/search", response_model=TieredSearchResponse)
 async def search(
     request: Request,
     q: str = Query(..., min_length=2, max_length=100),
-    category: Optional[str] = Query(None, max_length=50),
-    sort_by: str = Query("price_asc", pattern=r"^(price_asc|price_desc|name)$"),
-    page: int = Query(1, ge=1, le=100),
-    limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
     _: None = Depends(get_rate_limited),
 ):
     """
-    Search products with price comparison.
+    Search products, grouped by how well they match the query.
+
+    Returns three buckets -- exact, close (85-99%), similar (70-84%) -- each
+    carrying the reason it landed there, e.g. "different colour (blue, not
+    black)". See app/services/search.py for the two-stage design.
     """
-    # Try cache first
-    cache_key = f"search:{q}:{category}:{sort_by}:{page}:{limit}"
+    cache_key = f"search:v2:{hashlib.sha256(q.strip().lower().encode()).hexdigest()}"
     cache = await get_cache()
-    
+
     try:
         cached = await cache.get(cache_key)
         if cached:
-            return json.loads(cached)
+            return TieredSearchResponse.model_validate_json(cached)
     except Exception:
-        pass
-    
-    # Build query
-    query = db.query(Product)
-    
-    # Search by name (case-insensitive)
-    if q:
-        search_term = f"%{q}%"
-        query = query.filter(Product.canonical_name.ilike(search_term))
-    
-    if category:
-        query = query.filter(Product.category == category)
-    
-    # Get products with price stats
-    products = query.offset((page - 1) * limit).limit(limit).all()
-    
-    results = []
-    for product in products:
-        # Get all prices for this product (Price -> ProductAlias -> Store)
-        prices = (
-            db.query(Price, ProductAlias, Store)
-            .join(ProductAlias, Price.alias_id == ProductAlias.id)
-            .join(Store, ProductAlias.store_id == Store.id)
-            .filter(ProductAlias.product_id == product.id)
-            .all()
-        )
-        
-        if not prices:
-            continue
-        
-        # Calculate stats
-        price_values = [price.price for price, alias, store in prices if price.availability]
-        lowest = min(price_values) if price_values else 0
-        highest = max(price_values) if price_values else 0
-        
-        # Find best deal (lowest total cost = price + delivery)
-        best_deal = None
-        best_total = float('inf')
-        for price, alias, store in prices:
-            if price.availability:
-                total = price.price + price.delivery_cost
-                if total < best_total:
-                    best_total = total
-                    best_deal = store.name
-        
-        results.append({
-            "id": product.id,
-            "canonical_name": product.canonical_name,
-            "brand": product.brand,
-            "category": product.category,
-            "image_url": product.image_url,
-            "specs": product.specs,
-            "lowest_price": lowest,
-            "highest_price": highest,
-            "store_count": len(prices),
-            "best_deal_store": best_deal
-        })
-    
-    # Sort results
-    if sort_by == "price_asc":
-        results.sort(key=lambda x: x["lowest_price"])
-    elif sort_by == "price_desc":
-        results.sort(key=lambda x: x["highest_price"], reverse=True)
-    elif sort_by == "name":
-        results.sort(key=lambda x: x["canonical_name"])
-    
-    # Cache for 5 minutes
+        pass  # cache is an optimisation, never a dependency
+
+    response = search_products(db, q)
+
     try:
-        await cache.setex(cache_key, 300, json.dumps(results, default=str))
+        await cache.setex(cache_key, 300, response.model_dump_json())
     except Exception:
         pass
-    
-    return results
+
+    return response
 
 
 @router.get("/{product_id}", response_model=ProductDetailResponse)

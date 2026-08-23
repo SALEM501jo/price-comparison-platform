@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -16,6 +16,11 @@ class Price(Base):
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     alias = relationship("ProductAlias", back_populates="prices")
+
+    __table_args__ = (
+        # "prices" holds the CURRENT price; history lives in price_history.
+        UniqueConstraint("alias_id", name="uq_price_current_per_alias"),
+    )
     
 
 
@@ -40,6 +45,12 @@ class WishlistItem(Base):
 
     user = relationship("User", back_populates="wishlist_items")
     product = relationship("Product", back_populates="wishlist_items")
+
+    __table_args__ = (
+        # The router checks for an existing row first; without this, two
+        # concurrent requests can both pass that check and insert.
+        UniqueConstraint("user_id", "product_id", name="uq_wishlist_user_product"),
+    )
 
 
 class PriceAlert(Base):
