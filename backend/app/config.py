@@ -42,6 +42,18 @@ class Settings(BaseSettings):
     environment: str = "development"
     trusted_hosts: str = "*"
 
+    # --- Refresh token cookie ---
+    # The refresh token travels in an httpOnly cookie so that JavaScript --
+    # and therefore any XSS payload -- cannot read it.
+    refresh_cookie_name: str = "refresh_token"
+    # "lax" is enough while the API and the app share a site (localhost:5173
+    # and localhost:8000 are the same site; SameSite ignores the port). Split
+    # them across real domains and this must become "none", which browsers
+    # only honour on a Secure cookie.
+    cookie_samesite: str = "lax"
+    # Secure is forced on in production regardless; see cookie_is_secure.
+    cookie_secure_override: bool | None = None
+
     # Kept as a plain string on purpose. pydantic-settings JSON-decodes any
     # complex field type (list/dict) straight from the env var, which made
     # the documented comma-separated form in .env.example crash on startup.
@@ -80,6 +92,20 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
+
+    @property
+    def cookie_is_secure(self) -> bool:
+        """
+        Whether the refresh cookie is marked Secure (HTTPS only).
+
+        Always on in production -- a refresh token sent over plain HTTP is
+        readable by anyone on the path, which defeats the point of hiding it
+        from JavaScript. Off by default in development so the cookie works
+        over http://localhost, and overridable for an HTTPS dev setup.
+        """
+        if self.cookie_secure_override is not None:
+            return self.cookie_secure_override
+        return self.is_production
 
 
 @lru_cache()

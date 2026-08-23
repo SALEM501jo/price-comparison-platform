@@ -29,8 +29,11 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
+
+    # NOTE: the refresh token is deliberately absent. It is delivered as an
+    # httpOnly cookie instead, so page JavaScript never holds a copy and an
+    # XSS payload has nothing to exfiltrate. See app/security/cookies.py.
 
 
 class UserResponse(BaseModel):
@@ -41,9 +44,11 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class RefreshRequest(BaseModel):
-    """Refresh tokens travel in the JSON body, never the query string.
+    """Fallback body for clients without a cookie jar (mobile, CLI).
 
-    SECURITY: query strings land in access logs, browser history and Referer
-    headers. A 7-day credential must not be written to any of those.
+    Browsers send the httpOnly cookie instead and leave this empty.
+
+    SECURITY: never a query parameter -- query strings land in access logs,
+    browser history and Referer headers, and this is a multi-day credential.
     """
-    refresh_token: str
+    refresh_token: str | None = None

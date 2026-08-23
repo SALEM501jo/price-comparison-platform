@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AuthContext } from './auth-context';
+import { clearAccessToken, refreshAccessToken } from '../api/axios';
 import {
   login as loginApi,
   logout as logoutApi,
@@ -7,35 +8,30 @@ import {
   getMe,
 } from '../api/auth';
 
-const hasStoredToken = () => Boolean(localStorage.getItem('access_token'));
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
-  // Seed from whether a token exists rather than defaulting to true and
-  // immediately calling setLoading(false) inside the effect. That pattern
-  // triggers a cascading re-render, and eslint's react-hooks rule flags it.
-  const [loading, setLoading] = useState(hasStoredToken);
+  // Always true initially: the access token lives in memory and is gone after
+  // a reload, so whether a session exists can only be answered by asking the
+  // server. There is no token in storage to check synchronously any more --
+  // which is the point.
+  const [loading, setLoading] = useState(true);
 
-  // Restore the session on a page refresh: a token in storage only proves one
-  // was issued, so it has to be checked against the API before trusting it.
+  // Restore the session from the httpOnly refresh cookie. If the browser holds
+  // a valid one it is exchanged for a fresh access token; if not, the request
+  // 401s and the app simply renders logged out.
   useEffect(() => {
-    if (!hasStoredToken()) return undefined;
-
     let cancelled = false;
 
-    getMe()
+    refreshAccessToken()
+      .then(() => getMe())
       .then((data) => {
         if (!cancelled) setUser(data);
       })
       .catch(() => {
-        // Expired or revoked. Drop the tokens so the app shows a logged-out
-        // state rather than retrying credentials that will never work. Local
-        // only -- calling the API here would just 401 again.
-        if (!cancelled) {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('refresh_token');
-        }
+        // No cookie, expired, or revoked. Not an error worth surfacing --
+        // it is the normal state for a first-time visitor.
+        if (!cancelled) clearAccessToken();
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -59,8 +55,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    // logoutApi revokes the refresh token server-side and always clears local
-    // storage, so this cannot leave the UI signed in with dead credentials.
+    // Revokes every refresh token server-side and clears the cookie, then
+    // drops the in-memory access token.
     await logoutApi();
     setUser(null);
   }, []);

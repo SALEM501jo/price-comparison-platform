@@ -94,8 +94,15 @@ def main() -> int:
     if not check("register returns 201", registered.status_code == 201, registered.text):
         return report()
     tokens = registered.json()
-    check("register returns both tokens",
-          bool(tokens.get("access_token") and tokens.get("refresh_token")))
+    check("register returns an access token", bool(tokens.get("access_token")))
+    # The refresh token must reach the browser ONLY as an httpOnly cookie.
+    check("refresh token is NOT in the response body",
+          "refresh_token" not in tokens, str(sorted(tokens)))
+    cookie_header = registered.headers.get("set-cookie", "").lower()
+    check("refresh cookie is httponly", "httponly" in cookie_header, cookie_header)
+    check("refresh cookie is path-scoped to /auth", "path=/auth" in cookie_header,
+          cookie_header)
+    check("refresh cookie sets samesite", "samesite=" in cookie_header, cookie_header)
 
     duplicate = client.post("/auth/register", json={"email": email, "password": PASSWORD})
     check("duplicate registration is 409", duplicate.status_code == 409, duplicate.text)
@@ -111,15 +118,34 @@ def main() -> int:
     check("GET /auth/me returns 200", me.status_code == 200, me.text)
     check("password hash never returned", "password_hash" not in me.text)
 
-    # --- The refresh fix ---------------------------------------------------
-    section("Refresh (was broken: expected a query parameter)")
-    refreshed = client.post("/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    check("refresh accepts a JSON body", refreshed.status_code == 200, refreshed.text)
+    # --- Refresh, rotation and replay --------------------------------------
+    section("Refresh, rotation and replay detection")
+    before = client.cookies.get("refresh_token")
+    refreshed = client.post("/auth/refresh")  # cookie only, no body
+    check("refresh works from the cookie alone", refreshed.status_code == 200, refreshed.text)
     if refreshed.status_code == 200:
         check("refresh returns a new access token", bool(refreshed.json().get("access_token")))
+        check("refresh token was rotated", client.cookies.get("refresh_token") != before)
 
-    wrong_type = client.post("/auth/refresh", json={"refresh_token": tokens["access_token"]})
-    check("access token rejected as refresh token", wrong_type.status_code == 401, wrong_type.text)
+    # Replaying the spent token must revoke the whole chain.
+    replay = httpx.post(f"{BASE}/auth/refresh", json={"refresh_token": before}, timeout=15)
+    check("replaying a spent token is rejected", replay.status_code == 401, replay.text)
+    after_replay = client.post("/auth/refresh")
+    check("replay revokes the rest of the chain", after_replay.status_code == 401,
+          after_replay.text)
+
+    # Re-establish a working session for the remaining checks.
+    client.cookies.clear()
+    tokens = client.post(
+        "/auth/login", json={"email": email, "password": PASSWORD}
+    ).json()
+    auth = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+    wrong_type = httpx.post(
+        f"{BASE}/auth/refresh", json={"refresh_token": tokens["access_token"]}, timeout=15
+    )
+    check("access token rejected as refresh token", wrong_type.status_code == 401,
+          wrong_type.text)
 
     # --- Tiered search (the core feature) ----------------------------------
     section("Tiered search")
@@ -219,6 +245,14 @@ def main() -> int:
     else:
         skip("strict rate limit triggers a 429",
              "Redis not reachable on 127.0.0.1:6379; run 'docker compose up -d'")
+
+    # --- Logout ------------------------------------------------------------
+    section("Logout")
+    logged_out = client.post("/auth/logout", headers=auth)
+    check("logout returns 204", logged_out.status_code == 204, logged_out.text)
+    check("logout clears the refresh cookie",
+          not client.cookies.get("refresh_token"))
+    check("refresh fails after logout", client.post("/auth/refresh").status_code == 401)
 
     client.close()
     return report()

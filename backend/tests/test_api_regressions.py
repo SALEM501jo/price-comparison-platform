@@ -97,21 +97,40 @@ def product(db_session):
 # --- Bug: /auth/refresh expected a query parameter -------------------------
 
 
-class TestRefreshTokenBody:
-    def test_refresh_accepts_json_body(self, client):
-        tokens = register(client)
-        response = client.post(
-            "/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
-        )
+class TestRefreshTokenDelivery:
+    """
+    Original bug: /auth/refresh took the token as a QUERY PARAMETER while the
+    frontend sent a JSON body, so refresh always failed and users were logged
+    out 15 minutes after signing in. It is now an httpOnly cookie.
+    """
+
+    def test_refresh_token_is_never_a_query_parameter(self, client):
+        """Query strings reach access logs, history and Referer headers."""
+        spec = app.openapi()
+        params = {
+            p["name"]
+            for method in spec["paths"]["/auth/refresh"].values()
+            for p in method.get("parameters", [])
+        }
+        assert "refresh_token" not in params
+
+    def test_refresh_works_from_the_cookie_alone(self, client):
+        register(client)
+        response = client.post("/auth/refresh")
         assert response.status_code == 200, response.text
         assert response.json()["access_token"]
 
-    def test_refresh_without_body_is_rejected(self, client):
-        assert client.post("/auth/refresh").status_code == 422
+    def test_refresh_token_is_not_returned_in_the_body(self, client):
+        """An XSS payload must have nothing to read."""
+        assert "refresh_token" not in register(client)
+
+    def test_refresh_without_cookie_or_body_is_rejected(self, client):
+        assert client.post("/auth/refresh").status_code == 401
 
     def test_access_token_is_not_accepted_as_refresh_token(self, client):
         """Token type confusion: an access token must not refresh a session."""
         tokens = register(client)
+        client.cookies.clear()
         response = client.post(
             "/auth/refresh", json={"refresh_token": tokens["access_token"]}
         )

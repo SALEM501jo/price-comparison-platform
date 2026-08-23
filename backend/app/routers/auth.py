@@ -3,7 +3,7 @@ Authentication routes.
 SECURITY PRINCIPLE: Every auth operation must be auditable and timing-safe.
 """
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -23,8 +23,13 @@ from app.security.jwt_handler import (
     create_refresh_token,
     verify_token,
 )
+from app.security.cookies import (
+    clear_refresh_cookie,
+    read_refresh_token,
+    set_refresh_cookie,
+)
 from app.security.password import get_dummy_hash, hash_password, verify_password
-from app.security.rate_limiter import strict_rate_limit
+from app.security.rate_limiter import rate_limit, strict_rate_limit
 from app.services import tokens as token_service
 
 router = APIRouter()
@@ -35,19 +40,24 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _issue_tokens(db: Session, user: User) -> TokenResponse:
-    """Mint an access/refresh pair and record the refresh token for revocation."""
+def _issue_tokens(db: Session, user: User, response: Response) -> TokenResponse:
+    """
+    Mint an access/refresh pair, record the refresh token, and set the cookie.
+
+    The refresh token goes out ONLY as an httpOnly cookie -- it is never part
+    of the JSON body, so no JavaScript on the page ever sees it.
+    """
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
     refresh_token, jti = create_refresh_token({"sub": str(user.id)})
     token_service.record_issued(db, jti=jti, user_id=user.id)
-    return TokenResponse(
-        access_token=access_token, refresh_token=refresh_token, token_type="bearer"
-    )
+    set_refresh_cookie(response, refresh_token)
+    return TokenResponse(access_token=access_token, token_type="bearer")
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     request: Request,
+    response: Response,
     body: RegisterRequest,
     db: Session = Depends(get_db),
 ):
@@ -98,12 +108,13 @@ async def register(
             "success": True,
         },
     )
-    return _issue_tokens(db, user)
+    return _issue_tokens(db, user, response)
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
     request: Request,
+    response: Response,
     body: LoginRequest,
     db: Session = Depends(get_db),
 ):
@@ -142,14 +153,15 @@ async def login(
             "success": True,
         },
     )
-    return _issue_tokens(db, user)
+    return _issue_tokens(db, user, response)
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: Request,
-    body: RefreshRequest,
+    response: Response,
     db: Session = Depends(get_db),
+    body: RefreshRequest | None = None,
 ):
     """
     Exchange a refresh token for a new pair.
@@ -158,10 +170,19 @@ async def refresh_token(
     treated as proof of compromise and revokes every token the user holds --
     see app/services/tokens.py for why.
     """
-    await strict_rate_limit(request)
+    # The ordinary limit, not the strict one. The SPA exchanges the cookie for
+    # an access token on every page load, so 5/min would 429 anyone who
+    # reloaded a few times. The strict limit exists to slow password guessing;
+    # a refresh token is a signed 256-bit value that cannot be guessed, so the
+    # signature is what protects this endpoint, not the request rate.
+    await rate_limit(request)
+
+    presented = read_refresh_token(request, body.refresh_token if body else None)
+    if not presented:
+        raise AuthenticationError("Invalid refresh token")
 
     try:
-        payload = verify_token(body.refresh_token, token_type="refresh")
+        payload = verify_token(presented, token_type="refresh")
     except Exception:
         logger.warning(
             "Token refresh failed: invalid token",
@@ -194,6 +215,7 @@ async def refresh_token(
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
     new_refresh, new_jti = create_refresh_token({"sub": str(user.id)})
     token_service.rotate(db, record, new_jti)
+    set_refresh_cookie(response, new_refresh)
 
     logger.info(
         "Token refreshed",
@@ -204,14 +226,13 @@ async def refresh_token(
             "success": True,
         },
     )
-    return TokenResponse(
-        access_token=access_token, refresh_token=new_refresh, token_type="bearer"
-    )
+    return TokenResponse(access_token=access_token, token_type="bearer")
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     request: Request,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -224,6 +245,7 @@ async def logout(
     revoked = token_service.revoke_all_for_user(
         db, current_user.id, reason="user_logout"
     )
+    clear_refresh_cookie(response)
     logger.info(
         "User logged out",
         extra={
