@@ -3,17 +3,15 @@ Scraper service — runs via GitHub Actions cron, not as a server process.
 This keeps your 256MB Fly.io VM free for API requests only.
 """
 
-import json
-import httpx
+import logging
 from typing import List, Dict
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models.store import Store
 from app.models.price import Price, PriceHistory
 from app.services.deduplication import DeduplicationEngine
-from app.config import get_settings
 
-settings = get_settings()
+logger = logging.getLogger("app.scraper")
 
 
 # Mock store data — realistic product listings from simulated stores
@@ -202,10 +200,20 @@ class ScraperService:
             try:
                 count = self.process_store(store_code, store.id)
                 total_processed += count
-                print(f"✓ {store.name}: {count} products processed")
-            except Exception as e:
-                print(f"✗ {store.name}: {str(e)}")
-                # Continue with other stores — don't let one failure kill the job
+                logger.info(
+                    "Store scraped", extra={"action": "scrape_store",
+                                            "target": store.name, "success": True}
+                )
+            except Exception:
+                # Continue with other stores -- one failure must not kill the job.
+                # exc_info gives the real traceback; the previous version printed
+                # a non-ASCII marker that raised UnicodeEncodeError on the Windows
+                # console, hiding the very error it was trying to report.
+                logger.error(
+                    "Store scrape failed", exc_info=True,
+                    extra={"action": "scrape_store",
+                           "target": store.name, "success": False},
+                )
         
         return total_processed
     
@@ -233,10 +241,16 @@ if __name__ == "__main__":
             - install dependencies
             - run: python -m app.services.scraper
     """
+    from app.logging_config import setup_logging
+
+    setup_logging()
     db = SessionLocal()
     try:
         scraper = ScraperService(db)
         total = scraper.run_full_scrape()
-        print(f"\nScrape complete: {total} products processed")
+        logger.info(
+            "Scrape complete",
+            extra={"action": "scrape_complete", "target": total, "success": True},
+        )
     finally:
         db.close()

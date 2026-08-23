@@ -50,7 +50,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "payment=(), usb=(), magnetometer=(), gyroscope=()"
         )
 
-        if "server" in response.headers:
-            del response.headers["server"]
+        # NOTE: the Server header CANNOT be removed from here. Uvicorn writes it
+        # at the ASGI protocol level, after this middleware has already returned,
+        # so a del here silently does nothing -- a smoke test against a running
+        # server confirmed "server: uvicorn" still reaching the client.
+        # It must be suppressed at the server instead:
+        #     uvicorn app.main:app --no-server-header
+        # (see start-dev.ps1), or stripped by the reverse proxy in production.
 
         return response
