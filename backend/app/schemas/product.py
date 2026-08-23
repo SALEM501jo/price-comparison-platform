@@ -36,6 +36,10 @@ class ProductDetailResponse(BaseModel):
     category: Optional[str]
     image_url: Optional[str]
     description: Optional[str]
+    # Structured attributes from app/matching. `specs` is the legacy column
+    # written by the old regex extractor and still holds its output shape
+    # ({"storage": "128", "model_year": "15"}), so clients should prefer this.
+    attributes: Optional[Dict] = None
     specs: Optional[Dict]
     prices: List[StorePriceResponse]
 

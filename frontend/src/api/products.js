@@ -1,14 +1,31 @@
 import api from './axios';
 
-export const searchProducts = async (query, category = null, sortBy = 'price_asc', page = 1, limit = 20) => {
-  const params = { q: query, sort_by: sortBy, page, limit };
-  if (category) params.category = category;
-  const { data } = await api.get('/products/search', { params });
+/**
+ * Search products, grouped by how well they match the query.
+ *
+ * Returns the backend's tiered shape:
+ *   {
+ *     interpretation: { query, category, attributes, structured },
+ *     exact:   [ ...MatchedProduct ],
+ *     close:   [ ... ],
+ *     similar: [ ... ],
+ *     total:   number
+ *   }
+ *
+ * Each product carries match_score, match_tier and `differences` -- the
+ * plain-English reasons it is not an exact match, e.g.
+ * "different colour (blue, not black)".
+ */
+export const searchProducts = async (query, config = {}) => {
+  const { data } = await api.get('/products/search', {
+    params: { q: query },
+    ...config, // carries an AbortSignal so stale requests can be cancelled
+  });
   return data;
 };
 
-export const getProduct = async (productId) => {
-  const { data } = await api.get(`/products/${productId}`);
+export const getProduct = async (productId, config = {}) => {
+  const { data } = await api.get(`/products/${productId}`, config);
   return data;
 };
 

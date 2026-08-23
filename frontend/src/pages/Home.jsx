@@ -7,9 +7,9 @@ export default function Home() {
         Jordan Price Comparison
       </h1>
       <p className="text-gray-500 mb-8 text-center max-w-md">
-        Compare prices across Jordanian stores. Find the best deals instantly.
+        Compare prices across Jordanian stores. Include storage and colour to get an exact match.
       </p>
-      <SearchBar />
+      <SearchBar showExamples />
     </div>
   );
 }

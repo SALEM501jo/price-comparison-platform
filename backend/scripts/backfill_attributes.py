@@ -25,7 +25,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.database import SessionLocal  # noqa: E402
 from app.matching import parse  # noqa: E402
+from app.models.alias import ProductAlias  # noqa: E402
 from app.models.product import Product  # noqa: E402
+
+
+def readable_name(db, product: Product) -> str | None:
+    """
+    Recover a presentable name for a legacy product.
+
+    The old engine stored the NORMALISED name as the display name, so rows read
+    "apple iphone 15 256gb 5g blue" in the UI. A store's own listing keeps its
+    capitalisation, so borrow that. Returns None when the current name is
+    already fine.
+    """
+    if product.canonical_name != product.canonical_name.lower():
+        return None  # already mixed case, leave it alone
+
+    candidates = [
+        row.store_product_name
+        for row in db.query(ProductAlias.store_product_name).filter(
+            ProductAlias.product_id == product.id
+        )
+        if row.store_product_name and row.store_product_name != row.store_product_name.lower()
+    ]
+    return max(candidates, key=len) if candidates else None
 
 
 def main() -> int:
@@ -52,9 +75,13 @@ def main() -> int:
         changed = 0
         unparsed = []
 
+        renamed = 0
+
         for product in products:
             parsed = parse(product.canonical_name)
             attributes = parsed.specified
+
+            better_name = readable_name(db, product)
 
             if not attributes:
                 unparsed.append(product)
@@ -62,15 +89,21 @@ def main() -> int:
 
             before = (product.match_category, product.match_attributes)
             after = (parsed.category, attributes)
-            if before == after:
+            if before == after and not better_name:
                 continue
 
             print(f"  #{product.id} {product.canonical_name}")
             print(f"      {parsed.category}: {attributes}")
+            if better_name:
+                print(f"      rename -> {better_name!r}")
 
             if not args.dry_run:
                 product.match_category = parsed.category
                 product.match_attributes = attributes
+                if better_name:
+                    product.canonical_name = better_name
+            if better_name:
+                renamed += 1
             changed += 1
 
         if unparsed:
@@ -84,10 +117,11 @@ def main() -> int:
 
         if args.dry_run:
             db.rollback()
-            print(f"\nDRY RUN -- {changed} product(s) would change. Nothing written.")
+            print(f"\nDRY RUN -- {changed} product(s) would change "
+                  f"({renamed} rename(s)). Nothing written.")
         else:
             db.commit()
-            print(f"\nDone. {changed} product(s) updated.")
+            print(f"\nDone. {changed} product(s) updated, {renamed} renamed.")
         return 0
     finally:
         db.close()

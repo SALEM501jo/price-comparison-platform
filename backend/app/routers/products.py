@@ -116,6 +116,7 @@ async def get_product(
         category=product.category,
         image_url=product.image_url,
         description=product.description,
+        attributes=product.match_attributes,
         specs=product.specs,
         prices=price_responses
     )
