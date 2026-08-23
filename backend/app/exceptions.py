@@ -92,11 +92,25 @@ def setup_exception_handlers(app):
         SECURITY: Don't return the raw Pydantic error dict — it reveals schema structure.
         An attacker can learn your field names and types from error messages.
         """
-        # Sanitize: only tell them WHICH field failed, not the full schema
+        # Sanitize: name the field that failed and why, but nothing about the
+        # schema around it. The old format leaked the request structure into
+        # the UI ("Field 'body -> password': Value error, ...") and was too
+        # ugly to show a user, so clients displayed the generic detail instead
+        # and the actual reason never reached anyone.
         simplified_errors = []
         for error in exc.errors():
-            field = " -> ".join(str(loc) for loc in error.get("loc", []))
-            simplified_errors.append(f"Field '{field}': {error.get('msg', 'invalid')}")
+            parts = [
+                str(loc)
+                for loc in error.get("loc", [])
+                if loc not in ("body", "query", "path", "header")
+            ]
+            message = error.get("msg", "invalid")
+            for noise in ("Value error, ", "Assertion failed, "):
+                if message.startswith(noise):
+                    message = message[len(noise):]
+            simplified_errors.append(
+                {"field": ".".join(parts) or "request", "message": message}
+            )
         
         logger.info(
             f"Validation failed: {simplified_errors} | Path: {request.url.path} | "
