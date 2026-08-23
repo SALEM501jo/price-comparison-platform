@@ -80,7 +80,7 @@ async def get_wishlist(
     
     return [
         {
-            "id": item.WishlistItem.id,
+            "id": item.id,
             "product_id": product.id,
             "name": product.canonical_name,
             "brand": product.brand,
@@ -148,10 +148,10 @@ async def get_alerts(
     
     return [
         PriceAlertResponse(
-            id=alert.PriceAlert.id,
-            product_id=alert.PriceAlert.product_id,
-            target_price=alert.PriceAlert.target_price,
-            is_active=alert.PriceAlert.is_active,
+            id=alert.id,
+            product_id=alert.product_id,
+            target_price=alert.target_price,
+            is_active=alert.is_active,
             product_name=product.canonical_name
         )
         for alert, product in alerts

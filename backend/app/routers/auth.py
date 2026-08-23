@@ -6,7 +6,13 @@ SECURITY PRINCIPLE: Every auth operation must be auditable and timing-safe.
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+    RefreshRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.models.user import User
 from app.security.password import hash_password, verify_password, get_dummy_hash
 from app.security.jwt_handler import create_access_token, create_refresh_token, verify_token
@@ -154,7 +160,7 @@ async def login(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(
     request: Request,
-    refresh_token: str,
+    body: RefreshRequest,
     db: Session = Depends(get_db),
 ):
     """
@@ -167,7 +173,7 @@ async def refresh_token(
     await strict_rate_limit(request)
     
     try:
-        payload = verify_token(refresh_token, token_type="refresh")
+        payload = verify_token(body.refresh_token, token_type="refresh")
     except Exception:
         logger.warning("Token refresh failed: invalid token", extra={
             "ip": request.client.host if request.client else "unknown",
@@ -197,7 +203,7 @@ async def refresh_token(
     
     return TokenResponse(
         access_token=new_access,
-        refresh_token=refresh_token,  # Same refresh token
+        refresh_token=body.refresh_token,  # Same refresh token
         token_type="bearer"
     )
 

@@ -1,0 +1,269 @@
+"""
+HTTP-level regression tests for the critical bug fixes.
+
+Each test here corresponds to a bug that shipped in a state where the endpoint
+could never have been executed successfully. They exist so the fixes cannot be
+silently reverted.
+"""
+
+import asyncio
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.database import Base, get_db
+from app.main import app
+from app.models.alias import ProductAlias
+from app.models.price import Price
+from app.models.product import Product
+from app.models.store import Store
+from app.models.user import User, UserRole
+
+PASSWORD = "TestPass123"
+
+
+@pytest.fixture
+def db_session():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    session = sessionmaker(bind=engine)()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def client(db_session, monkeypatch):
+    # Neutralise the rate limiter so tests are deterministic without Redis.
+    # Both rate_limit() and strict_rate_limit() funnel through _enforce().
+    async def no_limit(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.security.rate_limiter._enforce", no_limit)
+
+    # The dev-convenience create_all() in the lifespan is bound to the real
+    # Postgres engine, not to the SQLite session injected below. Tests must not
+    # depend on a running database server.
+    monkeypatch.setattr(Base.metadata, "create_all", lambda *a, **k: None)
+
+    app.dependency_overrides[get_db] = lambda: db_session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+
+def register(client, email="user@example.com"):
+    response = client.post(
+        "/auth/register", json={"email": email, "password": PASSWORD}
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def auth_header(tokens):
+    return {"Authorization": f"Bearer {tokens['access_token']}"}
+
+
+@pytest.fixture
+def product(db_session):
+    """A minimal product with one store price attached."""
+    store = Store(name="DNA Jordan", website="dna.jo")
+    item = Product(canonical_name="iPhone 11 Pro 128GB Black", brand="apple")
+    db_session.add_all([store, item])
+    db_session.commit()
+
+    alias = ProductAlias(
+        product_id=item.id,
+        store_id=store.id,
+        store_product_name="Apple iPhone 11 Pro 128GB Black",
+        store_product_id="DNA-1",
+        match_confidence=1.0,
+    )
+    db_session.add(alias)
+    db_session.commit()
+    db_session.add(Price(alias_id=alias.id, price=899.0, delivery_cost=0.0))
+    db_session.commit()
+    return item
+
+
+# --- Bug: /auth/refresh expected a query parameter -------------------------
+
+
+class TestRefreshTokenBody:
+    def test_refresh_accepts_json_body(self, client):
+        tokens = register(client)
+        response = client.post(
+            "/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["access_token"]
+
+    def test_refresh_without_body_is_rejected(self, client):
+        assert client.post("/auth/refresh").status_code == 422
+
+    def test_access_token_is_not_accepted_as_refresh_token(self, client):
+        """Token type confusion: an access token must not refresh a session."""
+        tokens = register(client)
+        response = client.post(
+            "/auth/refresh", json={"refresh_token": tokens["access_token"]}
+        )
+        assert response.status_code == 401
+
+
+# --- Bug: wishlist and alerts crashed with AttributeError ------------------
+
+
+class TestWishlistAndAlerts:
+    def test_wishlist_add_then_list(self, client, product):
+        headers = auth_header(register(client))
+
+        assert client.post(f"/prices/wishlist/{product.id}", headers=headers).status_code == 201
+
+        response = client.get("/prices/wishlist", headers=headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert len(body) == 1
+        assert body[0]["product_id"] == product.id
+
+    def test_alerts_create_then_list(self, client, product):
+        headers = auth_header(register(client))
+
+        created = client.post(
+            "/prices/alerts",
+            json={"product_id": product.id, "target_price": 800.0},
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+        response = client.get("/prices/alerts", headers=headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert len(body) == 1
+        assert body[0]["target_price"] == 800.0
+        assert body[0]["product_name"] == product.canonical_name
+
+    def test_wishlist_is_scoped_to_the_owner(self, client, product):
+        owner = auth_header(register(client, "owner@example.com"))
+        other = auth_header(register(client, "other@example.com"))
+
+        client.post(f"/prices/wishlist/{product.id}", headers=owner)
+
+        assert client.get("/prices/wishlist", headers=other).json() == []
+
+
+# --- Bug: clients could raise their own rate limit -------------------------
+
+
+class TestRateLimitCannotBeSelfServed:
+    @pytest.mark.parametrize("path", ["/products/{id}", "/products/{id}/history"])
+    def test_limit_and_window_are_not_query_parameters(self, client, path):
+        spec = app.openapi()
+        template = path.replace("{id}", "{product_id}")
+        params = {
+            p["name"]
+            for method in spec["paths"][template].values()
+            for p in method.get("parameters", [])
+        }
+        assert "limit" not in params
+        assert "window" not in params
+
+    def test_supplying_them_does_not_change_behaviour(self, client, product):
+        clean = client.get(f"/products/{product.id}")
+        spoofed = client.get(f"/products/{product.id}?limit=999999&window=1")
+        assert clean.status_code == spoofed.status_code == 200
+        assert clean.json() == spoofed.json()
+
+
+# --- Bug: optional auth raised instead of returning None -------------------
+
+
+class TestOptionalAuth:
+    def test_returns_none_without_a_header(self, db_session):
+        from app.dependencies import get_current_user_optional
+
+        result = asyncio.run(get_current_user_optional(credentials=None, db=db_session))
+        assert result is None
+
+    def test_returns_the_user_with_a_valid_token(self, client, db_session):
+        from fastapi.security import HTTPAuthorizationCredentials
+
+        from app.dependencies import get_current_user_optional
+
+        tokens = register(client)
+        credentials = HTTPAuthorizationCredentials(
+            scheme="Bearer", credentials=tokens["access_token"]
+        )
+        result = asyncio.run(
+            get_current_user_optional(credentials=credentials, db=db_session)
+        )
+        assert result is not None
+        assert result.email == "user@example.com"
+
+
+# --- Access control --------------------------------------------------------
+
+
+class TestAccessControl:
+    def test_admin_endpoint_rejects_a_normal_user(self, client):
+        headers = auth_header(register(client))
+        assert client.get("/admin/users", headers=headers).status_code == 403
+
+    def test_admin_endpoint_rejects_anonymous(self, client):
+        assert client.get("/admin/users").status_code == 403
+
+    def test_admin_endpoint_allows_an_admin(self, client, db_session):
+        headers = auth_header(register(client, "admin@example.com"))
+        user = db_session.query(User).filter_by(email="admin@example.com").first()
+        user.role = UserRole.admin
+        db_session.commit()
+
+        assert client.get("/admin/users", headers=headers).status_code == 200
+
+    def test_wishlist_requires_authentication(self, client):
+        assert client.get("/prices/wishlist").status_code == 403
+
+
+# --- Auth hygiene ----------------------------------------------------------
+
+
+class TestAuthHygiene:
+    @pytest.mark.parametrize(
+        "password", ["short1A", "nouppercase123", "NOLOWERCASE123", "NoDigitsHere"]
+    )
+    def test_weak_passwords_are_rejected(self, client, password):
+        response = client.post(
+            "/auth/register", json={"email": "weak@example.com", "password": password}
+        )
+        assert response.status_code == 422
+
+    def test_duplicate_registration_is_conflict(self, client):
+        register(client)
+        response = client.post(
+            "/auth/register", json={"email": "user@example.com", "password": PASSWORD}
+        )
+        assert response.status_code == 409
+
+    def test_login_failure_does_not_reveal_whether_the_email_exists(self, client):
+        register(client)
+        known = client.post(
+            "/auth/login", json={"email": "user@example.com", "password": "WrongPass123"}
+        )
+        unknown = client.post(
+            "/auth/login", json={"email": "ghost@example.com", "password": "WrongPass123"}
+        )
+        assert known.status_code == unknown.status_code == 401
+        assert known.json() == unknown.json()
+
+    def test_password_is_never_returned(self, client):
+        headers = auth_header(register(client))
+        body = client.get("/auth/me", headers=headers).json()
+        assert "password" not in body
+        assert "password_hash" not in body

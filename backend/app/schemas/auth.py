@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 import re
 
 
@@ -38,5 +38,12 @@ class UserResponse(BaseModel):
     email: str
     role: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+class RefreshRequest(BaseModel):
+    """Refresh tokens travel in the JSON body, never the query string.
+
+    SECURITY: query strings land in access logs, browser history and Referer
+    headers. A 7-day credential must not be written to any of those.
+    """
+    refresh_token: str

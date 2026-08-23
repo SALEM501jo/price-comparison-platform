@@ -218,6 +218,27 @@ class DeduplicationEngine:
         # === NO MATCH ===
         return None, 0.0, "none"
     
+    def _find_existing_alias(
+        self,
+        store_id: int,
+        store_product_name: str,
+        store_product_id: Optional[str] = None,
+    ) -> Optional[ProductAlias]:
+        """
+        Look up the alias this exact store listing already maps to.
+
+        Scoped by store_id: two stores can legitimately reuse the same SKU
+        string, so matching on store_product_id alone would cross-link them.
+        """
+        q = self.db.query(ProductAlias).filter(ProductAlias.store_id == store_id)
+        if store_product_id:
+            hit = q.filter(ProductAlias.store_product_id == store_product_id).first()
+            if hit:
+                return hit
+        return q.filter(
+            ProductAlias.store_product_name == store_product_name
+        ).first()
+
     def create_alias(
         self,
         product_id: int,
@@ -263,6 +284,19 @@ class DeduplicationEngine:
         
         Returns: (product, alias, is_new_product)
         """
+        # IDEMPOTENCY GUARD -- must run before anything else.
+        # The scraper re-processes every listing on every run. Without this
+        # check, a listing we have already seen still fell through to
+        # create_alias() below and inserted a DUPLICATE alias, which in turn
+        # made the scraper insert a duplicate Price row. Four scrape runs =
+        # four aliases and four prices for one product at one store, so
+        # store_count inflated and PriceHistory never recorded a change.
+        existing_alias = self._find_existing_alias(
+            store_id, store_product_name, store_product_id
+        )
+        if existing_alias:
+            return existing_alias.product, existing_alias, False
+
         # Try to find existing match
         existing_product, confidence, method = self.find_match(
             store_product_name,
