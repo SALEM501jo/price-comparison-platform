@@ -5,8 +5,8 @@ export default function Navbar() {
   const { user, isAuthenticated, logout, loading } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     // navigate() keeps this a single-page transition. window.location.href
     // reloads the whole app and throws away every bit of client state.
     navigate('/');

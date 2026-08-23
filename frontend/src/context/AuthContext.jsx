@@ -29,9 +29,13 @@ export function AuthProvider({ children }) {
         if (!cancelled) setUser(data);
       })
       .catch(() => {
-        // Expired or revoked. Clear it so the app shows a logged-out state
-        // rather than retrying a token that will never work.
-        if (!cancelled) logoutApi();
+        // Expired or revoked. Drop the tokens so the app shows a logged-out
+        // state rather than retrying credentials that will never work. Local
+        // only -- calling the API here would just 401 again.
+        if (!cancelled) {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -54,8 +58,10 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  const logout = useCallback(() => {
-    logoutApi();
+  const logout = useCallback(async () => {
+    // logoutApi revokes the refresh token server-side and always clears local
+    // storage, so this cannot leave the UI signed in with dead credentials.
+    await logoutApi();
     setUser(null);
   }, []);
 

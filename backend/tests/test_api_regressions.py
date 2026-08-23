@@ -217,7 +217,10 @@ class TestAccessControl:
         assert client.get("/admin/users", headers=headers).status_code == 403
 
     def test_admin_endpoint_rejects_anonymous(self, client):
-        assert client.get("/admin/users").status_code == 403
+        # 401, not 403: the caller has not authenticated at all. Starlette
+        # returned 403 here until it corrected the semantics -- 403 means
+        # "authenticated but not allowed", which is a different situation.
+        assert client.get("/admin/users").status_code == 401
 
     def test_admin_endpoint_allows_an_admin(self, client, db_session):
         headers = auth_header(register(client, "admin@example.com"))
@@ -228,7 +231,7 @@ class TestAccessControl:
         assert client.get("/admin/users", headers=headers).status_code == 200
 
     def test_wishlist_requires_authentication(self, client):
-        assert client.get("/prices/wishlist").status_code == 403
+        assert client.get("/prices/wishlist").status_code == 401
 
 
 # --- Auth hygiene ----------------------------------------------------------

@@ -4,10 +4,41 @@ SECURITY PRINCIPLE: You can't investigate what you can't see.
 Every auth attempt, every admin action, every price change must be auditable.
 """
 
-import logging
+import hashlib
+import hmac
 import json
+import logging
 import sys
 from datetime import datetime, timezone
+
+
+def pseudonymize(value: str | None) -> str | None:
+    """
+    Turn an identifier into a stable, non-reversible tag for logging.
+
+    WHY: failed-login records used to write the submitted email address into
+    the log verbatim. Those logs are shipped, retained and widely readable, so
+    every mistyped password quietly deposited someone's address in them --
+    including addresses belonging to people who never signed up.
+
+    Keyed HMAC rather than a plain hash: an unkeyed digest of an email is
+    trivially reversed by hashing a wordlist. The same address always yields
+    the same tag, so brute-force attempts against one account are still
+    correlatable, which is the reason the field exists at all.
+    """
+    if not value:
+        return None
+
+    # Imported here: app.config imports nothing from this module, but keeping
+    # the dependency local avoids an import cycle if that ever changes.
+    from app.config import get_settings
+
+    digest = hmac.new(
+        get_settings().jwt_secret_key.encode(),
+        value.strip().lower().encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"anon:{digest[:16]}"
 
 
 class JSONFormatter(logging.Formatter):

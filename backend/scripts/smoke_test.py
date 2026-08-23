@@ -193,10 +193,11 @@ def main() -> int:
     section("Access control")
     check("admin endpoint denies a normal user",
           client.get("/admin/users", headers=auth).status_code == 403)
+    # 401 = not authenticated (correct), 403 = authenticated but forbidden.
     check("admin endpoint denies anonymous",
-          client.get("/admin/users").status_code == 403)
+          client.get("/admin/users").status_code == 401)
     check("wishlist requires auth",
-          client.get("/prices/wishlist").status_code == 403)
+          client.get("/prices/wishlist").status_code == 401)
 
     # --- The rate limit fix ------------------------------------------------
     section("Rate limiting (real Redis)")
