@@ -5,14 +5,21 @@ Loaded once from the environment / .env and cached for the process lifetime.
 
 import json
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Resolved from this file, not the working directory. A bare ".env" is looked
+# up relative to CWD, so the app booted from backend/ but failed to find its
+# settings from the repo root -- which made `pytest backend/tests/` blow up on
+# a missing database_url while `cd backend && pytest tests/` passed.
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILE,
         case_sensitive=False,
         extra="ignore",
     )
