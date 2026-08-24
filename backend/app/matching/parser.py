@@ -42,13 +42,27 @@ def detect_category(text: str) -> str | None:
     match against a real handset.
     """
     normalized = normalize(text)
+
+    def count(words) -> int:
+        return sum(
+            1 for w in words if re.search(rf"\b{re.escape(w)}\b", normalized)
+        )
+
+    # Strong evidence first: product lines and category words.
     best, best_hits = None, 0
     for name, rules in CATEGORY_RULES.items():
-        hits = sum(
-            1
-            for word in rules.detectors
-            if re.search(rf"\b{re.escape(word)}\b", normalized)
-        )
+        hits = count(rules.detectors)
+        if hits > best_hits:
+            best, best_hits = name, hits
+    if best is not None:
+        return best
+
+    # Only if nothing named the kind of thing do brands get a say. Counting
+    # them alongside product lines let "Samsung laptop 16GB" tie -- "samsung"
+    # for phones against "laptop" for laptops -- and the phone rules won on
+    # declaration order.
+    for name, rules in CATEGORY_RULES.items():
+        hits = count(rules.brand_detectors)
         if hits > best_hits:
             best, best_hits = name, hits
     return best
@@ -73,7 +87,11 @@ class ParsedProduct:
 
 
 def parse(
-    text: str, category: str | None = None, hint: str | None = None
+    text: str,
+    category: str | None = None,
+    hint: str | None = None,
+    require_evidence: bool = True,
+    apply_defaults: bool = True,
 ) -> ParsedProduct:
     """
     Parse a product name using its category's rules.
@@ -87,6 +105,18 @@ def parse(
     unmistakably a laptop to a person and contains no word this parser
     recognises; the store files it under product_type "Notebook". Without the
     hint every such listing is uncategorised and unmatchable.
+
+    `require_evidence` enforces CategoryRules.requires_any, which keeps
+    accessories out of the catalogue. It applies to LISTINGS, not to QUERIES: a
+    shopper typing "MacBook" has given no storage or processor and still means
+    every MacBook, so search parses with it off.
+
+    `apply_defaults` is the same distinction for Attribute.default. A LISTING
+    called "iPhone 11" really is the base variant, distinct from the 11 Pro. A
+    QUERY of "iPhone 11" means the shopper did not say which -- reading it as
+    an assertion of "base" made "Honor X7e" score 67% against the seven
+    "Honor X7e Plus" handsets in the catalogue and return nothing at all, for
+    want of one word.
     """
     normalized = normalize(text)
     category = category or detect_category(text)
@@ -103,11 +133,29 @@ def parse(
         )
 
     attributes: dict[str, str | None] = {}
+    extracted: set[str] = set()
     for attribute in rules.attributes:
         value = attribute.extractor.extract(normalized)
+        if value is not None:
+            extracted.add(attribute.name)
         # `default` encodes "absence means something": a phone with no "Pro"
-        # or "Max" in its name is the base variant, not an unknown one.
-        attributes[attribute.name] = value if value is not None else attribute.default
+        # or "Max" in its name is the base variant, not an unknown one. That
+        # holds for a listing; for a query, absence means unsaid.
+        if value is None and apply_defaults:
+            value = attribute.default
+        attributes[attribute.name] = value
+
+    # A detector word alone is weak evidence. Accessories name the thing they
+    # accessorise -- "ThinkPad Laptop Backpack", "Laptop Bag" -- and were being
+    # filed as laptops, then returned as EXACT matches for a search of
+    # "Laptop". Requiring one real attribute separates a product from a
+    # product's bag. Defaults do not count: they were assumed, not found.
+    if require_evidence and rules.requires_any and not (
+        extracted & set(rules.requires_any)
+    ):
+        return ParsedProduct(
+            raw=text, normalized=normalized, category=None, attributes={}
+        )
 
     return ParsedProduct(
         raw=text,

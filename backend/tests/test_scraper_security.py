@@ -256,10 +256,31 @@ class TestRealWorldNames:
         assert parsed.get("ram") is None
 
     def test_category_comes_from_the_store_when_the_title_lacks_it(self):
-        """No word in this title identifies a laptop; product_type does."""
-        title = "HP Omni Book 5 Flip Core 7-150U, 16GB DDR5 & 1TB SSD, 14Inch"
+        """
+        Nothing in this title identifies a laptop -- no category word and no
+        brand -- but the store files it under product_type "Notebook".
+
+        The original example here was "HP Omni Book 5 Flip ...", which the
+        parser now classifies unaided: "book" became a detector and "hp" a weak
+        brand detector. The mechanism still matters for titles carrying
+        neither, so the test uses one.
+        """
+        title = "Core i5-1334U, 8GB DDR4 & 512GB SSD, 15.6Inch Fhd, Touch"
         assert parse(title).category is None
-        assert parse(title, hint="GAMING NOTEBOOK").category == "laptops"
+        assert parse(title, hint="Notebook").category == "laptops"
+
+    def test_a_brand_alone_is_enough_when_nothing_else_names_the_category(self):
+        """Weak evidence, but better than leaving a real product unmatchable."""
+        assert parse("Hp Intel I7 -8550U, 16GB DDR4 & 512GB SSD").category == "laptops"
+        assert parse("Samsung A57 5G, 8GB & 256GB").category == "phones"
+
+    def test_a_category_word_outranks_a_brand(self):
+        """
+        "samsung" (phones) and "laptop" (laptops) both appear. Counting them
+        together tied, and the phone rules won on declaration order.
+        """
+        assert parse("Samsung laptop 16GB & 512GB SSD").category == "laptops"
+        assert parse("Samsung Galaxy Book laptop, 16GB & 512GB").category == "laptops"
 
     def test_terabyte_storage_normalises(self):
         parsed = parse("Lenovo LEG PRO5 Core I9, 32GB DDR5 & 1TB SSD", hint="Notebook")

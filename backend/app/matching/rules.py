@@ -23,6 +23,7 @@ BRANDS = Keyword(
     values=(
         "apple", "samsung", "sony", "lg", "huawei", "xiaomi", "nokia",
         "oppo", "realme", "google", "dell", "hp", "lenovo", "asus", "acer", "msi",
+        "honor", "vivo", "infinix", "tecno",
     ),
     # Product lines imply their brand, so "iPhone 15" resolves to apple even
     # when the listing never says "Apple".
@@ -110,8 +111,29 @@ class Attribute:
 @dataclass(frozen=True)
 class CategoryRules:
     name: str
-    detectors: tuple[str, ...]   # words that identify this category
+    # Strong evidence: product lines and category words. "macbook", "laptop",
+    # "iphone" name the kind of thing directly.
+    detectors: tuple[str, ...]
     attributes: tuple[Attribute, ...]
+
+    # Weak evidence: manufacturer names. A brand is consulted only when no
+    # category matched on a strong detector, because most of these firms make
+    # several kinds of product -- "Samsung laptop 16GB" counted "samsung" for
+    # phones and "laptop" for laptops, tied, and the phone rules won.
+    brand_detectors: tuple[str, ...] = ()
+
+    # At least one of these must be extracted for the category to apply.
+    #
+    # WHY: a detector word is weak evidence. "Lenovo ThinkPad Laptop Backpack",
+    # "Agtc Brinch Laptop Bag" and an "Apple Magic Mouse" all landed in
+    # `laptops` and came back as EXACT matches for a search of "Laptop" --
+    # accessories presented as the thing they accessorise. A real laptop
+    # listing always states storage or a processor; a bag states neither.
+    #
+    # A requirement rather than a list of banned words: "bag, backpack, case,
+    # sleeve, mouse, ..." would need extending forever, exactly like the CPU
+    # enumeration that went stale on the M5.
+    requires_any: tuple[str, ...] = ()
 
     def scoreable(self) -> tuple[Attribute, ...]:
         return tuple(a for a in self.attributes if not a.gate and a.weight > 0)
@@ -122,8 +144,13 @@ class CategoryRules:
 PHONES = CategoryRules(
     name="phones",
     detectors=(
+        # Product lines
         "iphone", "galaxy", "redmi", "poco", "pixel", "smartphone",
-        "phone", "nova", "mate", "oppo", "realme", "nokia",
+        "phone", "nova", "mate",
+    ),
+    brand_detectors=(
+        "oppo", "realme", "nokia", "honor", "xiaomi", "samsung",
+        "vivo", "infinix", "tecno", "huawei",
     ),
     attributes=(
         # Brand is a gate, not a score: an Apple result must never be offered
@@ -134,7 +161,15 @@ PHONES = CategoryRules(
             Regex(patterns=(
                 r"\b(?P<line>iphone)\s*(?P<num>\d{1,2})",
                 r"\b(?P<line>galaxy)\s+(?P<series>note|[sazm])?\s*(?P<num>\d{1,3})",
-                r"\b(?P<line>redmi|poco|pixel|nova|mate)\s*(?P<num>\d{1,2})",
+                # Sub-brands, alphanumeric rather than digits only: real
+                # listings read "Redmi A7 Pro" as often as "Redmi 17".
+                r"\b(?P<line>redmi|poco|pixel|nova|mate)\s*(?P<num>[a-z]?\d{1,3}[a-z]?)\b",
+                # Bare model codes after a brand: "Samsung A57", "Xiaomi 15T",
+                # "Honor X7e". Without this a large part of the real catalogue
+                # has no model at all -- 90 genuine handsets went uncategorised
+                # the moment a model became a requirement.
+                r"\b(?P<line>honor|samsung|xiaomi|realme|oppo|vivo|infinix|tecno)\s+"
+                r"(?P<num>[a-z]{0,2}\d{1,4}[a-z]?)\b",
             )),
         ),
         Attribute(
@@ -146,6 +181,10 @@ PHONES = CategoryRules(
         Attribute("ram", "memory", 5, RAM),
         Attribute("color", "colour", 10, COLORS),
     ),
+    # Either identifies a real handset. Model alone was too strict: the model
+    # patterns cannot name every phone on the market, and a listing they miss
+    # is still a phone if it states storage.
+    requires_any=("model", "storage"),
 )
 
 LAPTOPS = CategoryRules(
@@ -153,7 +192,11 @@ LAPTOPS = CategoryRules(
     detectors=(
         "macbook", "laptop", "notebook", "thinkpad", "ideapad", "inspiron",
         "xps", "pavilion", "elitebook", "zenbook", "vivobook", "omen", "rog",
+        # "Omni Book", "Galaxy Book". Word-bounded, so it does not fire inside
+        # "macbook".
+        "book",
     ),
+    brand_detectors=("dell", "hp", "lenovo", "asus", "acer", "msi"),
     attributes=(
         Attribute("brand", "brand", 0, BRANDS, gate=True),
         Attribute(
@@ -166,13 +209,29 @@ LAPTOPS = CategoryRules(
         Attribute(
             "variant", "variant", 15,
             Keyword(values=("air", "pro", "plus", "max")),
-            default="base",
+            # NO default here, unlike phones. "iPhone 11" really is the base
+            # variant, distinct from the 11 Pro. There is no such thing as a
+            # base MacBook -- every one is an Air or a Pro -- so defaulting a
+            # bare "MacBook" query to variant=base mismatched every model in
+            # the catalogue and returned nothing at all.
         ),
         Attribute(
             "cpu", "processor", 20,
-            Keyword(values=(
-                "m1", "m2", "m3", "m4", "i3", "i5", "i7", "i9",
-                "ryzen 3", "ryzen 5", "ryzen 7", "ryzen 9",
+            # Patterns, not a fixed list. Enumerating "m1, m2, m3, m4" went
+            # stale the moment Apple shipped the M5 -- a MacBook Pro M5 was
+            # already in the catalogue with cpu=None, so it could not be told
+            # apart from any other MacBook Pro. Model numbers elsewhere in
+            # these rules are matched the same way, which is why "iPhone 17"
+            # and "Galaxy S25" work without anyone updating a list.
+            Regex(patterns=(
+                # Apple silicon: m1 .. m99. Word-bounded so "M.2 SSD" (which
+                # normalises to "m 2") and RAM figures are not mistaken for it.
+                r"\b(?P<cpu>m\d{1,2})\b",
+                # Apple A-series, as used in "A18 Pro chip".
+                r"\b(?P<cpu>a\d{2})\b",
+                # Intel Core i-series. Stable naming, but a pattern anyway.
+                r"\b(?P<cpu>i[3579])\b",
+                r"\b(?P<line>ryzen)\s*(?P<num>\d)\b",
             )),
         ),
         Attribute("storage", "storage", 20, STORAGE),
@@ -182,6 +241,7 @@ LAPTOPS = CategoryRules(
         # the least identity-defining attribute.
         Attribute("color", "colour", 5, COLORS),
     ),
+    requires_any=("storage", "cpu"),
 )
 
 CATEGORY_RULES: dict[str, CategoryRules] = {

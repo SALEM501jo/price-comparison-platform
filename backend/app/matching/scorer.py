@@ -112,21 +112,39 @@ def score_match(query: ParsedProduct, candidate: ParsedProduct) -> MatchResult:
             )
             return MatchResult(0.0, EXCLUDED, (gate_failure,))
 
-    achievable = 0
-    earned = 0
+    # Start from the category's FULL weight and deduct only what the user
+    # asked for and did not get.
+    #
+    # WHY NOT earned/specified: normalising by the attributes the query happens
+    # to mention makes the score depend on how much was typed. "iPhone 15
+    # 512GB Black" specifies 67 points' worth, so a storage mismatch costs
+    # 24/67 = 36% and drops to 64 -- excluded -- while the same mismatch on a
+    # fuller query costs 24/95 = 25% and lands at 75, comfortably "similar".
+    # The identical difference between the identical two products fell in
+    # different tiers depending on the wording of the search.
+    #
+    # Deducting from the total instead measures how much of the PRODUCT'S
+    # identity differs, which is a property of the two products alone.
+    # Attributes the user did not mention are not mismatches, so they cost
+    # nothing.
+    total_weight = sum(a.weight for a in rules.scoreable())
+    if total_weight == 0:
+        return MatchResult(0.0, EXCLUDED, ())
+
+    lost = 0
+    specified = 0
     comparisons: list[AttributeComparison] = []
 
     for attribute in rules.scoreable():
         wanted = query.get(attribute.name)
         if wanted is None:
-            continue  # user did not ask for it -> not part of the score
+            continue  # not asked for -> neither earned nor lost
 
+        specified += 1
         found = candidate.get(attribute.name)
         matched = wanted == found
-
-        achievable += attribute.weight
-        if matched:
-            earned += attribute.weight
+        if not matched:
+            lost += attribute.weight
 
         comparisons.append(
             AttributeComparison(
@@ -139,9 +157,9 @@ def score_match(query: ParsedProduct, candidate: ParsedProduct) -> MatchResult:
             )
         )
 
-    if achievable == 0:
+    if specified == 0:
         # Query carried no scoreable attributes (e.g. a bare brand name).
         return MatchResult(0.0, EXCLUDED, tuple(comparisons))
 
-    score = round(earned / achievable * 100, 1)
+    score = round((total_weight - lost) / total_weight * 100, 1)
     return MatchResult(score, tier_for(score), tuple(comparisons))

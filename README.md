@@ -90,12 +90,17 @@ Same query, same catalogue:
 ```
 100.0%  EXACT     Apple iPhone 11 Pro 128GB Black
 100.0%  EXACT     iPhone 11 Pro Black 128GB Smartphone 5G
- 89.5%  CLOSE     Apple iPhone 11 Pro 128GB Midnight Green   different colour
- 74.7%  SIMILAR   Apple iPhone 11 Pro 256GB Black            different storage
- 70.5%  SIMILAR   Apple iPhone 11 Pro Max 128GB Black        different variant
- 65.3%  excluded  Apple iPhone 12 Pro 128GB Black            different model
+ 90.0%  CLOSE     Apple iPhone 11 Pro 128GB Midnight Green   different colour
+ 76.0%  SIMILAR   Apple iPhone 11 Pro 256GB Black            different storage
+ 72.0%  SIMILAR   Apple iPhone 11 Pro Max 128GB Black        different variant
+ 67.0%  excluded  Apple iPhone 12 Pro 128GB Black            different model
   0.0%  excluded  Samsung Galaxy S24 128GB Black             different brand
 ```
+
+A score starts at 100 and loses the weight of each attribute the shopper asked
+for and did not get. It deliberately does **not** divide by "how much the query
+mentioned": normalising that way made the same difference between the same two
+products land in different tiers depending on how the search was worded.
 
 Every score is **explainable**. The UI can say *"90% — same model and storage,
 different colour"* rather than showing an opaque number.
@@ -247,11 +252,11 @@ On Windows, `start-dev.ps1` starts all of it in one go.
 ## Testing
 
 ```bash
-cd backend && pytest -q                    # 226 unit tests
+cd backend && pytest -q                    # 258 unit tests
 ```
 
 ```bash
-cd backend && python scripts/smoke_test.py # 52 checks against a running stack
+cd backend && python scripts/smoke_test.py # 55 checks against a running stack
 ```
 
 The unit suite uses SQLite and stubs the rate limiter for determinism. The smoke
@@ -496,7 +501,7 @@ backend/
     routers/         auth, products, prices, admin, mock stores
     models/          SQLAlchemy models
   alembic/versions/  5 migrations
-  tests/             226 tests
+  tests/             258 tests
   scripts/           smoke test + maintenance tooling
 frontend/src/
   components/search/ tiered results, match badges, query interpretation

@@ -1,7 +1,21 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const EXAMPLES = ['iPhone 15 128GB Black', 'Galaxy S24 256GB', 'MacBook Air M3'];
+// Example searches offered on the home page.
+//
+// These are the first thing a visitor clicks, so each MUST return results
+// against the seeded catalogue -- "MacBook Air M3" sat here returning nothing,
+// because the store stocks M2 and M4 and never had an M3. The smoke test
+// checks all three, so a catalogue change turns that into a failed check
+// rather than a dead first impression.
+//
+// The middle one deliberately returns an exact match AND similar ones, since
+// the tiering is the thing worth showing off.
+const EXAMPLES = [
+  'iPhone 15 128GB Black',
+  'MacBook Air M2 256GB',
+  'Galaxy S24 128GB',
+];
 
 export default function SearchBar({ initialQuery = '', showExamples = false }) {
   const [query, setQuery] = useState(initialQuery);

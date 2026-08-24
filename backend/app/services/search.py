@@ -198,7 +198,13 @@ def search_products(
     page = max(1, page)
     limit = max(1, limit)
 
-    parsed = parse(raw_query)
+    # require_evidence=False: the rule exists to keep accessories OUT of the
+    # catalogue at ingest. A query of "MacBook" names no storage or chip and
+    # still means every MacBook.
+    # Neither rule applies to a query: requires_any keeps accessories out of
+    # the CATALOGUE, and defaults describe what a LISTING implies. A shopper
+    # who omits a word has not asserted its absence.
+    parsed = parse(raw_query, require_evidence=False, apply_defaults=False)
 
     interpretation = SearchInterpretation(
         query=raw_query,

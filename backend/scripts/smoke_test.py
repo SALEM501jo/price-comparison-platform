@@ -183,6 +183,16 @@ def main() -> int:
                   any("storage" in d for d in demoted[0]["differences"]),
                   str(demoted[0]["differences"]))
 
+    # The home page's example searches. Kept in step with EXAMPLES in
+    # frontend/src/components/search/SearchBar.jsx -- one of them used to
+    # return nothing, which meant a visitor's first click landed on "No
+    # products matched".
+    for example in ("iPhone 15 128GB Black", "MacBook Air M2 256GB", "Galaxy S24 128GB"):
+        response = client.get("/products/search", params={"q": example})
+        found = response.status_code == 200 and response.json().get("total", 0) > 0
+        check(f"home page example returns results: {example!r}", found,
+              response.text[:120])
+
     # Junk input must not match anything.
     junk = client.get("/products/search", params={"q": "%%%%"})
     check("wildcard query returns nothing",
