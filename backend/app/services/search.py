@@ -82,12 +82,15 @@ def _candidates(db: Session, parsed, raw_query: str) -> list[Product]:
     )
 
 
-def _price_summary(db: Session, product_ids: Iterable[int]) -> dict[int, dict]:
+def price_summary(db: Session, product_ids: Iterable[int]) -> dict[int, dict]:
     """
     Aggregate prices for many products in ONE query.
 
     The previous implementation ran a three-table join per product inside the
     result loop -- 20 results meant 21 round trips.
+
+    Public because the wishlist needs the same figures: it used to return a
+    hardcoded "lowest_price": 0 rather than duplicate the aggregation.
     """
     ids = list(product_ids)
     if not ids:
@@ -179,7 +182,7 @@ def search_products(db: Session, raw_query: str) -> TieredSearchResponse:
         # work with, so surface the name matches rather than nothing at all.
         scored = [(c, _unscored()) for c in candidates]
 
-    price_map = _price_summary(db, (c.id for c, _ in scored))
+    price_map = price_summary(db, (c.id for c, _ in scored))
 
     buckets: dict[str, list[MatchedProduct]] = {EXACT: [], CLOSE: [], SIMILAR: []}
     for candidate, result in scored:

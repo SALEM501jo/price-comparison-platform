@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getProduct } from '../api/products';
+import { getPriceHistory, getProduct } from '../api/products';
+import PriceHistoryChart from '../components/prices/PriceHistoryChart';
+import ProductActions from '../components/prices/ProductActions';
 import StorePriceTable from '../components/prices/StorePriceTable';
 import Spinner from '../components/ui/Spinner';
 
 export default function ProductDetail() {
   const { productId } = useParams();
   const [product, setProduct] = useState(null);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -17,7 +20,14 @@ export default function ProductDetail() {
       setLoading(true);
       setError(null);
       try {
-        setProduct(await getProduct(productId, { signal: controller.signal }));
+        const [detail, priceHistory] = await Promise.all([
+          getProduct(productId, { signal: controller.signal }),
+          // History is supplementary: a failure here must not stop the
+          // page rendering the prices, which are the point of the screen.
+          getPriceHistory(productId, { signal: controller.signal }).catch(() => []),
+        ]);
+        setProduct(detail);
+        setHistory(priceHistory);
       } catch (err) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
         setError(
@@ -98,10 +108,26 @@ export default function ProductDetail() {
         )}
       </header>
 
+      <div className="mb-6">
+        <ProductActions
+          productId={product.id}
+          lowestTotal={
+            product.prices?.length
+              ? Math.min(...product.prices.filter((p) => p.availability).map((p) => p.total_cost))
+              : null
+          }
+        />
+      </div>
+
       <h2 className="mb-3 text-lg font-semibold text-gray-900">
         Price comparison
       </h2>
       <StorePriceTable prices={product.prices} />
+
+      <h2 className="mb-3 mt-8 text-lg font-semibold text-gray-900">
+        Price history
+      </h2>
+      <PriceHistoryChart series={history} />
     </div>
   );
 }

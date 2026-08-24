@@ -29,7 +29,7 @@ export const getProduct = async (productId, config = {}) => {
   return data;
 };
 
-export const getPriceHistory = async (productId) => {
-  const { data } = await api.get(`/products/${productId}/history`);
+export const getPriceHistory = async (productId, config = {}) => {
+  const { data } = await api.get(`/products/${productId}/history`, config);
   return data;
 };
