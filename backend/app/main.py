@@ -45,6 +45,10 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None if settings.is_production else "/docs",
     redoc_url=None,
+    # The spec too, not just the UI. Disabling /docs while still serving
+    # /openapi.json hides the rendering and publishes the thing it renders --
+    # every route, parameter and schema, which is a map of the attack surface.
+    openapi_url=None if settings.is_production else "/openapi.json",
     lifespan=lifespan,
 )
 
@@ -74,7 +78,11 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(products.router, prefix="/products", tags=["products"])
 app.include_router(prices.router, prefix="/prices", tags=["prices"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
-app.include_router(mock_stores.router, prefix="/mock", tags=["mock stores"])
+# Development only. These serve invented prices, and a deployed site
+# offering them next to real scraped data -- visible to anyone who opens
+# /docs -- reads as carelessness rather than as a fixture.
+if not settings.is_production:
+    app.include_router(mock_stores.router, prefix="/mock", tags=["mock stores"])
 
 
 @app.get("/health")

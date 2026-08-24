@@ -247,7 +247,7 @@ On Windows, `start-dev.ps1` starts all of it in one go.
 ## Testing
 
 ```bash
-cd backend && pytest -q                    # 217 unit tests
+cd backend && pytest -q                    # 226 unit tests
 ```
 
 ```bash
@@ -264,8 +264,11 @@ Checks that depend on Redis report **SKIP**, never PASS, when it is unreachable,
 so an unverified control is never mistaken for a working one.
 
 ```bash
-cd frontend && npm run lint && npm run build
+cd frontend && npm test && npm run lint && npm run build
 ```
+
+36 component tests: price formatting, the tier explanations, and the store
+table's ordering by TOTAL cost rather than sticker price.
 
 ### Maintenance scripts
 
@@ -408,10 +411,21 @@ the exact strings that broke them.
 
 ## Limitations
 
-**Only one store is scraped for real.** The other three (DNA, Carrefour Jordan,
-City Center) remain mock data in `app/services/scraper.py` — real retailer
-names, invented prices. Adding a real store means appending a `StoreConfig`;
-adding a non-Shopify one also means writing an adapter.
+**Only one store is scraped for real, and that limits the whole premise.**
+SmartBuy supplies 158 real listings; DNA, Carrefour Jordan and City Center are
+mock data — real retailer names, invented prices. A comparison site with one
+real source cannot really compare.
+
+This is not for want of trying. Around fifty Jordanian and regional domains
+were probed for a structured feed. `smartbuy.jo` turned out to be SmartBuy's
+own second domain (identical SKUs and prices, so adding it would be fake
+competition). `leaders.jo` returns 403 to an identified bot, and working around
+that by impersonating a browser would contradict the rest of the scraping
+design. DNA and `cozmo.jo` serve JS-rendered pages with no feed behind them.
+
+Reaching those needs a headless browser (Playwright), which is a real option
+but a substantial one: a browser in CI, much more memory, and far more
+flakiness than an HTTP call.
 
 **Each retailer's terms of service govern what is actually permitted.** Reading
 public catalogue endpoints politely is the courteous baseline, not a legal
@@ -423,9 +437,36 @@ opinion.
   work dies with a restart and does not spread across replicas. A real
   deployment wants a task queue. The scheduled path does not depend on it.
 - The matching rules cover phones and laptops only
-- `/admin/price-anomalies` is still N+1
+- `/admin/scrape` uses BackgroundTasks, so the work dies with a restart
 
 ---
+
+## Deployment
+
+```bash
+docker build -t pricecompare-api ./backend
+docker build -t pricecompare-web ./frontend --build-arg VITE_API_URL=https://your-api-domain
+```
+
+The API image is multi-stage — wheels are built where a compiler exists and
+installed into a runtime image that has none — and runs as a non-root user.
+`VITE_API_URL` is a **build** argument, not a runtime one: Vite inlines
+`VITE_*` variables into the bundle, so the API address is baked in at build
+time.
+
+Production differs from development in ways worth knowing:
+
+| Setting | Why |
+|---|---|
+| `ENVIRONMENT=production` | Disables `/docs` **and** `/openapi.json`, drops the `/mock/*` routes, forces `Secure` on the refresh cookie, and stops `create_all()` — the schema belongs to Alembic |
+| `TRUSTED_HOSTS` | Real hostnames. Left as `*`, Host-header injection is open |
+| `TRUSTED_PROXY_COUNT` | The actual number of proxies. `0` ignores `X-Forwarded-For`; a wrong value either collapses every user into one rate-limit bucket or lets callers forge their address |
+| `COOKIE_SAMESITE=none` | Only if the API and app are on different sites. Browsers require `Secure` alongside it |
+| `EMAIL_BACKEND=smtp` | The app refuses to start with `console` in production rather than pretending to send |
+
+Verified by running the image with `ENVIRONMENT=production`: `/docs`,
+`/openapi.json` and `/mock/stores` all return 404, HSTS and the strict CSP are
+present, and the `Server` header is absent.
 
 ## Project structure
 
@@ -455,7 +496,7 @@ backend/
     routers/         auth, products, prices, admin, mock stores
     models/          SQLAlchemy models
   alembic/versions/  5 migrations
-  tests/             217 tests
+  tests/             226 tests
   scripts/           smoke test + maintenance tooling
 frontend/src/
   components/search/ tiered results, match badges, query interpretation

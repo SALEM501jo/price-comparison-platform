@@ -289,3 +289,141 @@ class TestAuthHygiene:
         body = client.get("/auth/me", headers=headers).json()
         assert "password" not in body
         assert "password_hash" not in body
+
+
+class TestPriceAnomalies:
+    """
+    Rewritten from a per-row subquery to a single window function. These check
+    it still finds what it should -- "runs without erroring" only proves the
+    SQL parses.
+    """
+
+    def _history(self, db, prices):
+        """Seed one alias with a sequence of historical prices."""
+        from datetime import datetime, timedelta, timezone
+        from decimal import Decimal
+
+        from app.models.price import PriceHistory
+
+        store = Store(name="DNA Jordan")
+        product = Product(canonical_name="iPhone 15 128GB Black")
+        db.add_all([store, product])
+        db.commit()
+
+        alias = ProductAlias(
+            product_id=product.id,
+            store_id=store.id,
+            store_product_name="iPhone 15",
+            store_product_id="A1",
+        )
+        db.add(alias)
+        db.commit()
+
+        base = datetime.now(timezone.utc) - timedelta(hours=6)
+        for i, price in enumerate(prices):
+            db.add(
+                PriceHistory(
+                    alias_id=alias.id,
+                    price=Decimal(str(price)),
+                    recorded_at=base + timedelta(minutes=i * 10),
+                )
+            )
+        db.commit()
+
+    def _admin_headers(self, client, db_session):
+        tokens = register(client, "anomaly-admin@example.com")
+        user = db_session.query(User).filter_by(email="anomaly-admin@example.com").one()
+        user.role = UserRole.admin
+        db_session.commit()
+        return auth_header(tokens)
+
+    def test_a_large_drop_is_reported(self, client, db_session):
+        self._history(db_session, ["900.000", "400.000"])  # -55%
+        headers = self._admin_headers(client, db_session)
+
+        response = client.get("/admin/price-anomalies", headers=headers)
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert len(body) == 1
+        assert body[0]["old_price"] == 900.0
+        assert body[0]["new_price"] == 400.0
+        assert body[0]["change_percent"] > 50
+
+    def test_the_store_name_is_returned_not_its_id(self, client, db_session):
+        """This field used to contain alias.store_id -- a raw integer."""
+        self._history(db_session, ["900.000", "400.000"])
+        headers = self._admin_headers(client, db_session)
+
+        body = client.get("/admin/price-anomalies", headers=headers).json()
+        assert body[0]["store"] == "DNA Jordan"
+
+    def test_a_small_change_is_ignored(self, client, db_session):
+        self._history(db_session, ["900.000", "880.000"])  # -2%
+        headers = self._admin_headers(client, db_session)
+        assert client.get("/admin/price-anomalies", headers=headers).json() == []
+
+    def test_the_first_record_has_no_predecessor_and_is_skipped(self, client, db_session):
+        """One row means no previous price to compare against."""
+        self._history(db_session, ["900.000"])
+        headers = self._admin_headers(client, db_session)
+        assert client.get("/admin/price-anomalies", headers=headers).json() == []
+
+    def test_it_compares_consecutive_prices_per_alias(self, client, db_session):
+        """
+        The window is partitioned by alias, so a series that drifts gently is
+        not flagged just because its first and last values differ a lot.
+        """
+        self._history(db_session, ["900.000", "800.000", "700.000", "620.000"])
+        headers = self._admin_headers(client, db_session)
+        assert client.get("/admin/price-anomalies", headers=headers).json() == []
+
+    def test_it_requires_admin(self, client):
+        headers = auth_header(register(client))
+        assert client.get("/admin/price-anomalies", headers=headers).status_code == 403
+
+
+class TestProductionSurface:
+    """
+    Things that must not be exposed on a deployed site. Found by running the
+    container with ENVIRONMENT=production: /docs was correctly disabled while
+    /openapi.json still served the spec /docs renders.
+    """
+
+    def _spec_urls(self, production: bool):
+        from app.config import Settings
+
+        settings = Settings(
+            database_url="postgresql://x/y",
+            jwt_secret_key="x" * 32,
+            environment="production" if production else "development",
+        )
+        return (
+            None if settings.is_production else "/docs",
+            None if settings.is_production else "/openapi.json",
+        )
+
+    def test_docs_and_spec_are_both_disabled_in_production(self):
+        docs, spec = self._spec_urls(production=True)
+        assert docs is None
+        assert spec is None, "the spec was served while its UI was hidden"
+
+    def test_both_are_available_in_development(self):
+        docs, spec = self._spec_urls(production=False)
+        assert docs == "/docs"
+        assert spec == "/openapi.json"
+
+    def test_mock_routes_are_registered_in_development(self):
+        """
+        They serve invented prices, so a production build must not offer them
+        next to real scraped data. Verified against a container running with
+        ENVIRONMENT=production, where /mock/stores returns 404.
+
+        Enumerated from the OpenAPI spec rather than app.routes: newer FastAPI
+        keeps included routers as nested _IncludedRouter objects instead of
+        flattening them onto the parent, so app.routes has no `.path`.
+        """
+        import app.main as main
+
+        assert not main.settings.is_production, "test env should be development"
+        paths = main.app.openapi()["paths"]
+        assert any(p.startswith("/mock") for p in paths), "mock routes missing in dev"

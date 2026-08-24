@@ -6,7 +6,9 @@ Every admin endpoint must verify the user is an admin.
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import func, select
 from typing import List
 from app.database import get_db
 from app.dependencies import require_admin
@@ -173,50 +175,74 @@ def _run_scrape(store_codes: list[str]) -> None:
 @router.get("/price-anomalies")
 async def get_price_anomalies(
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin)
+    admin: User = Depends(require_admin),
 ):
     """
-    Find products with suspicious price changes (>50% change in 24h).
-    Admin only.
+    Products whose price moved more than 50% in 24h. Admin only.
+
+    Usually a scrape error -- a parsing change, or a store publishing a
+    placeholder -- rather than a real discount, which is why it is worth
+    surfacing.
+
+    Uses a window function so this is ONE query. The previous version ran a
+    subquery per history row to find the preceding price, which is O(n) round
+    trips against a table that grows with every scrape.
     """
-    # This is a simplified query — in production you'd use window functions
-    logger.info("Admin checking price anomalies", extra={
-        "admin_id": admin.id,
-        "action": "admin_price_anomalies"
-    })
-    
-    # Get recent price history
-    from datetime import datetime, timedelta, timezone
+    logger.info(
+        "Admin checking price anomalies",
+        extra={"admin_id": admin.id, "action": "admin_price_anomalies"},
+    )
+
     cutoff = datetime.now(timezone.utc) - timedelta(days=1)
-    
-    recent_changes = (
-        db.query(PriceHistory, ProductAlias, Product)
-        .join(ProductAlias, PriceHistory.alias_id == ProductAlias.id)
-        .join(Product, ProductAlias.product_id == Product.id)
-        .filter(PriceHistory.recorded_at > cutoff)
+
+    previous_price = func.lag(PriceHistory.price).over(
+        partition_by=PriceHistory.alias_id, order_by=PriceHistory.recorded_at
+    )
+
+    history = (
+        select(
+            PriceHistory.alias_id.label("alias_id"),
+            PriceHistory.price.label("price"),
+            PriceHistory.recorded_at.label("recorded_at"),
+            previous_price.label("previous_price"),
+        )
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            Product.canonical_name.label("product"),
+            Store.name.label("store"),
+            history.c.previous_price,
+            history.c.price,
+            history.c.recorded_at,
+        )
+        .select_from(history)
+        .join(ProductAlias, ProductAlias.id == history.c.alias_id)
+        .join(Product, Product.id == ProductAlias.product_id)
+        .join(Store, Store.id == ProductAlias.store_id)
+        .filter(history.c.recorded_at > cutoff)
+        .filter(history.c.previous_price.isnot(None))
+        .filter(history.c.previous_price > 0)
+        .order_by(history.c.recorded_at.desc())
         .all()
     )
-    
+
     anomalies = []
-    for history, alias, product in recent_changes:
-        # Get previous price (before this history entry)
-        previous = (
-            db.query(PriceHistory)
-            .filter(PriceHistory.alias_id == alias.id)
-            .filter(PriceHistory.recorded_at < history.recorded_at)
-            .order_by(PriceHistory.recorded_at.desc())
-            .first()
-        )
-        
-        if previous and previous.price > 0:
-            change_pct = abs(history.price - previous.price) / previous.price * 100
-            if change_pct > 50:
-                anomalies.append({
-                    "product": product.canonical_name,
-                    "store": alias.store_id,
-                    "old_price": previous.price,
-                    "new_price": history.price,
-                    "change_percent": round(change_pct, 2)
-                })
-    
+    for row in rows:
+        change = abs(row.price - row.previous_price) / row.previous_price * 100
+        if change > 50:
+            anomalies.append(
+                {
+                    "product": row.product,
+                    # The store's NAME. This used to return alias.store_id, a
+                    # raw integer under a field called "store".
+                    "store": row.store,
+                    "old_price": float(row.previous_price),
+                    "new_price": float(row.price),
+                    "change_percent": round(float(change), 2),
+                    "recorded_at": row.recorded_at,
+                }
+            )
+
     return anomalies

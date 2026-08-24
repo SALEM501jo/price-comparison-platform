@@ -92,6 +92,11 @@ jobs:
           PY
           python scripts/smoke_test.py
 
+      - name: Build the production image
+        # A Dockerfile that has never been built is a Dockerfile that does not
+        # work. This catches a broken build before a deploy does.
+        run: docker build -t pricecompare-api:ci .
+
       - name: Dependency audit
         # No `continue-on-error`: a known CVE in a dependency should fail the
         # build, not add a warning nobody reads.
@@ -114,4 +119,5 @@ jobs:
 
       - run: npm ci
       - run: npm run lint
+      - run: npm test
       - run: npm run build
