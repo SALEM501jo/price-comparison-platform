@@ -55,9 +55,31 @@ class SearchInterpretation(BaseModel):
     )
 
 
+class TierCounts(BaseModel):
+    """How many matched each tier BEFORE pagination.
+
+    Needed because the lists are paginated per tier: without these the UI
+    cannot tell "3 exact matches" from "3 shown of 40".
+    """
+
+    exact: int = 0
+    close: int = 0
+    similar: int = 0
+
+
 class TieredSearchResponse(BaseModel):
     interpretation: SearchInterpretation
     exact: List[MatchedProduct] = Field(default_factory=list)
     close: List[MatchedProduct] = Field(default_factory=list)
     similar: List[MatchedProduct] = Field(default_factory=list)
-    total: int = 0
+
+    total: int = Field(0, description="Products on this page, across all tiers")
+    counts: TierCounts = Field(
+        default_factory=TierCounts, description="Total matches per tier"
+    )
+    page: int = 1
+    limit: int = Field(20, description="Maximum products per tier, per page")
+    sort: str = "price_asc"
+    has_more: bool = Field(
+        False, description="True when any tier has further pages"
+    )

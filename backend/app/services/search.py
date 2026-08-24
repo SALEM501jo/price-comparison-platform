@@ -28,6 +28,7 @@ from app.models.store import Store
 from app.schemas.search import (
     MatchedProduct,
     SearchInterpretation,
+    TierCounts,
     TieredSearchResponse,
 )
 
@@ -48,7 +49,20 @@ def escape_like(term: str) -> str:
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _candidates(db: Session, parsed, raw_query: str) -> list[Product]:
+SORT_KEYS = {
+    # Products with nothing in stock have no price. Sorting them by a
+    # substituted 0 would put unbuyable items at the top of a cheapest-first
+    # list, so the None flag pushes them last under every ordering.
+    "price_asc": lambda p: (p.lowest_total_cost is None, p.lowest_total_cost or 0),
+    "price_desc": lambda p: (p.lowest_total_cost is None, -(p.lowest_total_cost or 0)),
+    "name": lambda p: (p.canonical_name or "").lower(),
+}
+DEFAULT_SORT = "price_asc"
+
+
+def _candidates(
+    db: Session, parsed, raw_query: str, category: str | None = None
+) -> list[Product]:
     """
     Narrow the catalogue before scoring.
 
@@ -57,6 +71,8 @@ def _candidates(db: Session, parsed, raw_query: str) -> list[Product]:
     for "playstation" should still return something.
     """
     query = db.query(Product)
+    if category:
+        query = query.filter(Product.category == category)
 
     if parsed.specified:
         filters = [Product.match_category == parsed.category]
@@ -69,9 +85,11 @@ def _candidates(db: Session, parsed, raw_query: str) -> list[Product]:
 
     # Fallback: plain name search.
     term = f"%{escape_like(raw_query)}%"
+    fallback = db.query(Product)
+    if category:
+        fallback = fallback.filter(Product.category == category)
     return (
-        db.query(Product)
-        .filter(
+        fallback.filter(
             or_(
                 Product.canonical_name.ilike(term, escape="\\"),
                 Product.brand.ilike(term, escape="\\"),
@@ -155,8 +173,27 @@ def _to_response(product: Product, result, prices: dict | None) -> MatchedProduc
     )
 
 
-def search_products(db: Session, raw_query: str) -> TieredSearchResponse:
-    """Run a tiered search and return results grouped by match quality."""
+def search_products(
+    db: Session,
+    raw_query: str,
+    *,
+    category: str | None = None,
+    sort: str = DEFAULT_SORT,
+    page: int = 1,
+    limit: int = 20,
+) -> TieredSearchResponse:
+    """
+    Run a tiered search and return results grouped by match quality.
+
+    Pagination applies PER TIER rather than across a flattened list. Paging a
+    combined list would let a long tail of "similar" results push the exact
+    match onto page two, which defeats the point of the tiers. `counts` carries
+    the pre-pagination totals so the UI can show "3 of 40".
+    """
+    sort = sort if sort in SORT_KEYS else DEFAULT_SORT
+    page = max(1, page)
+    limit = max(1, limit)
+
     parsed = parse(raw_query)
 
     interpretation = SearchInterpretation(
@@ -166,9 +203,13 @@ def search_products(db: Session, raw_query: str) -> TieredSearchResponse:
         structured=bool(parsed.specified),
     )
 
-    candidates = _candidates(db, parsed, raw_query)
+    empty = TieredSearchResponse(
+        interpretation=interpretation, total=0, page=page, limit=limit, sort=sort
+    )
+
+    candidates = _candidates(db, parsed, raw_query, category)
     if not candidates:
-        return TieredSearchResponse(interpretation=interpretation, total=0)
+        return empty
 
     scored = []
     for candidate in candidates:
@@ -189,18 +230,35 @@ def search_products(db: Session, raw_query: str) -> TieredSearchResponse:
         item = _to_response(candidate, result, price_map.get(candidate.id))
         buckets.setdefault(result.tier, []).append(item)
 
-    for items in buckets.values():
-        # Within a tier the cheapest total cost wins -- that is what the user
-        # came for. Products with no in-stock price sort last rather than
-        # first, which a naive `or 0` would invert.
-        items.sort(key=lambda i: (i.lowest_total_cost is None, i.lowest_total_cost))
+    counts = TierCounts(
+        exact=len(buckets[EXACT]),
+        close=len(buckets[CLOSE]),
+        similar=len(buckets[SIMILAR]),
+    )
+
+    key = SORT_KEYS[sort]
+    start = (page - 1) * limit
+    end = start + limit
+
+    paged = {}
+    has_more = False
+    for tier, items in buckets.items():
+        items.sort(key=key)
+        paged[tier] = items[start:end]
+        if len(items) > end:
+            has_more = True
 
     return TieredSearchResponse(
         interpretation=interpretation,
-        exact=buckets[EXACT],
-        close=buckets[CLOSE],
-        similar=buckets[SIMILAR],
-        total=sum(len(v) for v in buckets.values()),
+        exact=paged[EXACT],
+        close=paged[CLOSE],
+        similar=paged[SIMILAR],
+        total=sum(len(v) for v in paged.values()),
+        counts=counts,
+        page=page,
+        limit=limit,
+        sort=sort,
+        has_more=has_more,
     )
 
 

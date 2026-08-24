@@ -180,3 +180,86 @@ class TestLikeEscaping:
     def test_wildcard_query_does_not_match_everything(self, catalogue):
         """An unescaped '%' would ILIKE-match the entire table."""
         assert search_products(catalogue, "%%%%").total == 0
+
+
+class TestSortingAndPagination:
+    """
+    Regression guard. These parameters existed on the original endpoint and
+    were dropped when search was rewritten for tiered results, so the API
+    returned every match with no ordering control.
+
+    NOTE: "iPhone 11 Pro" places three products in the EXACT tier, not the
+    similar one -- every attribute the user specified matches on all three, and
+    the ones they left unspecified are not penalised. That is the intended
+    behaviour, so these assertions target `exact`.
+    """
+
+    VAGUE = "iPhone 11 Pro"
+
+    def test_price_ascending_is_the_default(self, catalogue):
+        result = search_products(catalogue, self.VAGUE)
+        prices = [p.lowest_total_cost for p in result.exact]
+        assert prices == sorted(prices)
+        assert result.sort == "price_asc"
+
+    def test_price_descending_reverses_within_a_tier(self, catalogue):
+        result = search_products(catalogue, self.VAGUE, sort="price_desc")
+        prices = [p.lowest_total_cost for p in result.exact]
+        assert prices == sorted(prices, reverse=True)
+
+    def test_sort_by_name(self, catalogue):
+        result = search_products(catalogue, self.VAGUE, sort="name")
+        names = [p.canonical_name.lower() for p in result.exact]
+        assert names == sorted(names)
+
+    def test_unknown_sort_falls_back_to_the_default(self, catalogue):
+        result = search_products(catalogue, self.VAGUE, sort="'; DROP TABLE--")
+        assert result.sort == "price_asc"
+
+    def test_out_of_stock_products_sort_last_under_price_asc(self, db):
+        add_product(db, "Apple iPhone 15 128GB Black", [("DNA", 899.0, True)])
+        add_product(db, "Apple iPhone 15 256GB Black", [("DNA", 100.0, False)])
+        result = search_products(db, "iPhone 15")
+        everything = result.exact + result.close + result.similar
+        assert everything[-1].lowest_total_cost is None, (
+            "an unbuyable product led a cheapest-first list"
+        )
+
+    def test_limit_caps_each_tier(self, catalogue):
+        result = search_products(catalogue, self.VAGUE, limit=1)
+        assert len(result.exact) == 1
+
+    def test_counts_report_totals_before_pagination(self, catalogue):
+        full = search_products(catalogue, self.VAGUE)
+        paged = search_products(catalogue, self.VAGUE, limit=1)
+        assert paged.counts.exact == full.counts.exact == 3
+        assert len(paged.exact) == 1, "counts must not shrink with the page"
+
+    def test_has_more_flags_further_pages(self, catalogue):
+        assert search_products(catalogue, self.VAGUE, limit=1).has_more is True
+        assert search_products(catalogue, self.VAGUE, limit=50).has_more is False
+
+    def test_second_page_returns_different_products(self, catalogue):
+        first = search_products(catalogue, self.VAGUE, limit=1, page=1)
+        second = search_products(catalogue, self.VAGUE, limit=1, page=2)
+        assert first.exact[0].id != second.exact[0].id
+
+    def test_paging_past_the_end_is_empty_not_an_error(self, catalogue):
+        result = search_products(catalogue, self.VAGUE, limit=10, page=99)
+        assert result.total == 0
+
+    def test_exact_match_is_never_pushed_off_page_one(self, catalogue):
+        """The reason pagination is per tier and not over a flattened list."""
+        result = search_products(catalogue, "iPhone 11 Pro Black 128GB", limit=1)
+        assert len(result.exact) == 1
+
+
+class TestCategoryFilter:
+    def test_category_narrows_the_search(self, db):
+        add_product(db, "Apple iPhone 15 128GB Black", [("DNA", 899.0, True)])
+        product = db.query(Product).one()
+        product.category = "Phones"
+        db.commit()
+
+        assert search_products(db, "iPhone 15", category="Phones").total == 1
+        assert search_products(db, "iPhone 15", category="Laptops").total == 0

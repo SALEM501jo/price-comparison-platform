@@ -41,6 +41,10 @@ async def get_cache():
 async def search(
     request: Request,
     q: str = Query(..., min_length=2, max_length=100),
+    category: Optional[str] = Query(None, max_length=50),
+    sort: str = Query("price_asc", pattern=r"^(price_asc|price_desc|name)$"),
+    page: int = Query(1, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
     _: None = Depends(get_rate_limited),
 ):
@@ -50,8 +54,14 @@ async def search(
     Returns three buckets -- exact, close (85-99%), similar (70-84%) -- each
     carrying the reason it landed there, e.g. "different colour (blue, not
     black)". See app/services/search.py for the two-stage design.
+
+    `limit` and `page` apply PER TIER: paging a flattened list would let a long
+    tail of similar products push the exact match onto page two.
     """
-    cache_key = f"search:v2:{hashlib.sha256(q.strip().lower().encode()).hexdigest()}"
+    # Every parameter that changes the response must be in the cache key, or
+    # page 2 gets served page 1's rows.
+    fingerprint = f"{q.strip().lower()}|{category or ''}|{sort}|{page}|{limit}"
+    cache_key = f"search:v3:{hashlib.sha256(fingerprint.encode()).hexdigest()}"
     cache = await get_cache()
 
     try:
@@ -61,7 +71,9 @@ async def search(
     except Exception:
         pass  # cache is an optimisation, never a dependency
 
-    response = search_products(db, q)
+    response = search_products(
+        db, q, category=category, sort=sort, page=page, limit=limit
+    )
 
     try:
         await cache.setex(cache_key, 300, response.model_dump_json())

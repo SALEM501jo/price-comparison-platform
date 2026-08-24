@@ -16,9 +16,16 @@ import api from './axios';
  * plain-English reasons it is not an exact match, e.g.
  * "different colour (blue, not black)".
  */
-export const searchProducts = async (query, config = {}) => {
+export const searchProducts = async (query, options = {}, config = {}) => {
+  const { sort, page, limit, category } = options;
   const { data } = await api.get('/products/search', {
-    params: { q: query },
+    params: {
+      q: query,
+      ...(sort ? { sort } : {}),
+      ...(page ? { page } : {}),
+      ...(limit ? { limit } : {}),
+      ...(category ? { category } : {}),
+    },
     ...config, // carries an AbortSignal so stale requests can be cancelled
   });
   return data;
