@@ -11,6 +11,7 @@ any scraper.
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -61,23 +62,29 @@ class IngestService:
         existing = self.db.query(Price).filter(Price.alias_id == alias.id).first()
         changed = False
 
+        # Convert through str, not float: Decimal(0.1) captures the binary
+        # approximation, Decimal("0.1") is exact. The feed gives us decimal
+        # strings, so this round-trips the value the store actually quoted.
+        price = Decimal(str(item.price))
+        delivery = Decimal(str(item.delivery_cost))
+
         if existing:
-            if existing.price != item.price:
+            if existing.price != price:
                 # Record the OLD price before overwriting it -- that is what
                 # makes the history a series rather than a single point.
                 self.db.add(PriceHistory(alias_id=alias.id, price=existing.price))
                 changed = True
-            existing.price = item.price
+            existing.price = price
             existing.availability = item.availability
-            existing.delivery_cost = item.delivery_cost
+            existing.delivery_cost = delivery
         else:
             self.db.add(
                 Price(
                     alias_id=alias.id,
-                    price=item.price,
+                    price=price,
                     currency=item.currency,
                     availability=item.availability,
-                    delivery_cost=item.delivery_cost,
+                    delivery_cost=delivery,
                 )
             )
 

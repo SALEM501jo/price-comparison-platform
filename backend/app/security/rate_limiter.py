@@ -31,13 +31,44 @@ async def get_redis():
 
 def client_ip(request: Request) -> str:
     """
-    Best-effort client IP.
-    NOTE: behind a reverse proxy every request appears to come from the proxy,
-    which collapses all users into one bucket. Trusting X-Forwarded-For is only
-    safe once the proxy is known to overwrite it, so that is deliberately not
-    done here yet.
+    The address to rate-limit on.
+
+    Without a proxy this is the socket peer. Behind one, every request appears
+    to come from the proxy and all users collapse into a single bucket -- one
+    busy user then rate-limits everybody.
+
+    X-Forwarded-For fixes that, but it is client-supplied and each proxy
+    APPENDS to it, so the list is:
+
+        <forged by client>, <added by proxy 1>, ..., <added by proxy N>
+
+    Everything left of the last N entries is attacker-controlled. Reading the
+    leftmost value -- the common mistake -- lets a caller send
+    "X-Forwarded-For: 1.2.3.4" and land in a fresh bucket on every request,
+    which removes the rate limit rather than fixing it. Counting N from the
+    RIGHT skips exactly the hops we control and lands on the address our
+    outermost proxy observed.
+
+    With trusted_proxy_count = 0 the header is ignored completely.
     """
-    return request.client.host if request.client else "unknown"
+    peer = request.client.host if request.client else "unknown"
+
+    hops = settings.trusted_proxy_count
+    if hops <= 0:
+        return peer
+
+    forwarded = request.headers.get("x-forwarded-for")
+    if not forwarded:
+        return peer
+
+    chain = [part.strip() for part in forwarded.split(",") if part.strip()]
+    if len(chain) < hops:
+        # Fewer entries than proxies means the header did not traverse the
+        # expected path. Fall back to the peer rather than trusting a value
+        # from an unexpected shape.
+        return peer
+
+    return chain[-hops]
 
 
 async def _enforce(request: Request, limit: int, window: int) -> None:

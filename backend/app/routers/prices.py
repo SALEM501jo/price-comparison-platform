@@ -6,6 +6,7 @@ story for these routes: without the filter, any authenticated user could read
 or delete another's saved items by guessing an id.
 """
 
+from decimal import Decimal
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -139,7 +140,9 @@ async def create_alert(
     alert = PriceAlert(
         user_id=current_user.id,
         product_id=body.product_id,
-        target_price=body.target_price,
+        # via str so the user's typed target is stored exactly, not as the
+        # nearest binary approximation of it.
+        target_price=Decimal(str(body.target_price)),
     )
     db.add(alert)
     db.commit()

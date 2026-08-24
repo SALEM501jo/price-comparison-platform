@@ -42,6 +42,17 @@ class Settings(BaseSettings):
     environment: str = "development"
     trusted_hosts: str = "*"
 
+    # How many reverse proxies sit in front of the app. 0 means none, and
+    # X-Forwarded-For is ignored entirely.
+    #
+    # WHY A COUNT AND NOT A BOOLEAN: the header is a client-supplied list that
+    # each proxy APPENDS to. Trusting the leftmost entry lets any caller forge
+    # their address -- "X-Forwarded-For: 1.2.3.4" and the rate limiter counts a
+    # different bucket on every request, which removes the control entirely.
+    # Only the last N entries were written by infrastructure we control, so the
+    # real client is the (N+1)th from the right.
+    trusted_proxy_count: int = 0
+
     # --- Refresh token cookie ---
     # The refresh token travels in an httpOnly cookie so that JavaScript --
     # and therefore any XSS payload -- cannot read it.

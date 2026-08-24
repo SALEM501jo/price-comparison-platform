@@ -207,7 +207,7 @@ On Windows, `start-dev.ps1` starts all of it in one go.
 ## Testing
 
 ```bash
-cd backend && pytest -q                    # 179 unit tests
+cd backend && pytest -q                    # 192 unit tests
 ```
 
 ```bash
@@ -308,6 +308,15 @@ engine — exact SKU match — work on real identifiers.
 cd backend && python -m app.services.ingest
 ```
 
+Also runs on a six-hourly cron (`.github/workflows/scrape.yml`) and from
+`POST /admin/scrape`.
+
+Money is stored as `Numeric(10,3)`, not `Float`. JOD has three decimal places,
+the feeds return `"136.000"`, and these values are summed and then *compared* —
+to pick the cheapest store and to decide whether a price alert has been met.
+Binary floating point cannot represent most decimal fractions, so two stores a
+thousandth of a dinar apart could be ordered wrongly.
+
 ### SSRF defences (OWASP A10)
 
 A scraper is a server-side URL fetcher, which is the exact shape of an SSRF
@@ -368,12 +377,12 @@ opinion.
 
 **Also outstanding:**
 
-- Prices are `Float`; `Numeric(10,3)` is correct for JOD's three decimal places
 - No email verification, so registration is an account-existence oracle
-- `POST /admin/scrape` returns `202` and does nothing — needs a task queue
-- Rate limiting keys on `request.client.host` with no `X-Forwarded-For` handling,
-  so behind a proxy every user shares one bucket
+- `POST /admin/scrape` runs the real ingest, but via `BackgroundTasks` — the
+  work dies with a restart and does not spread across replicas. A real
+  deployment wants a task queue. The scheduled path does not depend on it.
 - The matching rules cover phones and laptops only
+- `/admin/price-anomalies` is still N+1
 
 ---
 
@@ -401,8 +410,8 @@ backend/
     security/        JWT, password hashing, cookies, rate limiting
     routers/         auth, products, prices, admin, mock stores
     models/          SQLAlchemy models
-  alembic/versions/  3 migrations
-  tests/             179 tests
+  alembic/versions/  4 migrations
+  tests/             192 tests
   scripts/           smoke test + maintenance tooling
 frontend/src/
   components/search/ tiered results, match badges, query interpretation

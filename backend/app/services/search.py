@@ -15,6 +15,7 @@ entire table on every request.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Iterable
 
 from sqlalchemy import func, or_
@@ -141,7 +142,10 @@ def price_summary(db: Session, product_ids: Iterable[int]) -> dict[int, dict]:
             {"prices": [], "totals": [], "stores": set(), "best": None,
              "best_total": None},
         )
-        total = (row.price or 0.0) + (row.delivery_cost or 0.0)
+        # Decimal throughout: mixing in a float 0.0 would silently promote
+        # the sum back to binary floating point and undo the point of the
+        # Numeric column.
+        total = (row.price or Decimal(0)) + (row.delivery_cost or Decimal(0))
         bucket["prices"].append(row.price)
         bucket["totals"].append(total)
         bucket["stores"].add(row.store_name)

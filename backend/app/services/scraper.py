@@ -4,6 +4,7 @@ This keeps your 256MB Fly.io VM free for API requests only.
 """
 
 import logging
+from decimal import Decimal
 from typing import List, Dict
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
@@ -156,7 +157,7 @@ class ScraperService:
             
             if existing_price:
                 # Price changed? Record history
-                if existing_price.price != item["price"]:
+                if existing_price.price != Decimal(str(item["price"])):
                     history = PriceHistory(
                         alias_id=alias.id,
                         price=existing_price.price  # Old price
@@ -164,16 +165,16 @@ class ScraperService:
                     self.db.add(history)
                 
                 # Update current price
-                existing_price.price = item["price"]
+                existing_price.price = Decimal(str(item["price"]))
                 existing_price.availability = item["availability"]
-                existing_price.delivery_cost = item["delivery_cost"]
+                existing_price.delivery_cost = Decimal(str(item["delivery_cost"]))
             else:
                 # First time seeing this product at this store
                 new_price = Price(
                     alias_id=alias.id,
-                    price=item["price"],
+                    price=Decimal(str(item["price"])),
                     availability=item["availability"],
-                    delivery_cost=item["delivery_cost"]
+                    delivery_cost=Decimal(str(item["delivery_cost"]))
                 )
                 self.db.add(new_price)
             

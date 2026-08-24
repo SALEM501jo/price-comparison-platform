@@ -4,7 +4,7 @@ SECURITY PRINCIPLE: Role-Based Access Control (RBAC).
 Every admin endpoint must verify the user is an admin.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
@@ -16,7 +16,10 @@ from app.models.price import Price, PriceHistory
 from app.models.store import Store
 from app.models.alias import ProductAlias
 from app.schemas.auth import UserResponse
+from app.database import SessionLocal
 from app.logging_config import get_security_logger
+from app.services.ingest import IngestService
+from app.services.scrapers import STORES, store_by_code
 
 router = APIRouter()
 logger = get_security_logger("app.admin")
@@ -98,20 +101,73 @@ async def get_stats(
 
 @router.post("/scrape", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_scrape(
-    admin: User = Depends(require_admin)
+    background: BackgroundTasks,
+    store: str | None = None,
+    admin: User = Depends(require_admin),
 ):
     """
-    Manually trigger a scrape run. Admin only.
-    Returns 202 Accepted — scraping happens in background.
+    Run the real scrapers. Admin only.
+
+    202 Accepted with the work queued behind the response: a full run takes
+    minutes (deliberately -- requests are spaced out to be polite to the store),
+    which is far longer than any sensible HTTP timeout.
+
+    `store` optionally limits the run to one store code.
+
+    NOTE: BackgroundTasks runs in this process, so the work dies with a restart
+    and does not spread across replicas. A real deployment wants a task queue.
+    The scheduled path does not rely on this at all -- CI runs the same code as
+    a standalone command on a cron.
     """
-    logger.warning("Admin triggered manual scrape", extra={
-        "admin_id": admin.id,
-        "action": "admin_trigger_scrape"
-    })
-    
-    # In production, this would queue a Celery task or trigger GitHub Actions
-    # For now, return a message
-    return {"message": "Scrape triggered", "status": "pending"}
+    targets = STORES
+    if store:
+        config = store_by_code(store)
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown store. Known: {[s.code for s in STORES]}",
+            )
+        targets = (config,)
+
+    logger.warning(
+        "Admin triggered a scrape",
+        extra={
+            "user_id": admin.id,
+            "action": "admin_trigger_scrape",
+            "target": ",".join(s.code for s in targets),
+            "success": True,
+        },
+    )
+
+    background.add_task(_run_scrape, [s.code for s in targets])
+
+    return {
+        "status": "started",
+        "stores": [s.name for s in targets],
+        "note": "Runs in the background; watch the logs or re-check /admin/stats.",
+    }
+
+
+def _run_scrape(store_codes: list[str]) -> None:
+    """
+    Background worker. Opens its OWN session: the request's session is closed
+    when the response is sent, so reusing it here would fail partway through.
+    """
+    db = SessionLocal()
+    try:
+        service = IngestService(db)
+        for code in store_codes:
+            config = store_by_code(code)
+            if config:
+                service.run_store(config)
+    except Exception:
+        logger.error(
+            "Background scrape failed",
+            exc_info=True,
+            extra={"action": "admin_scrape_run", "success": False},
+        )
+    finally:
+        db.close()
 
 
 @router.get("/price-anomalies")
