@@ -72,15 +72,26 @@ class ParsedProduct:
         return {k: v for k, v in self.attributes.items() if v is not None}
 
 
-def parse(text: str, category: str | None = None) -> ParsedProduct:
+def parse(
+    text: str, category: str | None = None, hint: str | None = None
+) -> ParsedProduct:
     """
     Parse a product name using its category's rules.
 
-    `category` may be supplied when it is already known (e.g. from the store
-    feed); otherwise it is detected from the name itself.
+    `category` may be supplied when it is already known. `hint` is extra text
+    consulted ONLY for category detection, never for attributes -- a store's
+    own product_type field, typically.
+
+    WHY THE HINT EXISTS: real listings often do not name their category in the
+    title. "Hp Intel I7 -8550U, 16GB DDR4 & 512GB SSD, 15.6Inch" is
+    unmistakably a laptop to a person and contains no word this parser
+    recognises; the store files it under product_type "Notebook". Without the
+    hint every such listing is uncategorised and unmatchable.
     """
     normalized = normalize(text)
     category = category or detect_category(text)
+    if category is None and hint:
+        category = detect_category(hint)
     rules: CategoryRules | None = CATEGORY_RULES.get(category) if category else None
 
     if rules is None:

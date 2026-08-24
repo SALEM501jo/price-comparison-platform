@@ -79,20 +79,21 @@ scored on weighted attribute agreement:
 | Attribute | Weight | Rationale |
 |---|---|---|
 | brand | *gate* | An Apple result must never be offered for a Samsung query |
-| model | 35 | Generation defines the product |
-| variant | 30 | Pro / Pro Max / base are different phones |
-| storage | 25 | Different SKU, different price |
+| model | 33 | Generation defines the product |
+| variant | 28 | Pro / Pro Max / base are different phones |
+| storage | 24 | Different SKU, different price |
 | colour | 10 | Cosmetic |
+| memory | 5 | Real listings specify it (`4GB & 128GB`); minor next to storage |
 
 Same query, same catalogue:
 
 ```
 100.0%  EXACT     Apple iPhone 11 Pro 128GB Black
 100.0%  EXACT     iPhone 11 Pro Black 128GB Smartphone 5G
- 90.0%  CLOSE     Apple iPhone 11 Pro 128GB Midnight Green   different colour
- 75.0%  SIMILAR   Apple iPhone 11 Pro 256GB Black            different storage
- 70.0%  SIMILAR   Apple iPhone 11 Pro Max 128GB Black        different variant
- 65.0%  excluded  Apple iPhone 12 Pro 128GB Black            different model
+ 89.5%  CLOSE     Apple iPhone 11 Pro 128GB Midnight Green   different colour
+ 74.7%  SIMILAR   Apple iPhone 11 Pro 256GB Black            different storage
+ 70.5%  SIMILAR   Apple iPhone 11 Pro Max 128GB Black        different variant
+ 65.3%  excluded  Apple iPhone 12 Pro 128GB Black            different model
   0.0%  excluded  Samsung Galaxy S24 128GB Black             different brand
 ```
 
@@ -151,7 +152,7 @@ The OWASP Top 10 is a design requirement here, not an afterthought.
 | **A07 Authentication failures** | Refresh token rotation with automatic reuse detection; `POST /auth/logout` revokes every session; timing-safe login; password policy |
 | **A08 Integrity failures** | CI runs tests, applies **and reverses** migrations from an empty database, runs the smoke test, and audits dependencies |
 | **A09 Logging failures** | Structured JSON audit log of every auth and admin action; email addresses stored as keyed-HMAC tags rather than plaintext |
-| **A10 SSRF** | Not applicable while store data is mocked. It becomes the primary risk on real scraping — see *Limitations* |
+| **A10 SSRF** | Live scraping fetches remote URLs. Scheme and host allowlists, DNS resolution checked against private/loopback/link-local ranges, no redirect following, bounded time and size — see *Scraping* |
 
 ### Refresh token rotation
 
@@ -206,7 +207,7 @@ On Windows, `start-dev.ps1` starts all of it in one go.
 ## Testing
 
 ```bash
-cd backend && pytest -q                    # 125 unit tests
+cd backend && pytest -q                    # 179 unit tests
 ```
 
 ```bash
@@ -293,16 +294,77 @@ search surprises someone, the difference between *"we don't stock it"* and
 
 ---
 
+## Scraping
+
+Live data comes from **SmartBuy** (`smartbuy-me.com`) via the Shopify
+storefront feed at `/products.json` — the same catalogue the site renders, as
+structured data. Parsing HTML instead would mean guessing CSS selectors that
+break whenever the merchant edits their theme, per store. The JSON shape is
+Shopify's, so one adapter covers every store on the platform. It also carries
+the barcode as the variant SKU, which is what makes Layer 1 of the matching
+engine — exact SKU match — work on real identifiers.
+
+```bash
+cd backend && python -m app.services.ingest
+```
+
+### SSRF defences (OWASP A10)
+
+A scraper is a server-side URL fetcher, which is the exact shape of an SSRF
+vulnerability. Point it at `169.254.169.254` and it reads cloud instance
+metadata; at `localhost:6379` and it reads this app's own Redis. Five controls,
+in `app/services/scrapers/http.py`:
+
+1. **Scheme allowlist** — https only; `file://`, `gopher://` and friends refused
+2. **Host allowlist** — derived from the store registry, so a host cannot be
+   fetched without first being declared as a store
+3. **DNS resolution before connecting**, with every returned address checked
+   against private, loopback, link-local and reserved ranges. An allowlisted
+   host that resolves to `127.0.0.1` is still refused, and one private answer
+   among several is enough to refuse
+4. **No redirect following** — a redirect is a URL chosen by the remote server,
+   exactly the input we are not trusting. Each hop is re-validated explicitly
+5. **Bounded time and response size**, so a slow or enormous response cannot
+   exhaust the worker
+
+Not solved: DNS rebinding, which needs the connection pinned to the validated
+IP. The host allowlist is what makes that gap acceptable.
+
+`robots.txt` is honoured, requests are spaced (and a site's `Crawl-delay`
+raises that spacing, never lowers it), and the client identifies itself
+honestly rather than impersonating a browser.
+
+> **Note on untrusted content.** A store's `robots.txt` was found to contain
+> prose addressed to AI agents, asking the reader to install a shopping skill
+> and make purchases on the user's behalf. The parser reads only
+> `Allow` / `Disallow` / `Crawl-delay`; everything else in a fetched document
+> is data, never instruction. There is a test asserting exactly that.
+
+### What real data broke
+
+The mock catalogue was clean. Real titles are not, and two things failed on
+first contact:
+
+| Real listing | Problem |
+|---|---|
+| `Hp Intel I7 -8550U, 16GB DDR4 & 512GB SSD, 15.6Inch` | No word identifies it as a laptop — the store files that under `product_type: Notebook`. Every such listing was uncategorised. |
+| `Xiaomi Redmi 17 4G, 4GB & 128GB, 6.9Inch` | Storage took **4GB** — the memory. Real titles never say "RAM", so a keyword lookahead finds nothing. |
+
+Fixed by passing the store's own category as a parse hint, and by splitting
+capacities on size rather than keyword: between two figures on one device the
+larger is storage and the smaller is memory. Both are regression-tested against
+the exact strings that broke them.
+
 ## Limitations
 
-**Store data is mocked.** Nothing is scraped. `MOCK_STORE_DATA` in
-`app/services/scraper.py` is hardcoded — the retailer names are real, the prices
-are invented. `fetch_store_data()` is the single seam where real HTTP would go.
+**Only one store is scraped for real.** The other three (DNA, Carrefour Jordan,
+City Center) remain mock data in `app/services/scraper.py` — real retailer
+names, invented prices. Adding a real store means appending a `StoreConfig`;
+adding a non-Shopify one also means writing an adapter.
 
-Real scraping brings problems the mock data hides: per-site rate limits, layouts
-that change without notice, each retailer's terms of service, and **SSRF** —
-fetching attacker-influenceable URLs needs a host allowlist, no redirect
-following, and blocked private IP ranges.
+**Each retailer's terms of service govern what is actually permitted.** Reading
+public catalogue endpoints politely is the courteous baseline, not a legal
+opinion.
 
 **Also outstanding:**
 
@@ -329,12 +391,18 @@ backend/
       search.py      candidate generation + reranking
       deduplication.py  entity resolution at ingest
       tokens.py      refresh rotation, revocation, replay detection
-      scraper.py     mock store feeds
+      ingest.py      scrape -> canonical products -> prices
+      scraper.py     mock store feeds (the three unscraped stores)
+      scrapers/      REAL scraping
+        http.py      SSRF-hardened fetch -- the security boundary
+        robots.py    robots.txt parsing and compliance
+        shopify.py   Shopify storefront adapter
+        registry.py  store configs; the host allowlist derives from these
     security/        JWT, password hashing, cookies, rate limiting
     routers/         auth, products, prices, admin, mock stores
     models/          SQLAlchemy models
   alembic/versions/  3 migrations
-  tests/             125 tests
+  tests/             179 tests
   scripts/           smoke test + maintenance tooling
 frontend/src/
   components/search/ tiered results, match badges, query interpretation

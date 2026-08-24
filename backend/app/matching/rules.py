@@ -65,17 +65,30 @@ COLORS = Keyword(
     },
 )
 
-# Negative lookahead keeps "8GB RAM" out of the storage slot on laptops.
+# Capacities, split by size rather than by keyword. Real titles read
+# "16GB DDR4 & 512GB SSD" or "4GB & 128GB" and never say "RAM", so matching on
+# that word finds nothing and storage ends up holding the memory figure.
+CAPACITY_PATTERN = r"(?P<num>\d+)\s*(?P<unit>gb|tb)\b"
+
 STORAGE = Quantity(
-    pattern=r"(?P<num>\d+)\s*(?P<unit>gb|tb)\b(?!\s*(?:ram|memory))",
+    pattern=CAPACITY_PATTERN,
     base_unit="gb",
     unit_multipliers={"gb": 1, "tb": 1024},
+    select="max",
 )
 
 RAM = Quantity(
-    pattern=r"(?P<num>\d+)\s*(?P<unit>gb)\s*(?:ram|memory)\b",
+    pattern=CAPACITY_PATTERN,
     base_unit="gb",
-    unit_multipliers={"gb": 1},
+    # Same multipliers as STORAGE on purpose: this has to SEE the terabyte
+    # figure to know it is the larger of the two. Omitting "tb" left
+    # "32GB DDR5 & 1TB SSD" with a single visible capacity, so the guard below
+    # fired and memory came back empty.
+    unit_multipliers={"gb": 1, "tb": 1024},
+    select="min",
+    # Needs two capacities to distinguish memory from storage. With one, there
+    # is nothing to compare and "iPhone 15 128GB" would claim 128GB of RAM.
+    min_matches=2,
 )
 
 
@@ -117,7 +130,7 @@ PHONES = CategoryRules(
         # as a near-match for a Samsung query, however many specs coincide.
         Attribute("brand", "brand", 0, BRANDS, gate=True),
         Attribute(
-            "model", "model", 35,
+            "model", "model", 33,
             Regex(patterns=(
                 r"\b(?P<line>iphone)\s*(?P<num>\d{1,2})",
                 r"\b(?P<line>galaxy)\s+(?P<series>note|[sazm])?\s*(?P<num>\d{1,3})",
@@ -125,11 +138,12 @@ PHONES = CategoryRules(
             )),
         ),
         Attribute(
-            "variant", "variant", 30,
+            "variant", "variant", 28,
             Keyword(values=("pro max", "pro", "plus", "ultra", "mini", "fe", "max")),
             default="base",  # a plain "iPhone 11" IS a variant, not a blank
         ),
-        Attribute("storage", "storage", 25, STORAGE),
+        Attribute("storage", "storage", 24, STORAGE),
+        Attribute("ram", "memory", 5, RAM),
         Attribute("color", "colour", 10, COLORS),
     ),
 )

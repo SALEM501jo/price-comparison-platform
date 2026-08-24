@@ -72,13 +72,31 @@ class Quantity:
     products.
 
     `unit_multipliers` is expressed in the base unit: {"tb": 1024, "gb": 1}.
+
+    `select` decides which match wins when a name contains several:
+      "first" -- the earliest match
+      "max"   -- the largest quantity
+      "min"   -- the smallest quantity
+
+    WHY max/min RATHER THAN A KEYWORD: real listings almost never label memory
+    the way test data does. Actual titles read "16GB DDR4 & 512GB SSD" and
+    "4GB & 128GB" -- no "RAM" anywhere -- so a lookahead for that word finds
+    nothing and storage silently takes the memory figure instead. Between two
+    capacities on one device the larger is the storage and the smaller is the
+    memory, which holds across every phone and laptop in the feeds.
+
+    `min_matches` guards the memory case: with only one capacity present there
+    is nothing to compare, and "iPhone 15 128GB" must not report 128GB of RAM.
     """
 
     pattern: str
     base_unit: str
     unit_multipliers: dict[str, int]
+    select: str = "first"
+    min_matches: int = 1
 
-    def extract(self, text: str) -> str | None:
+    def _values(self, text: str) -> list[int]:
+        found: list[int] = []
         for match in re.finditer(self.pattern, text):
             groups = match.groupdict()
             unit = (groups.get("unit") or self.base_unit).lower()
@@ -89,5 +107,19 @@ class Quantity:
                 amount = int(groups["num"])
             except (KeyError, TypeError, ValueError):
                 continue
-            return f"{amount * multiplier}{self.base_unit}"
-        return None
+            found.append(amount * multiplier)
+        return found
+
+    def extract(self, text: str) -> str | None:
+        values = self._values(text)
+        if len(values) < self.min_matches:
+            return None
+
+        if self.select == "max":
+            chosen = max(values)
+        elif self.select == "min":
+            chosen = min(values)
+        else:
+            chosen = values[0]
+
+        return f"{chosen}{self.base_unit}"

@@ -93,6 +93,7 @@ class DeduplicationEngine:
         store_product_name: str,
         store_product_id: Optional[str] = None,
         store_id: Optional[int] = None,
+        category_hint: Optional[str] = None,
     ) -> Tuple[Optional[Product], float, str]:
         """
         Try to resolve a store listing to an existing canonical product.
@@ -111,7 +112,7 @@ class DeduplicationEngine:
                 return existing.product, 1.0, "sku"
 
         # === LAYER 2: symmetric attribute match ===
-        incoming = parse(store_product_name)
+        incoming = parse(store_product_name, hint=category_hint)
 
         for candidate in self._candidates(incoming):
             other = parse(
@@ -180,8 +181,12 @@ class DeduplicationEngine:
         if existing_alias:
             return existing_alias.product, existing_alias, False
 
+        # The store's own category is passed through as a hint: real titles
+        # often omit what the product IS ("Hp Intel I7 -8550U, 16GB DDR4 &
+        # 512GB SSD"), and without it those listings are stored with no
+        # match_category and can never be matched or filtered.
         existing_product, confidence, method = self.find_match(
-            store_product_name, store_product_id, store_id
+            store_product_name, store_product_id, store_id, category_hint=category
         )
 
         if existing_product:
@@ -197,7 +202,7 @@ class DeduplicationEngine:
             return existing_product, alias, False
 
         # No match -- this listing defines a new canonical product.
-        parsed = parse(store_product_name)
+        parsed = parse(store_product_name, hint=category)
 
         new_product = Product(
             # The store's own wording, NOT a normalised form. Normalising for
