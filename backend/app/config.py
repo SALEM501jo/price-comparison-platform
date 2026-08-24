@@ -53,6 +53,28 @@ class Settings(BaseSettings):
     # real client is the (N+1)th from the right.
     trusted_proxy_count: int = 0
 
+    # --- Email ---
+    # "console" writes messages to the log and sends nothing, which is what
+    # lets verification work with no account, no domain and no DNS records.
+    # get_sender() refuses this in production rather than silently pretending
+    # to send.
+    email_backend: str = "console"
+    email_from: str = "PriceCompare <noreply@localhost>"
+    smtp_host: str = "localhost"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+
+    # Where the links in emails point. The API cannot infer this: it is the
+    # FRONTEND's address, and a link built from the request Host header would
+    # be forgeable into a phishing link by anyone who can set that header.
+    app_base_url: str = "http://localhost:5173"
+
+    # How long a verification link stays valid.
+    email_token_ttl_hours: int = 24
+
     # --- Refresh token cookie ---
     # The refresh token travels in an httpOnly cookie so that JavaScript --
     # and therefore any XSS payload -- cannot read it.

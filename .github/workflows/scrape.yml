@@ -44,6 +44,16 @@ jobs:
       JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
       REDIS_URL: ${{ secrets.REDIS_URL }}
       ENVIRONMENT: production
+      # Alert notifications go out at the end of the run, so this job
+      # needs real mail credentials. Set EMAIL_BACKEND=null to run the
+      # scrape without notifying anyone.
+      EMAIL_BACKEND: ${{ secrets.EMAIL_BACKEND || 'null' }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
 
     steps:
       - uses: actions/checkout@v4

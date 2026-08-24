@@ -130,7 +130,8 @@ class IngestService:
         )
         return result
 
-    def run_all(self) -> list[dict]:
+    def run_all(self, notify: bool = True) -> list[dict]:
+        """Scrape every store, then act on any alerts the new prices met."""
         results = []
         for config in STORES:
             try:
@@ -148,6 +149,15 @@ class IngestService:
                     },
                 )
                 results.append({"store": config.name, "error": True})
+
+        if notify:
+            # After ingest, not during: an alert should fire on the final
+            # price of the run, not on whichever store happened to be
+            # scraped first.
+            from app.services.notifications import process_alerts
+
+            results.append({"alerts": process_alerts(self.db)})
+
         return results
 
 

@@ -45,6 +45,9 @@ jobs:
       JWT_SECRET_KEY: ci_only_secret_not_used_anywhere_real_0123456789
       ENVIRONMENT: development
       ALLOWED_ORIGINS: http://localhost:5173
+      # No mail leaves CI. 'null' discards messages; 'console' would work
+      # too but floods the job log with full email bodies.
+      EMAIL_BACKEND: "null"
 
     defaults:
       run:

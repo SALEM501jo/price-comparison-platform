@@ -46,3 +46,16 @@ export const getMe = async () => {
   const { data } = await api.get('/auth/me');
   return data;
 };
+
+/** Redeem a verification link. Unauthenticated: the link is opened from an
+ *  email client, often in a different browser from the one that signed up. */
+export const verifyEmail = async (token) => {
+  const { data } = await api.post('/auth/verify-email', { token });
+  return data;
+};
+
+/** Request a fresh link. Always resolves — the API returns 202 whether or not
+ *  the address exists, so that it cannot be used to test who has an account. */
+export const resendVerification = async (email) => {
+  await api.post('/auth/resend-verification', { email });
+};

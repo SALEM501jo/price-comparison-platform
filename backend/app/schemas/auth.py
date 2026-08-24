@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 import re
 
@@ -40,6 +43,13 @@ class UserResponse(BaseModel):
     id: int
     email: str
     role: str
+    # Exposed so the UI can prompt an unverified user. A timestamp rather than
+    # a flag, so "when" is answerable too.
+    email_verified_at: Optional[datetime] = None
+
+    @property
+    def is_verified(self) -> bool:
+        return self.email_verified_at is not None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,3 +62,11 @@ class RefreshRequest(BaseModel):
     browser history and Referer headers, and this is a multi-day credential.
     """
     refresh_token: str | None = None
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr

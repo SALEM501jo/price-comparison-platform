@@ -15,8 +15,10 @@ from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    ResendVerificationRequest,
     TokenResponse,
     UserResponse,
+    VerifyEmailRequest,
 )
 from app.security.jwt_handler import (
     create_access_token,
@@ -31,6 +33,7 @@ from app.security.cookies import (
 from app.security.password import get_dummy_hash, hash_password, verify_password
 from app.security.rate_limiter import rate_limit, strict_rate_limit
 from app.services import tokens as token_service
+from app.services import verification
 
 router = APIRouter()
 logger = get_security_logger("app.auth")
@@ -108,6 +111,11 @@ async def register(
             "success": True,
         },
     )
+
+    # Best effort: send() never raises. A mail outage must not fail a signup
+    # and leave the account in limbo -- the user can request a new link.
+    verification.send_verification(db, user)
+
     return _issue_tokens(db, user, response)
 
 
@@ -257,6 +265,82 @@ async def logout(
         },
     )
     return None
+
+
+@router.post("/verify-email", response_model=UserResponse)
+async def verify_email(
+    request: Request,
+    body: VerifyEmailRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Redeem a verification link.
+
+    Unauthenticated on purpose: the link is opened from an email client, often
+    in a different browser from the one that signed up.
+    """
+    await strict_rate_limit(request)
+
+    try:
+        user = verification.consume(db, body.token)
+    except verification.VerificationError:
+        # One message for every failure. Telling a caller whether a token
+        # expired, was already used, or never existed is free information for
+        # anyone holding a stale link, and no help to a real user beyond
+        # "request another".
+        raise AuthenticationError("This link is invalid or has expired.")
+
+    return user
+
+
+@router.post("/resend-verification", status_code=status.HTTP_202_ACCEPTED)
+async def resend_verification(
+    request: Request,
+    body: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Send a fresh verification link.
+
+    ALWAYS returns 202, whatever happens. This endpoint is unauthenticated and
+    takes an email address, which makes it the easiest account-enumeration
+    oracle in the application: a 404 for unknown addresses would turn it into a
+    membership check anyone can run. It is also a way to send mail to a
+    stranger using our infrastructure, which is why verification.can_resend
+    throttles per ACCOUNT as well as the per-IP limit here.
+    """
+    await strict_rate_limit(request)
+
+    accepted = {"status": "accepted"}
+
+    user = db.query(User).filter(User.email == body.email).first()
+    if user is None or user.email_verified_at is not None:
+        # Nothing to do -- and the response is identical either way.
+        logger.info(
+            "Verification resend ignored",
+            extra={
+                "ip": _client_ip(request),
+                "action": "resend_verification",
+                "target": pseudonymize(body.email),
+                "success": True,
+            },
+        )
+        return accepted
+
+    if not verification.can_resend(db, user):
+        logger.warning(
+            "Verification resend throttled",
+            extra={
+                "user_id": user.id,
+                "ip": _client_ip(request),
+                "action": "resend_verification",
+                "success": False,
+            },
+        )
+        return accepted
+
+    verification.send_verification(db, user)
+    return accepted
 
 
 @router.get("/me", response_model=UserResponse)

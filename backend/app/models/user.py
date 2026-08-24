@@ -19,6 +19,11 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.user, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Null until the address is confirmed. A timestamp rather than a boolean:
+    # "when" answers questions a flag cannot, and costs the same to store.
+    email_verified_at = Column(DateTime(timezone=True))
+
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    email_tokens = relationship("EmailToken", back_populates="user", cascade="all, delete-orphan")
     wishlist_items = relationship("WishlistItem", back_populates="user", cascade="all, delete-orphan")
     price_alerts = relationship("PriceAlert", back_populates="user", cascade="all, delete-orphan")

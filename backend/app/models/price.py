@@ -84,6 +84,10 @@ class PriceAlert(Base):
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     target_price = Column(MONEY, nullable=False)
     is_active = Column(Boolean, default=True)
+    # When the user was last told this alert fired. Prevents re-sending on
+    # every scrape while the price stays below target; cleared when it rises
+    # back above, so a later drop notifies again.
+    notified_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="price_alerts")

@@ -149,10 +149,50 @@ The OWASP Top 10 is a design requirement here, not an afterthought.
 | **A04 Insecure design** | Redis rate limiting (5/min on auth, 100/min elsewhere), per IP and per endpoint; limits are not client-controllable |
 | **A05 Misconfiguration** | CSP, HSTS, `X-Frame-Options`, `nosniff`, Referrer-Policy, Permissions-Policy; `Server` header suppressed; strict CORS allow-list; docs disabled in production |
 | **A06 Vulnerable components** | `pip-audit` in CI, failing the build on any known CVE, and running weekly as well as on push |
-| **A07 Authentication failures** | Refresh token rotation with automatic reuse detection; `POST /auth/logout` revokes every session; timing-safe login; password policy |
+| **A07 Authentication failures** | Refresh token rotation with automatic reuse detection; `POST /auth/logout` revokes every session; timing-safe login; password policy; email verification with single-use, hashed, expiring tokens |
 | **A08 Integrity failures** | CI runs tests, applies **and reverses** migrations from an empty database, runs the smoke test, and audits dependencies |
 | **A09 Logging failures** | Structured JSON audit log of every auth and admin action; email addresses stored as keyed-HMAC tags rather than plaintext |
 | **A10 SSRF** | Live scraping fetches remote URLs. Scheme and host allowlists, DNS resolution checked against private/loopback/link-local ranges, no redirect following, bounded time and size — see *Scraping* |
+
+### Email verification
+
+Free to run: `EMAIL_BACKEND=console` prints the message to the server log, so
+the whole flow works with **no provider account, no domain and no DNS records**.
+Switching to `smtp` and filling in credentials is a config change — the backend
+uses stdlib SMTP, which every free-tier provider speaks, so there is no vendor
+SDK and nothing extra for `pip-audit` to find a CVE in.
+
+Only the token's SHA-256 hash is stored; the token exists in the email and
+nowhere else, so a database dump yields no working links. (SHA-256 is correct
+here and bcrypt is not: these are 256 bits of CSPRNG output, so there is nothing
+to brute-force and the hash only has to be one-way and fast.)
+
+The security shape of the feature is the unauthenticated endpoints:
+
+- **`/auth/resend-verification` always returns 202** — whether the address
+  exists, is already verified, or is throttled. A 404 for unknown addresses
+  would make it a membership check anyone could run.
+- **Resending is throttled per account**, not only per IP. An IP limit alone
+  still lets someone rotate addresses and bury a stranger's inbox using our
+  sending reputation.
+- **Every redemption failure returns one message.** Distinguishing "expired"
+  from "already used" from "never existed" informs an attacker holding a stale
+  link and helps a real user not at all.
+- **Alert emails are never sent to an unverified address.** Anyone can type a
+  stranger's email at signup; that is precisely how a notification feature
+  becomes a way to mail someone who never asked.
+
+Verification gates outbound email, not access — browsing needs no confirmed
+address, and locking a new user out over an unclicked link would lose them for
+no security gain.
+
+### Price alert notifications
+
+Alerts were previously only evaluated when a user happened to open the page,
+which made "tell me when it drops" a promise the system never kept. They now
+run at the end of each scrape. `notified_at` prevents re-sending on every run
+while a price stays low, and is cleared when it rises back above target so a
+later drop notifies again.
 
 ### Refresh token rotation
 
@@ -207,7 +247,7 @@ On Windows, `start-dev.ps1` starts all of it in one go.
 ## Testing
 
 ```bash
-cd backend && pytest -q                    # 192 unit tests
+cd backend && pytest -q                    # 217 unit tests
 ```
 
 ```bash
@@ -247,6 +287,8 @@ The two that modify data support `--dry-run`.
 | POST | `/auth/login` | Sets refresh cookie |
 | POST | `/auth/refresh` | Rotates; reuse revokes the chain |
 | POST | `/auth/logout` | Revokes every session |
+| POST | `/auth/verify-email` | Redeems a link; single use |
+| POST | `/auth/resend-verification` | Always 202 — never reveals who has an account |
 | GET | `/auth/me` | |
 | GET | `/products/search?q=` | **Tiered results** |
 | GET | `/products/{id}` | All store prices, cheapest total first |
@@ -377,7 +419,6 @@ opinion.
 
 **Also outstanding:**
 
-- No email verification, so registration is an account-existence oracle
 - `POST /admin/scrape` runs the real ingest, but via `BackgroundTasks` — the
   work dies with a restart and does not spread across replicas. A real
   deployment wants a task queue. The scheduled path does not depend on it.
@@ -400,6 +441,9 @@ backend/
       search.py      candidate generation + reranking
       deduplication.py  entity resolution at ingest
       tokens.py      refresh rotation, revocation, replay detection
+      verification.py   email verification: issue, send, redeem
+      notifications.py  price alert emails
+      email/         sender interface; console (free) and SMTP backends
       ingest.py      scrape -> canonical products -> prices
       scraper.py     mock store feeds (the three unscraped stores)
       scrapers/      REAL scraping
@@ -410,8 +454,8 @@ backend/
     security/        JWT, password hashing, cookies, rate limiting
     routers/         auth, products, prices, admin, mock stores
     models/          SQLAlchemy models
-  alembic/versions/  4 migrations
-  tests/             192 tests
+  alembic/versions/  5 migrations
+  tests/             217 tests
   scripts/           smoke test + maintenance tooling
 frontend/src/
   components/search/ tiered results, match badges, query interpretation
