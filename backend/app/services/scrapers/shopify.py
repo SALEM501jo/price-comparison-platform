@@ -19,7 +19,7 @@ import json
 import logging
 from typing import Iterator
 
-from app.matching import detect_category
+from app.matching import parse
 from app.services.scrapers.base import ScrapedProduct, StoreScraper
 from app.services.scrapers.http import BlockedURLError, fetch
 from app.services.scrapers.robots import can_fetch, rules_for
@@ -115,14 +115,25 @@ class ShopifyScraper(StoreScraper):
         """
         Keep only what the matching engine understands.
 
-        Uses the engine's own category detection rather than a second list of
-        keywords here -- one source of truth, so adding a category to
+        Uses the engine's own parser rather than a second list of keywords
+        here -- one source of truth, so adding a category to
         app/matching/rules.py widens what gets scraped automatically.
+
+        WHY parse() AND NOT detect_category(): detect_category only asks
+        whether a category word appears; the full parse also enforces that
+        category's `requires_any`. Gating on the weaker of the two while the
+        storage side used the stronger one meant everything in between was
+        ingested and then filed with no category at all -- "Lenovo ThinkPad
+        Laptop Backpack" and "HP M290 Wireless Mouse" are laptops to
+        detect_category and nothing to parse. Those rows are invisible to
+        search, so they were pure noise in the catalogue. One gate, applied
+        once.
         """
-        return bool(
-            detect_category(raw.get("product_type") or "")
-            or detect_category(raw.get("title") or "")
-        )
+        for field in ("product_type", "title"):
+            value = (raw.get(field) or "").strip()
+            if value and parse(value).category:
+                return True
+        return False
 
     def _to_products(self, raw: dict) -> Iterator[ScrapedProduct]:
         """

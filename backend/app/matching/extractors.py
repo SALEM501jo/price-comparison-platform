@@ -87,6 +87,11 @@ class Quantity:
 
     `min_matches` guards the memory case: with only one capacity present there
     is nothing to compare, and "iPhone 15 128GB" must not report 128GB of RAM.
+
+    `minimum` discards capacities too small to be the thing being measured. A
+    graphics card states "16GB GDDR7" and a memory stick "8GB DDR4"; against a
+    category whose storage floor is 128GB neither can pose as a disk, so a
+    GPU stops arriving in the catalogue as a laptop. Left at 0 it does nothing.
     """
 
     pattern: str
@@ -94,6 +99,7 @@ class Quantity:
     unit_multipliers: dict[str, int]
     select: str = "first"
     min_matches: int = 1
+    minimum: int = 0
 
     def _values(self, text: str) -> list[int]:
         found: list[int] = []
@@ -114,6 +120,14 @@ class Quantity:
         values = self._values(text)
         if len(values) < self.min_matches:
             return None
+
+        # Applied AFTER min_matches so the guard above still counts every
+        # capacity on the label -- it is asking "were there two figures to
+        # compare", which is true regardless of how large they are.
+        if self.minimum:
+            values = [value for value in values if value >= self.minimum]
+            if not values:
+                return None
 
         if self.select == "max":
             chosen = max(values)

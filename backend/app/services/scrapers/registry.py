@@ -33,6 +33,33 @@ STORES: tuple[StoreConfig, ...] = (
         # -- "mobile-phones" existed on this store and was empty, while its
         # phones sit under product_type "Smart Phone".
     ),
+    StoreConfig(
+        code="igeek",
+        name="iGeek Megastore",
+        # Apex, not www: this store serves robots.txt on the apex and 301s the
+        # www form. fetch() does not follow redirects by design, so the host
+        # recorded here has to be the one that answers both robots.txt and
+        # products.json with a 200. Verified for each entry below.
+        host="igeekjo.com",
+        platform="shopify",
+        delay_seconds=2.0,
+        # ~5,000 products in the feed, of which roughly 100 are laptops; the
+        # rest are peripherals and games the matching rules do not cover.
+        # known_categories_only filters them, so this cap applies to what is
+        # KEPT, and the scraper pages the whole catalogue to find them.
+        max_products=150,
+    ),
+    StoreConfig(
+        code="ammancart",
+        name="AmmanCart",
+        # www, not apex -- the mirror image of iGeek above.
+        host="www.ammancart.com",
+        platform="shopify",
+        delay_seconds=2.0,
+        # Phones are the overlap with SmartBuy. The bulk of this catalogue is
+        # televisions and white goods, which no category rule covers yet.
+        max_products=100,
+    ),
 )
 
 ADAPTERS: dict[str, type[StoreScraper]] = {

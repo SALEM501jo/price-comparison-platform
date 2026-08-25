@@ -24,6 +24,11 @@ BRANDS = Keyword(
         "apple", "samsung", "sony", "lg", "huawei", "xiaomi", "nokia",
         "oppo", "realme", "google", "dell", "hp", "lenovo", "asus", "acer", "msi",
         "honor", "vivo", "infinix", "tecno",
+        # Present in the Jordanian catalogues but previously unlisted, so every
+        # listing from them resolved to brand=None and was excluded by the
+        # brand gate. Motorola alone accounted for 10 of SmartBuy's 17
+        # unparsed handsets; Doogee for 7 of AmmanCart's 29.
+        "motorola", "tcl", "doogee", "microsoft",
     ),
     # Product lines imply their brand, so "iPhone 15" resolves to apple even
     # when the listing never says "Apple".
@@ -39,6 +44,11 @@ BRANDS = Keyword(
         "pavilion": "hp", "elitebook": "hp", "omen": "hp",
         "zenbook": "asus", "vivobook": "asus", "rog": "asus",
         "nova": "huawei", "mate": "huawei",
+        # "Moto Smart Phone G06" and "Motorola Moto Razr 50" are the same
+        # marque. Keyword matches the longest candidate first, so "motorola"
+        # is still preferred over "moto" when both appear.
+        "moto": "motorola", "razr": "motorola",
+        "surface": "microsoft",
     },
 )
 
@@ -76,6 +86,22 @@ STORAGE = Quantity(
     base_unit="gb",
     unit_multipliers={"gb": 1, "tb": 1024},
     select="max",
+)
+
+# Laptops only. A graphics card advertises "16GB GDDR7" and a memory module
+# "8GB DDR4"; both satisfied the laptops rule that a real machine states its
+# storage, so iGeek's GPU and RAM aisles arrived in the catalogue as laptops.
+# No laptop on sale ships a disk below 128GB and no consumer GPU carries that
+# much memory, so the floor separates them cleanly -- and it is a property of
+# the things themselves, not a list of words to keep extending.
+#
+# Phones keep the unbounded STORAGE above: 32GB and 64GB handsets are real.
+LAPTOP_STORAGE = Quantity(
+    pattern=CAPACITY_PATTERN,
+    base_unit="gb",
+    unit_multipliers={"gb": 1, "tb": 1024},
+    select="max",
+    minimum=128,
 )
 
 RAM = Quantity(
@@ -151,6 +177,7 @@ PHONES = CategoryRules(
     brand_detectors=(
         "oppo", "realme", "nokia", "honor", "xiaomi", "samsung",
         "vivo", "infinix", "tecno", "huawei",
+        "motorola", "moto", "doogee", "tcl",
     ),
     attributes=(
         # Brand is a gate, not a score: an Apple result must never be offered
@@ -161,15 +188,46 @@ PHONES = CategoryRules(
             Regex(patterns=(
                 r"\b(?P<line>iphone)\s*(?P<num>\d{1,2})",
                 r"\b(?P<line>galaxy)\s+(?P<series>note|[sazm])?\s*(?P<num>\d{1,3})",
+                # Two-word sub-lines MUST precede the single-word rule below.
+                # Regex returns the first pattern that matches, so a bare
+                # "redmi" rule placed first would swallow "Redmi Note 15" and
+                # report line=redmi with no number -- collapsing the Note range
+                # into the numbered one.
+                r"\b(?P<line>redmi\s+note)\s*(?P<num>\d{1,3}[a-z]?)\b",
                 # Sub-brands, alphanumeric rather than digits only: real
                 # listings read "Redmi A7 Pro" as often as "Redmi 17".
                 r"\b(?P<line>redmi|poco|pixel|nova|mate)\s*(?P<num>[a-z]?\d{1,3}[a-z]?)\b",
+                # Named product ranges. Tecno, Oppo, Motorola and Doogee name
+                # their lines instead of numbering them off the marque, so the
+                # brand-adjacent rule below never fires: "TECNO SPARK 50" has
+                # no digits following "tecno" at all. These 24 listings parsed
+                # to nothing before this pattern existed.
+                r"\b(?P<line>spark|camon|pova|phantom|reno|blade|edge|narzo|nord"
+                r"|razr)\s*(?P<num>\d{1,3}[a-z]?)\b",
                 # Bare model codes after a brand: "Samsung A57", "Xiaomi 15T",
                 # "Honor X7e". Without this a large part of the real catalogue
                 # has no model at all -- 90 genuine handsets went uncategorised
                 # the moment a model became a requirement.
-                r"\b(?P<line>honor|samsung|xiaomi|realme|oppo|vivo|infinix|tecno)\s+"
-                r"(?P<num>[a-z]{0,2}\d{1,4}[a-z]?)\b",
+                #
+                # Filler words are tolerated because AmmanCart writes "Oppo
+                # Smart Phones A5 PRO" -- the code is not adjacent to the
+                # brand. The filler list is CLOSED on purpose. Allowing any
+                # word here (\w+) let the rule reach across a product name and
+                # seize the first number it found: "Samsung Galaxy Buds 3 Pro"
+                # became phone model "samsung 3" and "Xiaomi Robot Vacuum X20"
+                # became "xiaomi x20". Earbuds and vacuum cleaners then sat in
+                # the phone tiers.
+                #
+                # The code must also contain a LETTER. Real model codes do --
+                # A57, 15T, X7e, G35, S200c -- while a bare number next to a
+                # brand is usually something else entirely: "Samsung 55" is a
+                # television's screen size, and it satisfied the old rule.
+                # The lookahead rejects a network suffix; without it "5G"
+                # satisfies the code shape and becomes the model.
+                r"\b(?P<line>honor|samsung|xiaomi|realme|oppo|vivo|infinix|tecno"
+                r"|motorola|doogee|tcl)\b"
+                r"(?:\s+(?:smart|smartphones?|mobile|phones?)){0,3}\s+"
+                r"(?P<num>(?!\d+g\b)(?:[a-z]{1,2}\d{1,4}[a-z]?|\d{1,4}[a-z]))\b",
             )),
         ),
         Attribute(
@@ -195,15 +253,16 @@ LAPTOPS = CategoryRules(
         # "Omni Book", "Galaxy Book". Word-bounded, so it does not fire inside
         # "macbook".
         "book",
+        "surface",
     ),
-    brand_detectors=("dell", "hp", "lenovo", "asus", "acer", "msi"),
+    brand_detectors=("dell", "hp", "lenovo", "asus", "acer", "msi", "microsoft"),
     attributes=(
         Attribute("brand", "brand", 0, BRANDS, gate=True),
         Attribute(
             "model", "model", 30,
             Regex(patterns=(
                 r"\b(?P<line>macbook)\b",
-                r"\b(?P<line>thinkpad|ideapad|inspiron|xps|pavilion|elitebook|zenbook|vivobook|omen|rog)\s*(?P<num>\w{1,6})?",
+                r"\b(?P<line>thinkpad|ideapad|inspiron|xps|pavilion|elitebook|zenbook|vivobook|omen|rog|surface)\s*(?P<num>\w{1,6})?",
             )),
         ),
         Attribute(
@@ -227,14 +286,31 @@ LAPTOPS = CategoryRules(
                 # Apple silicon: m1 .. m99. Word-bounded so "M.2 SSD" (which
                 # normalises to "m 2") and RAM figures are not mistaken for it.
                 r"\b(?P<cpu>m\d{1,2})\b",
-                # Apple A-series, as used in "A18 Pro chip".
-                r"\b(?P<cpu>a\d{2})\b",
                 # Intel Core i-series. Stable naming, but a pattern anyway.
                 r"\b(?P<cpu>i[3579])\b",
-                r"\b(?P<line>ryzen)\s*(?P<num>\d)\b",
+                # Intel's current naming: "Core Ultra 7 255U", and often just
+                # "Ultra 7 256V" with the word Core omitted. Matched before the
+                # Ryzen rule because a title may mention both a CPU and a GPU
+                # vendor, and the processor is what this attribute is for.
+                r"\b(?:core\s+)?(?P<line>ultra)\s*(?P<num>\d)\b",
+                # Ryzen. The trailing \b used to sit immediately after the
+                # digit, which meant a full part number never matched: in
+                # "Ryzen 5800H" the 5 is followed by 8, not a boundary, so 7
+                # ASUS laptops came back with no processor at all. Only the
+                # series digit is captured -- 5800H and 5 are both "ryzen 5" --
+                # and "Ryzen AI 9" is tolerated because AMD inserts that
+                # marketing token into current part names.
+                r"\b(?P<line>ryzen)\s*(?:ai\s*)?(?P<num>\d)\d*[a-z]*",
+                # Apple A-series ("A18 Pro chip"), LAST because it is the most
+                # collision-prone rule here: ASUS names TUF models A14 and A16,
+                # and while this pattern sat above the others it captured the
+                # model designation instead of the processor -- "TUF Gaming A16
+                # AMD Ryzen 7" reported cpu=a16. Real CPU tokens now win, and
+                # this only fires when nothing else matched.
+                r"\b(?P<cpu>a\d{2})\b",
             )),
         ),
-        Attribute("storage", "storage", 20, STORAGE),
+        Attribute("storage", "storage", 20, LAPTOP_STORAGE),
         Attribute("ram", "memory", 10, RAM),
         # Space Gray and Silver are different SKUs at different prices, so
         # colour belongs here too -- weighted low, as on phones, because it is
