@@ -29,6 +29,17 @@ class MatchedProduct(BaseModel):
     store_count: int = Field(0, description="Stores currently listing it in stock")
     best_deal_store: Optional[str] = None
 
+    # NEW UNITS ONLY, all four fields above. Second-hand stock is reported
+    # separately below rather than folded in, because a worn handset at 620
+    # would otherwise become this product's headline price and every product
+    # with one used listing would look like a bargain it is not.
+    second_hand_from: Optional[float] = Field(
+        None, description="Cheapest used or refurbished total, if any"
+    )
+    second_hand_store_count: int = Field(
+        0, description="Stores listing this second-hand and in stock"
+    )
+
     # Match explanation
     match_score: float = Field(..., description="0-100, weighted attribute agreement")
     match_tier: str = Field(..., description="exact | close | similar")

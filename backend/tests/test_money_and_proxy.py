@@ -18,7 +18,7 @@ from app.models.price import Price
 from app.models.product import Product
 from app.models.store import Store
 from app.security.rate_limiter import client_ip
-from app.services.search import price_summary
+from app.services.search import offers_for, price_summary
 
 
 # --- Money ------------------------------------------------------------------
@@ -83,14 +83,14 @@ class TestMoneyPrecision:
         store is cheapest and whether a price alert has been met.
         """
         product = add_price(db, "SmartBuy", "0.1", "0.2")
-        summary = price_summary(db, [product.id])[product.id]
+        summary = offers_for(price_summary(db, [product.id]), product.id)
         assert summary["best_total"] == Decimal("0.3")
 
     def test_a_thousandth_of_a_dinar_still_orders_correctly(self, db):
         product = add_price(db, "StoreA", "100.001", "0")
         add_price(db, "StoreB", "100.002", "0", product=product)
 
-        summary = price_summary(db, [product.id])[product.id]
+        summary = offers_for(price_summary(db, [product.id]), product.id)
         assert summary["best"] == "StoreA"
         assert summary["best_total"] == Decimal("100.001")
 
@@ -99,7 +99,7 @@ class TestMoneyPrecision:
         product = add_price(db, "Cheap sticker", "100.000", "10.000")
         add_price(db, "Free delivery", "105.000", "0.000", product=product)
 
-        summary = price_summary(db, [product.id])[product.id]
+        summary = offers_for(price_summary(db, [product.id]), product.id)
         assert summary["best"] == "Free delivery"
         assert summary["best_total"] == Decimal("105.000")
 
@@ -109,7 +109,7 @@ class TestMoneyPrecision:
         count as met.
         """
         product = add_price(db, "SmartBuy", "839.150", "0")
-        lowest = price_summary(db, [product.id])[product.id]["best_total"]
+        lowest = offers_for(price_summary(db, [product.id]), product.id)["best_total"]
         assert lowest <= Decimal("839.150")
 
 

@@ -165,6 +165,25 @@ class CategoryRules:
         return tuple(a for a in self.attributes if not a.gate and a.weight > 0)
 
 
+# Words that name a category this platform deliberately does NOT carry.
+#
+# NOT a blocklist of accessories -- that is what `requires_any` is for, and a
+# list of "bag, case, mouse, ..." would need extending forever. This is one
+# word per category we have decided is out of scope, which is a closed set
+# that changes only when the product scope does.
+#
+# Televisions are the whole of it today. A TV shares a panel with a monitor
+# and nothing else a buyer cares about: nobody cross-shops a 77-inch OLED
+# television against a 27-inch 180Hz gaming panel. Without this, three TCL and
+# Xiaomi televisions were categorised as PHONES, because "TCL C6K" has exactly
+# the shape of a handset model code.
+#
+# Measured against the real feeds before adding it: of 487 listings in the
+# three supported categories, ZERO mention a television. The false-negative
+# cost is nil.
+UNSUPPORTED_CATEGORIES: tuple[str, ...] = ("tv", "television", "televisions")
+
+
 # --- Categories -------------------------------------------------------------
 
 PHONES = CategoryRules(
@@ -227,7 +246,10 @@ PHONES = CategoryRules(
                 r"\b(?P<line>honor|samsung|xiaomi|realme|oppo|vivo|infinix|tecno"
                 r"|motorola|doogee|tcl)\b"
                 r"(?:\s+(?:smart|smartphones?|mobile|phones?)){0,3}\s+"
-                r"(?P<num>(?!\d+g\b)(?:[a-z]{1,2}\d{1,4}[a-z]?|\d{1,4}[a-z]))\b",
+                # The lookahead rejects a network suffix AND a resolution:
+                # both "5G" and "4K" fit the bare code shape, and without this
+                # "Xiaomi 4K TV Stick" became phone model "xiaomi 4k".
+                r"(?P<num>(?!\d+[gk]\b)(?:[a-z]{1,2}\d{1,4}[a-z]?|\d{1,4}[a-z]))\b",
             )),
         ),
         Attribute(
@@ -286,13 +308,31 @@ LAPTOPS = CategoryRules(
                 # Apple silicon: m1 .. m99. Word-bounded so "M.2 SSD" (which
                 # normalises to "m 2") and RAM figures are not mistaken for it.
                 r"\b(?P<cpu>m\d{1,2})\b",
-                # Intel Core i-series. Stable naming, but a pattern anyway.
-                r"\b(?P<cpu>i[3579])\b",
+                # Intel Core i-series, the OLD naming, still most of the
+                # market. Matches a bare "i7" and the full part number alike
+                # -- "i7-14650HX" and "i7 14650HX" both resolve to i7, which
+                # is what a shopper searching "i7 laptop" means.
+                r"\b(?P<cpu>i[3579])(?:[- ]?\d{4,5}[a-z]{0,2})?\b",
                 # Intel's current naming: "Core Ultra 7 255U", and often just
                 # "Ultra 7 256V" with the word Core omitted. Matched before the
                 # Ryzen rule because a title may mention both a CPU and a GPU
                 # vendor, and the processor is what this attribute is for.
                 r"\b(?:core\s+)?(?P<line>ultra)\s*(?P<num>\d)\b",
+                # Intel's OTHER new scheme, the one without "Ultra":
+                # "Core 5-120U", "Core 7-150U". Named in the project's own
+                # known-limitations list as unparsed. Distinct from both
+                # "Core i5" and "Core Ultra 5" -- three different product
+                # lines that happen to share a digit, so they must not
+                # collapse onto one value.
+                # [- ]? because normalize() has already turned the hyphen
+                # into a space by the time this runs: "Core 5-120U" reaches
+                # the extractor as "core 5 120u". A pattern written against
+                # the raw title silently matches nothing.
+                r"\b(?P<line>core)\s+(?P<num>\d)[- ]?\d{3,4}[a-z]{0,2}\b",
+                # Budget silicon, common in the cheap end of this market and
+                # previously invisible: a Celeron laptop and an i7 laptop
+                # scored as equally unknown on processor.
+                r"\b(?P<cpu>celeron|pentium|athlon)\b",
                 # Ryzen. The trailing \b used to sit immediately after the
                 # digit, which meant a full part number never matched: in
                 # "Ryzen 5800H" the 5 is followed by 8, not a boundary, so 7
@@ -320,9 +360,101 @@ LAPTOPS = CategoryRules(
     requires_any=("storage", "cpu"),
 )
 
+
+
+# --- Monitors ---------------------------------------------------------------
+#
+# NOT televisions. A TV and a PC monitor share a panel and nothing else that
+# matters to a buyer: nobody cross-shops a 55-inch smart TV against a 27-inch
+# 180Hz gaming monitor, and putting them in one category would produce
+# "comparisons" between products that answer different questions. TVs have no
+# category here at all, so they are filtered out at ingest rather than stored
+# and hidden.
+#
+# Monitors earn one because they are real overlap: iGeek alone lists 169, and
+# the attributes buyers actually compare on -- size, resolution, refresh rate
+# -- are all stated in the title.
+
+SCREEN_SIZE = Regex(
+    patterns=(
+        # WHY NOT MATCH ON THE INCH MARK: normalize() turns punctuation into
+        # spaces before any extractor runs, so 27" arrives as a bare 27 and
+        # 24.5" arrives as two tokens, "24 5". A pattern anchored on the quote
+        # character silently matches nothing at all.
+        #
+        # So: the spelled-out form first, then a bare number inside a
+        # plausible panel range that is not carrying a unit. 165hz, 100hz,
+        # 1440p and 16gb all fail that test; 27 and 32 pass.
+        r"\b(?P<size>1[7-9]|[2-9]\d)\s*inch\b",
+        # The optional trailing digit recovers a fractional size: 24.5 has
+        # already become "24 5" by this point, and 24.5 is a different
+        # product from 24 at a different price.
+        r"\b(?P<size>1[7-9]|[2-5]\d)\b(?!\s*(?:hz|gb|tb|mm|ms|w|k)\b)(?:\s(?P<frac>\d)\b)?",
+    ),
+)
+
+
+RESOLUTION = Keyword(
+    values=("8k", "5k", "4k", "2k", "fhd", "hd"),
+    synonyms={
+        # One panel, several marketing names. Without these, the same monitor
+        # listed as "4K" at one shop and "UHD" at another is two products.
+        "uhd": "4k",
+        "2160p": "4k",
+        "qhd": "2k",
+        "wqhd": "2k",
+        "dqhd": "2k",
+        "1440p": "2k",
+        "full hd": "fhd",
+        "1080p": "fhd",
+    },
+)
+
+REFRESH_RATE = Regex(patterns=(r"\b(?P<hz>\d{2,3})\s*hz\b",))
+
+PANEL = Keyword(
+    values=("qd-oled", "oled", "nano ips", "ips", "va", "tn"),
+    synonyms={"quantum dot oled": "qd-oled"},
+)
+
+MONITORS = CategoryRules(
+    name="monitors",
+    # "monitor" only. A television never calls itself one, which is exactly
+    # how TVs stay out without a list of banned words.
+    detectors=("monitor",),
+    # DELIBERATELY NO brand_detectors, unlike every other category here.
+    #
+    # Brand detectors fire when no strong detector matched, and a television
+    # carries exactly the same weak signals a monitor does: a brand, a
+    # resolution and a refresh rate. With "lg" in this list, 20 of the 130 TVs
+    # in the real feeds were categorised as monitors -- a 77-inch OLED TV
+    # offered as a near-match for a 27-inch gaming panel.
+    #
+    # Requiring the word "monitor" keeps them out without a list of banned
+    # words: a television never calls itself one, and the ingest path passes
+    # the store's own product_type as a hint, so a monitor whose title omits
+    # the word is still caught.
+    attributes=(
+        Attribute("brand", "brand", 0, BRANDS, gate=True),
+        # Size dominates. A 24-inch and a 27-inch are not near-matches of one
+        # another however well everything else agrees.
+        Attribute("size", "screen size", 32, SCREEN_SIZE),
+        Attribute("resolution", "resolution", 26, RESOLUTION),
+        Attribute("refresh", "refresh rate", 22, REFRESH_RATE),
+        Attribute("panel", "panel type", 12, PANEL),
+        Attribute("color", "colour", 8, COLORS),
+    ),
+    # Every real monitor listing states its size. A stand, an arm or a cable
+    # "for 27-inch monitors" states one too, but states nothing else -- which
+    # is why size alone is not enough and resolution or refresh must also be
+    # present for the listing to count as a monitor.
+    requires_any=("resolution", "refresh"),
+)
+
 CATEGORY_RULES: dict[str, CategoryRules] = {
     PHONES.name: PHONES,
     LAPTOPS.name: LAPTOPS,
+    MONITORS.name: MONITORS,
 }
 
 DEFAULT_CATEGORY = PHONES.name

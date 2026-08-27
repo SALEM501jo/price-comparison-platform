@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from app.matching.rules import CATEGORY_RULES, CategoryRules
+from app.matching.rules import UNSUPPORTED_CATEGORIES, CATEGORY_RULES, CategoryRules
 
 
 def normalize(text: str) -> str:
@@ -42,6 +42,14 @@ def detect_category(text: str) -> str | None:
     match against a real handset.
     """
     normalized = normalize(text)
+
+    # A listing that names an unsupported category belongs to none of ours,
+    # however well its other words happen to match. Checked BEFORE scoring:
+    # a television states a brand, a resolution and a refresh rate, which is
+    # indistinguishable from a monitor by weight alone.
+    for word in UNSUPPORTED_CATEGORIES:
+        if re.search(rf"\b{re.escape(word)}\b", normalized):
+            return None
 
     def count(words) -> int:
         return sum(
@@ -119,9 +127,17 @@ def parse(
     want of one word.
     """
     normalized = normalize(text)
-    category = category or detect_category(text)
+    # THE HINT IS CONSULTED FIRST, not as a fallback. A store's product_type
+    # is a direct statement of what the thing is; the title is an inference
+    # from whatever words happen to appear in it. Trying the title first meant
+    # brand detectors claimed listings they had no business claiming: a
+    # "Lenovo ThinkVision 27 FHD 100Hz" monitor was routed to LAPTOPS because
+    # "lenovo" is a laptop brand, then failed the laptop requires_any and
+    # parsed to nothing at all -- with the store filing it under "Monitor"
+    # the whole time.
     if category is None and hint:
         category = detect_category(hint)
+    category = category or detect_category(text)
     rules: CategoryRules | None = CATEGORY_RULES.get(category) if category else None
 
     if rules is None:

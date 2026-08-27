@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 import re
@@ -8,6 +8,13 @@ import re
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
+
+    # Which side of the platform this account is for. A Literal, NOT the
+    # UserRole enum: this value comes from an anonymous request body, and
+    # accepting a role name directly would let anyone register as an admin.
+    # These two are the only self-selectable options, and the router maps them
+    # rather than passing them through.
+    account_type: Literal["buyer", "merchant"] = "buyer"
 
     @field_validator("password")
     @classmethod
@@ -70,3 +77,19 @@ class VerifyEmailRequest(BaseModel):
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    # Same policy as registration, reused rather than restated: a reset that
+    # accepted a weaker password than signup would be the easiest way past the
+    # policy, and nobody would notice.
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        return RegisterRequest.validate_password(v)

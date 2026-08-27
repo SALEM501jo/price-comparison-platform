@@ -19,7 +19,7 @@ from app.models.product import Product
 from app.models.user import User
 from app.services import email as email_service
 from app.services.email import Message
-from app.services.search import price_summary
+from app.services.search import offers_for, price_summary
 
 logger = logging.getLogger("app.notifications")
 settings = get_settings()
@@ -78,7 +78,7 @@ def process_alerts(db: Session) -> dict:
     skipped_unverified = 0
 
     for alert, product, user in rows:
-        current = prices.get(product.id, {}).get("best_total")
+        current = offers_for(prices, product.id).get("best_total")
 
         if current is None or current > alert.target_price:
             # Back above target: clear the marker so a future drop notifies

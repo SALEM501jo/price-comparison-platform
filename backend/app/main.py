@@ -15,7 +15,15 @@ from app.database import Base, engine
 from app.exceptions import setup_exception_handlers
 from app.logging_config import setup_logging
 from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.routers import admin, auth, mock_stores, prices, products
+from app.routers import (
+    admin,
+    auth,
+    merchant,
+    mock_stores,
+    prices,
+    products,
+    support,
+)
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -77,6 +85,8 @@ if settings.is_production:
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(products.router, prefix="/products", tags=["products"])
 app.include_router(prices.router, prefix="/prices", tags=["prices"])
+app.include_router(support.router, prefix="/support", tags=["support"])
+app.include_router(merchant.router, prefix="/merchant", tags=["merchant"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 # Development only. These serve invented prices, and a deployed site
 # offering them next to real scraped data -- visible to anyone who opens

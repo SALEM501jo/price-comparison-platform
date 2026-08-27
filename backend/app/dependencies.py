@@ -66,6 +66,26 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+async def require_merchant(current_user: User = Depends(get_current_user)) -> User:
+    """
+    Endpoints a shop owner uses to manage their own store.
+
+    Admins pass too. They already administer every store through /admin, so
+    refusing them here would mean an admin could not reproduce a merchant's
+    bug without a second account.
+
+    This only establishes WHO is asking. It says nothing about WHICH store
+    they may touch -- that is resolved per request from the signed-in user,
+    never from an id in the URL. See app/routers/merchant.py.
+    """
+    if current_user.role not in (UserRole.merchant, UserRole.admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Merchant access required",
+        )
+    return current_user
+
+
 async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme_optional),
     db: Session = Depends(get_db),

@@ -18,3 +18,5 @@ __all__ = [
     "RefreshToken",
     "EmailToken",
 ]
+from app.models.support import SupportMessage  # noqa: F401
+from app.models.scrape_job import ScrapeJob  # noqa: F401

@@ -22,7 +22,7 @@ from app.schemas.price import (
     PriceAlertResponse,
     WishlistItemResponse,
 )
-from app.services.search import price_summary
+from app.services.search import offers_for, price_summary
 
 router = APIRouter()
 
@@ -103,12 +103,12 @@ async def get_wishlist(
             name=product.canonical_name,
             brand=product.brand,
             image_url=product.image_url,
-            lowest_price=min(prices[product.id]["prices"])
-            if prices.get(product.id, {}).get("prices")
+            lowest_price=min(offers_for(prices, product.id)["prices"])
+            if offers_for(prices, product.id).get("prices")
             else None,
-            lowest_total_cost=prices.get(product.id, {}).get("best_total"),
-            best_deal_store=prices.get(product.id, {}).get("best"),
-            store_count=len(prices.get(product.id, {}).get("stores") or ()),
+            lowest_total_cost=offers_for(prices, product.id).get("best_total"),
+            best_deal_store=offers_for(prices, product.id).get("best"),
+            store_count=len(offers_for(prices, product.id).get("stores") or ()),
         )
         for item, product in rows
     ]
@@ -148,7 +148,7 @@ async def create_alert(
     db.commit()
     db.refresh(alert)
 
-    summary = price_summary(db, [product.id]).get(product.id, {})
+    summary = offers_for(price_summary(db, [product.id]), product.id)
     lowest = summary.get("best_total")
 
     return PriceAlertResponse(
@@ -182,7 +182,7 @@ async def get_alerts(
 
     results = []
     for alert, product in rows:
-        summary = prices.get(product.id, {})
+        summary = offers_for(prices, product.id)
         lowest = summary.get("best_total")
         results.append(
             PriceAlertResponse(

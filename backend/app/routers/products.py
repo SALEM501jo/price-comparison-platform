@@ -19,22 +19,13 @@ from app.schemas.product import (
     PriceHistoryPoint
 )
 from app.schemas.search import TieredSearchResponse
-from app.services.search import search_products
+from app.services.search import best_savings, search_products
 from app.config import get_settings
-import redis.asyncio as aioredis
+from app.services.cache import cached_json, catalogue_version, store_json
 import hashlib
 
 router = APIRouter()
 settings = get_settings()
-
-# Redis cache singleton
-_cache = None
-
-async def get_cache():
-    global _cache
-    if _cache is None:
-        _cache = aioredis.from_url(settings.redis_url, decode_responses=True)
-    return _cache
 
 
 @router.get("/search", response_model=TieredSearchResponse)
@@ -60,27 +51,51 @@ async def search(
     """
     # Every parameter that changes the response must be in the cache key, or
     # page 2 gets served page 1's rows.
+    # The catalogue version is part of the key, so a merchant repricing a
+    # listing or an admin verifying a store retires every cached result at
+    # once instead of leaving search five minutes behind the product page.
+    version = await catalogue_version()
     fingerprint = f"{q.strip().lower()}|{category or ''}|{sort}|{page}|{limit}"
-    cache_key = f"search:v3:{hashlib.sha256(fingerprint.encode()).hexdigest()}"
-    cache = await get_cache()
+    cache_key = (
+        f"search:v3:{version}:{hashlib.sha256(fingerprint.encode()).hexdigest()}"
+    )
 
-    try:
-        cached = await cache.get(cache_key)
-        if cached:
-            return TieredSearchResponse.model_validate_json(cached)
-    except Exception:
-        pass  # cache is an optimisation, never a dependency
+    # cached_json swallows every failure, the connection included. The cache
+    # is an optimisation and must never be able to fail a search.
+    cached = await cached_json(cache_key)
+    if cached is not None:
+        return TieredSearchResponse.model_validate(cached)
 
     response = search_products(
         db, q, category=category, sort=sort, page=page, limit=limit
     )
-
-    try:
-        await cache.setex(cache_key, 300, response.model_dump_json())
-    except Exception:
-        pass
-
+    await store_json(cache_key, response.model_dump(mode="json"))
     return response
+
+
+@router.get("/deals")
+async def deals(
+    limit: int = Query(8, ge=1, le=24),
+    db: Session = Depends(get_db),
+    _: None = Depends(get_rate_limited),
+):
+    """
+    Products where shopping around saves the most, for the home page.
+
+    Declared BEFORE /{product_id}: FastAPI matches routes in order, so with
+    the dynamic route first a request for /products/deals would be parsed as
+    a product id of "deals" and fail validation.
+    """
+    version = await catalogue_version()
+    cache_key = f"deals:v1:{version}:{limit}"
+
+    cached = await cached_json(cache_key)
+    if cached is not None:
+        return cached
+
+    results = best_savings(db, limit=limit)
+    await store_json(cache_key, results)
+    return results
 
 
 @router.get("/{product_id}", response_model=ProductDetailResponse)
@@ -100,9 +115,13 @@ async def get_product(
         .join(ProductAlias, Price.alias_id == ProductAlias.id)
         .join(Store, ProductAlias.store_id == Store.id)
         .filter(ProductAlias.product_id == product_id)
+        # An unverified merchant store must not reach a shopper here either.
+        # The comparison table is the most visible place a fabricated price
+        # could land, so the same predicate that guards search guards it.
+        .filter(Store.visible_to_shoppers())
         .all()
     )
-    
+
     price_responses = []
     for price, alias, store in prices:
         price_responses.append(StorePriceResponse(
@@ -115,7 +134,18 @@ async def get_product(
             total_cost=price.price + price.delivery_cost,
             last_updated=price.last_updated,
             store_product_url=alias.store_product_url,
-            match_confidence=alias.match_confidence
+            match_confidence=alias.match_confidence,
+            phone=store.phone,
+            whatsapp=store.whatsapp,
+            facebook_url=store.facebook_url,
+            is_merchant=store.is_merchant,
+            condition=alias.condition,
+            comparison_group=alias.comparison_group,
+            battery_health=alias.battery_health,
+            has_damage=alias.has_damage,
+            damage_notes=alias.damage_notes,
+            warranty_months=alias.warranty_months,
+            listing_notes=alias.listing_notes,
         ))
     
     # Sort by total cost (price + delivery)
@@ -140,31 +170,46 @@ async def get_price_history(
     db: Session = Depends(get_db),
     _: None = Depends(get_rate_limited),
 ):
-    """Get price history for all stores of a product."""
-    # Get all aliases for this product
-    aliases = db.query(ProductAlias).filter(ProductAlias.product_id == product_id).all()
-    
-    history_by_store = []
-    
-    for alias in aliases:
-        history = (
-            db.query(PriceHistory)
-            .filter(PriceHistory.alias_id == alias.id)
-            .order_by(PriceHistory.recorded_at)
-            .all()
+    """
+    Price history for every visible store listing this product.
+
+    ONE QUERY, NOT ONE PER STORE. This used to load the aliases, then run a
+    history query for each, then a store lookup for each again -- four shops
+    meant nine round trips, and the count grew with every shop that started
+    stocking the product. That is the same shape price_summary() was
+    rewritten to avoid; the comment there still reads "20 results meant 21
+    round trips".
+
+    Grouping in Python is safe here in a way it is not for the deals list:
+    the rows are already restricted to one product.
+    """
+    rows = (
+        db.query(PriceHistory, ProductAlias.id.label("alias_id"), Store.name)
+        .join(ProductAlias, ProductAlias.id == PriceHistory.alias_id)
+        .join(Store, Store.id == ProductAlias.store_id)
+        .filter(ProductAlias.product_id == product_id)
+        # Same visibility rule as the price table. Without it an unverified
+        # store's history is readable even though its current price is
+        # hidden, which leaks both the price and that the store exists.
+        .filter(Store.visible_to_shoppers())
+        .order_by(PriceHistory.recorded_at)
+        .all()
+    )
+
+    by_alias: dict[int, dict] = {}
+    for record, alias_id, store_name in rows:
+        bucket = by_alias.setdefault(
+            alias_id, {"store_name": store_name, "points": []}
         )
-        
-        if history:
-            store = db.query(Store).filter(Store.id == alias.store_id).first()
-            points = [
-                PriceHistoryPoint(price=h.price, recorded_at=h.recorded_at)
-                for h in history
-            ]
-            
-            history_by_store.append(PriceHistoryResponse(
-                alias_id=alias.id,
-                store_name=store.name if store else "Unknown",
-                history=points
-            ))
-    
-    return history_by_store
+        bucket["points"].append(
+            PriceHistoryPoint(price=record.price, recorded_at=record.recorded_at)
+        )
+
+    return [
+        PriceHistoryResponse(
+            alias_id=alias_id,
+            store_name=bucket["store_name"],
+            history=bucket["points"],
+        )
+        for alias_id, bucket in by_alias.items()
+    ]

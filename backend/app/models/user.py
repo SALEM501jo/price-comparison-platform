@@ -7,6 +7,11 @@ from app.database import Base
 
 class UserRole(str, enum.Enum):
     user = "user"
+    # A shop owner who submits their own prices. Deliberately NOT a flavour of
+    # admin: a merchant has more power than a shopper over their own store and
+    # none at all over anyone else's, which is a different shape of authority
+    # from "can do everything".
+    merchant = "merchant"
     admin = "admin"
 
 
@@ -27,3 +32,7 @@ class User(Base):
     email_tokens = relationship("EmailToken", back_populates="user", cascade="all, delete-orphan")
     wishlist_items = relationship("WishlistItem", back_populates="user", cascade="all, delete-orphan")
     price_alerts = relationship("PriceAlert", back_populates="user", cascade="all, delete-orphan")
+
+    # At most one store per account, enforced by a unique index on the store
+    # side. uselist=False makes that a scalar here rather than a list of one.
+    store = relationship("Store", back_populates="owner", uselist=False)

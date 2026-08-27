@@ -54,21 +54,32 @@ class DeduplicationEngine:
         store_id: int,
         store_product_name: str,
         store_product_id: Optional[str] = None,
+        condition: Optional[str] = None,
     ) -> Optional[ProductAlias]:
         """
         Look up the alias this exact store listing already maps to.
 
         Scoped by store_id: two stores can legitimately reuse the same SKU
         string, so matching on store_product_id alone would cross-link them.
+
+        The name fallback exists because a store can change a product's SKU
+        while still selling the same thing, and without it every such change
+        would insert a duplicate alias. But the fallback is scoped by
+        CONDITION: a shop legitimately sells the same phone new and used, and
+        those are two listings under one name. Matching on name alone let the
+        second submission overwrite the first, so the used unit replaced the
+        new one and the shop appeared to sell only the worn handset.
         """
         q = self.db.query(ProductAlias).filter(ProductAlias.store_id == store_id)
         if store_product_id:
             hit = q.filter(ProductAlias.store_product_id == store_product_id).first()
             if hit:
                 return hit
-        return q.filter(
-            ProductAlias.store_product_name == store_product_name
-        ).first()
+
+        by_name = q.filter(ProductAlias.store_product_name == store_product_name)
+        if condition is not None:
+            by_name = by_name.filter(ProductAlias.condition == condition)
+        return by_name.first()
 
     def _candidates(self, parsed) -> list[Product]:
         """
@@ -162,6 +173,7 @@ class DeduplicationEngine:
         store_product_url: Optional[str] = None,
         brand: Optional[str] = None,
         category: Optional[str] = None,
+        condition: Optional[str] = None,
     ) -> Tuple[Product, ProductAlias, bool]:
         """
         Main entry point: ingest one listing from one store.
@@ -176,7 +188,7 @@ class DeduplicationEngine:
         # product at one store, inflating store_count and preventing
         # PriceHistory from ever recording a change.
         existing_alias = self._find_existing_alias(
-            store_id, store_product_name, store_product_id
+            store_id, store_product_name, store_product_id, condition
         )
         if existing_alias:
             return existing_alias.product, existing_alias, False

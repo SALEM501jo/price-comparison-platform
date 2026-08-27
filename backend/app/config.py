@@ -75,6 +75,11 @@ class Settings(BaseSettings):
     # How long a verification link stays valid.
     email_token_ttl_hours: int = 24
 
+    # Where contact-form messages are forwarded. Optional: with no address
+    # set, messages are still STORED and readable in the admin panel -- the
+    # notification is the part that is missing, not the message.
+    support_email: str | None = None
+
     # --- Refresh token cookie ---
     # The refresh token travels in an httpOnly cookie so that JavaScript --
     # and therefore any XSS payload -- cannot read it.

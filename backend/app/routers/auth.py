@@ -10,12 +10,14 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.exceptions import AuthenticationError, ConflictError
 from app.logging_config import get_security_logger, pseudonymize
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    ForgotPasswordRequest,
     ResendVerificationRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserResponse,
     VerifyEmailRequest,
@@ -33,7 +35,7 @@ from app.security.cookies import (
 from app.security.password import get_dummy_hash, hash_password, verify_password
 from app.security.rate_limiter import rate_limit, strict_rate_limit
 from app.services import tokens as token_service
-from app.services import verification
+from app.services import password_reset, verification
 
 router = APIRouter()
 logger = get_security_logger("app.auth")
@@ -93,10 +95,15 @@ async def register(
         )
         raise ConflictError("An account with this email already exists")
 
+    # Mapped, never passed through. body.account_type is restricted to two
+    # values by the schema, and this dict is the only place either becomes a
+    # role -- so a request cannot name a role the platform did not offer.
+    role = UserRole.merchant if body.account_type == "merchant" else UserRole.user
+
     user = User(
         email=body.email,
         password_hash=hash_password(body.password),
-        role="user",
+        role=role,
     )
     db.add(user)
     db.commit()
@@ -347,3 +354,99 @@ async def resend_verification(
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user info."""
     return current_user
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Send a password reset link.
+
+    A LINK, NOT A PASSWORD. Mailing a generated password would put a working
+    credential in plaintext into an inbox where it stays forever, and would
+    mean this server briefly knew it -- the one thing bcrypt exists to prevent.
+    See app/services/password_reset.py.
+
+    ALWAYS returns 202, whatever happens. Unauthenticated and taking an email
+    address, this is the easiest account-enumeration oracle in the application:
+    a 404 for unknown addresses turns it into a membership check anyone can
+    run against any list of emails. The throttle is per ACCOUNT as well as
+    per IP, so rotating addresses cannot bury one person's inbox either.
+    """
+    await strict_rate_limit(request)
+
+    accepted = {"status": "accepted"}
+    user = db.query(User).filter(User.email == body.email).first()
+
+    if user is None:
+        logger.info(
+            "Password reset requested for unknown address",
+            extra={
+                "ip": _client_ip(request),
+                "action": "forgot_password",
+                "target": pseudonymize(body.email),
+                "success": True,
+            },
+        )
+        return accepted
+
+    if not password_reset.can_request(db, user):
+        logger.warning(
+            "Password reset throttled",
+            extra={
+                "user_id": user.id,
+                "ip": _client_ip(request),
+                "action": "forgot_password",
+                "success": False,
+            },
+        )
+        return accepted
+
+    password_reset.send_reset(db, user)
+    logger.warning(
+        "Password reset link sent",
+        extra={
+            "user_id": user.id,
+            "ip": _client_ip(request),
+            "action": "forgot_password",
+            "success": True,
+        },
+    )
+    return accepted
+
+
+@router.post("/reset-password", response_model=UserResponse)
+async def reset_password(
+    request: Request,
+    body: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Spend a reset link and set the new password.
+
+    Deliberately does NOT sign the user in. Someone who has just proved
+    control of the mailbox should still enter the password they chose -- it is
+    the only thing that confirms they remember it, and it means a reset link
+    opened on a shared machine does not leave a live session behind.
+
+    Every existing session is revoked inside reset_password(); see there.
+    """
+    await strict_rate_limit(request)
+
+    try:
+        user = password_reset.reset_password(db, body.token, body.password)
+    except password_reset.ResetError:
+        logger.warning(
+            "Password reset failed",
+            extra={
+                "ip": _client_ip(request),
+                "action": "password_reset",
+                "success": False,
+            },
+        )
+        raise AuthenticationError("This link is invalid or has expired.")
+
+    return user
