@@ -395,11 +395,7 @@ function ListingRow({ listing, onChanged, onRemoved }) {
     // Removing takes the price history with it and cannot be undone, so it
     // is worth one confirmation rather than a single misplaced click -- the
     // same treatment user deletion gets in the admin screen.
-    if (
-      !window.confirm(
-        `Remove "${listing.name}" from your shop? This cannot be undone.`,
-      )
-    ) {
+    if (!window.confirm(t('merchant.confirmRemove', { name: listing.name }))) {
       return;
     }
     setBusy(true);
@@ -428,7 +424,10 @@ function ListingRow({ listing, onChanged, onRemoved }) {
     }
   };
 
-  const age = formatAge(listing.last_updated);
+  // `t` is not optional here. Without it formatAge falls back to returning
+  // the key itself, and the row rendered "Updated time.today" -- in both
+  // languages, on the one screen a shop owner uses every day.
+  const age = formatAge(listing.last_updated, t);
   const stale = isPriceStale(listing.last_updated);
 
   return (
@@ -437,21 +436,29 @@ function ListingRow({ listing, onChanged, onRemoved }) {
         <span className="font-medium text-gray-900 dark:text-white">{listing.name}</span>
         {listing.condition !== 'new' && (
           <span className="ml-2 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
-            {listing.condition}
+            {/* The stored value is a database word ("used", "refurbished").
+                Rendering it raw put English in the middle of the Arabic row;
+                the add-product form above already translates the same three
+                conditions, so reuse its wording rather than inventing a
+                second vocabulary for the same thing. */}
+            {t(
+              listing.condition === 'refurbished'
+                ? 'merchant.conditionRefurbished'
+                : 'merchant.conditionUsed',
+            )}
             {listing.battery_health != null && ` · ${listing.battery_health}%`}
-            {listing.has_damage && ' · damaged'}
+            {listing.has_damage && ` · ${t('table.hasDamage')}`}
           </span>
         )}
         {!listing.is_searchable ? (
           <span className="mt-0.5 block text-xs text-amber-700 dark:text-amber-400">
-            Not shown in search — we could not tell what this product is. Try
-            including the brand, model and storage.
+            {t('merchant.notSearchable')}
           </span>
         ) : (
           listing.matched_product_name &&
           listing.matched_product_name !== listing.name && (
             <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
-              Matched to “{listing.matched_product_name}”
+              {t('merchant.matchedTo', { name: listing.matched_product_name })}
             </span>
           )
         )}
@@ -459,7 +466,9 @@ function ListingRow({ listing, onChanged, onRemoved }) {
           <span
             className={`mt-0.5 block text-xs ${stale ? 'text-amber-700' : 'text-gray-400'}`}
           >
-            {stale ? `Not updated since ${age} — shoppers see a warning` : `Updated ${age}`}
+            {stale
+              ? t('merchant.notUpdatedSince', { age })
+              : t('table.updated', { age })}
           </span>
         )}
         {error && <span className="mt-0.5 block text-xs text-red-700 dark:text-red-300">{error}</span>}
@@ -480,7 +489,7 @@ function ListingRow({ listing, onChanged, onRemoved }) {
             disabled={busy || !dirty}
             className="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-40"
           >
-            Save
+            {t('merchant.save')}
           </button>
         </div>
       </td>
@@ -555,22 +564,22 @@ function ContactPanel({ store, onSaved }) {
         <input
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          placeholder="Phone"
-          aria-label="Phone"
+          placeholder={t('merchant.phone')}
+          aria-label={t('merchant.phone')}
           className="rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
         <input
           value={form.whatsapp}
           onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-          placeholder="WhatsApp"
-          aria-label="WhatsApp"
+          placeholder={t('merchant.whatsapp')}
+          aria-label={t('merchant.whatsapp')}
           className="rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
         <input
           value={form.facebook_url}
           onChange={(e) => setForm({ ...form, facebook_url: e.target.value })}
-          placeholder="Facebook page"
-          aria-label="Facebook page"
+          placeholder={t('merchant.facebook')}
+          aria-label={t('merchant.facebook')}
           className="rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
       </div>
@@ -654,7 +663,9 @@ export default function Merchant() {
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{store.name}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {store.listing_count} {store.listing_count === 1 ? 'product' : 'products'}
+            {store.listing_count === 1
+              ? t('merchant.productCountOne')
+              : t('merchant.productCount', { count: store.listing_count })}
           </p>
         </div>
         {store.is_verified ? (

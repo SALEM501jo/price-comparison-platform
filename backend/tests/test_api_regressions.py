@@ -427,3 +427,70 @@ class TestProductionSurface:
         assert not main.settings.is_production, "test env should be development"
         paths = main.app.openapi()["paths"]
         assert any(p.startswith("/mock") for p in paths), "mock routes missing in dev"
+
+
+class TestCorsAllowsEveryMethodTheApiRoutes:
+    """
+    The CORS allow-list must cover every method the API actually serves.
+
+    THE BUG: allow_methods listed GET, POST, PUT and DELETE. The merchant
+    routes are PATCH -- repricing a listing, marking it out of stock,
+    updating the shop's phone number -- so the browser's preflight came back
+    "400 Disallowed CORS method" and the request was never sent. axios
+    surfaces a blocked preflight as a network error, so the shop owner was
+    told "Cannot reach the server. Is the backend running?" while every GET
+    on the same page worked.
+
+    WHY 480 TESTS MISSED IT: TestClient calls the ASGI app directly and never
+    performs a preflight, so the CORS configuration was exercised by nothing
+    at all. These tests send the preflight explicitly, which is the only way
+    to reach that middleware from the suite.
+
+    The second test derives the requirement from the routing table rather
+    than naming PATCH, so the next method added to the API is covered without
+    anyone remembering this file exists.
+    """
+
+    PREFLIGHT_ORIGIN = "http://localhost:5173"
+
+    def _preflight(self, client, method: str, path: str = "/merchant/listings/1"):
+        return client.options(
+            path,
+            headers={
+                "Origin": self.PREFLIGHT_ORIGIN,
+                "Access-Control-Request-Method": method,
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+
+    def test_patch_preflight_is_accepted(self, client):
+        response = self._preflight(client, "PATCH")
+
+        assert response.status_code == 200, (
+            "the browser's preflight for a merchant price edit was rejected: "
+            f"{response.text}"
+        )
+        allowed = response.headers.get("access-control-allow-methods", "")
+        assert "PATCH" in allowed, f"PATCH missing from {allowed!r}"
+
+    def test_every_method_the_api_routes_survives_a_preflight(self, client):
+        import app.main as main
+
+        # HEAD and OPTIONS are never subject to a preflight themselves.
+        routed = {
+            method.upper()
+            for operations in main.app.openapi()["paths"].values()
+            for method in operations
+            if method.upper() not in {"HEAD", "OPTIONS"}
+        }
+        assert routed, "no routes found -- the spec did not build"
+
+        rejected = [
+            method
+            for method in sorted(routed)
+            if self._preflight(client, method).status_code != 200
+        ]
+        assert not rejected, (
+            f"the API routes {rejected} but CORS rejects the preflight, so a "
+            "browser can never call those endpoints"
+        )

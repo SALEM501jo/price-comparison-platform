@@ -191,6 +191,7 @@ const translations = {
     'merchant.confirmRemove': 'إزالة «{name}» من متجرك؟ لا يمكن التراجع.',
     'merchant.save': 'حفظ',
     'merchant.productCount': '{count} منتج',
+    'merchant.productCountOne': 'منتج واحد',
     'merchant.loadError': 'تعذّر تحميل متجرك.',
     'merchant.saveError': 'تعذّر حفظ المنتج.',
 
@@ -417,6 +418,7 @@ const translations = {
       'Remove “{name}” from your shop? This cannot be undone.',
     'merchant.save': 'Save',
     'merchant.productCount': '{count} products',
+    'merchant.productCountOne': '1 product',
     'merchant.loadError': 'Could not load your shop.',
     'merchant.saveError': 'Could not save the product.',
 

@@ -73,7 +73,16 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    # PATCH is not optional: every merchant edit uses it -- repricing a
+    # listing, marking it out of stock, updating the shop's phone number --
+    # and so does admin moderation. Omitting it let the browser reject the
+    # preflight with "Disallowed CORS method" before the request was ever
+    # sent, and axios reports that as a network failure, so the shop owner
+    # was told "cannot reach the server" while every GET on the page worked.
+    #
+    # Not caught by the test suite because TestClient calls the app directly
+    # and never performs a preflight; only a real browser exercises this.
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 

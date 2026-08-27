@@ -114,7 +114,7 @@ export default function Wishlist() {
                         {formatPrice(item.lowest_total_cost)}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatStoreCount(item.store_count)}
+                        {formatStoreCount(item.store_count, t)}
                         {item.best_deal_store ? ` · ${item.best_deal_store}` : ''}
                       </p>
                     </>

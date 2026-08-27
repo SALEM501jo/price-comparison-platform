@@ -78,7 +78,15 @@ def process_alerts(db: Session) -> dict:
     skipped_unverified = 0
 
     for alert, product, user in rows:
-        current = offers_for(prices, product.id).get("best_total")
+        # Read the group's figures ONCE, through the accessor that knows
+        # price_summary() nests them under the comparison group. Reaching into
+        # the raw dict for the store name -- prices.get(id, {}).get("best") --
+        # silently returned None every time, because that level holds
+        # {"new": ..., "second_hand": ...} and nothing called "best". The
+        # emails still sent, and still said the target was met, but never said
+        # where, which is the actionable half of the message.
+        offers = offers_for(prices, product.id)
+        current = offers.get("best_total")
 
         if current is None or current > alert.target_price:
             # Back above target: clear the marker so a future drop notifies
@@ -98,7 +106,7 @@ def process_alerts(db: Session) -> dict:
             skipped_unverified += 1
             continue
 
-        store = prices.get(product.id, {}).get("best")
+        store = offers.get("best")
         if email_service.send(_message(user, product, alert.target_price, current, store)):
             alert.notified_at = datetime.now(timezone.utc)
             notified += 1

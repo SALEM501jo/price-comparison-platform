@@ -327,3 +327,30 @@ class TestAlertNotifications:
         assert result["notified"] == 0
         assert result["skipped_unverified"] == 1
         assert mail.sent == []
+
+    def test_the_email_names_the_shop_with_the_best_price(self, db_session, mail):
+        """
+        "Now: 800 JOD at SmartBuy" -- the shop is the actionable half.
+
+        THE BUG: the store was read as prices.get(product_id, {}).get("best"),
+        but price_summary() nests its figures one level deeper, under the
+        comparison group: {product_id: {"new": {...}, "second_hand": {...}}}.
+        So the lookup always returned None, the " at <shop>" clause was always
+        empty, and every price-drop email told the reader a price had been met
+        without saying where -- leaving them to search the site again for the
+        thing the alert existed to tell them.
+
+        Silent because the value is optional by design: `where` is "" when the
+        store is unknown, so the email still sent and every count was right.
+        The sibling lookup on the line above uses offers_for(), which is the
+        accessor that knows about the grouping.
+        """
+        from app.services.notifications import process_alerts
+
+        self._catalogue(db_session, price="800.000", target="850.000")
+        assert process_alerts(db_session)["notified"] == 1
+
+        body = mail.sent[0].text
+        assert "SmartBuy" in body, (
+            "the alert email did not name the shop with the best price: " + body
+        )
