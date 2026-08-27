@@ -8,8 +8,10 @@ import TierSection from '../components/search/TierSection';
 import Spinner from '../components/ui/Spinner';
 import { extractApiError } from '../utils/errors';
 import { MATCH_TIERS } from '../utils/constants';
+import { useLocale } from '../hooks/useLocale';
 
 export default function Results() {
+  const { t } = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const sort = searchParams.get('sort') || 'price_asc';
@@ -35,7 +37,7 @@ export default function Results() {
         );
       } catch (err) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-        setError(extractApiError(err, 'Could not load results.'));
+        setError(extractApiError(err, t('search.loadError')));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -43,7 +45,7 @@ export default function Results() {
 
     fetchResults();
     return () => controller.abort();
-  }, [query, sort, page]);
+  }, [query, sort, page, t]);
 
   // Options live in the URL so a result page can be bookmarked and shared,
   // and the back button steps through them.
@@ -66,7 +68,7 @@ export default function Results() {
         <SearchBar key={query} initialQuery={query} />
       </div>
 
-      <h1 className="mb-1 text-xl font-semibold text-gray-900">
+      <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">
         Results for &ldquo;{query}&rdquo;
       </h1>
 
@@ -84,17 +86,16 @@ export default function Results() {
       {loading && <Spinner />}
 
       {error && (
-        <div role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div role="alert" className="rounded-lg bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">
           {error}
         </div>
       )}
 
       {isEmpty && !loading && (
-        <div className="rounded-lg border border-dashed border-gray-300 px-4 py-10 text-center">
-          <p className="font-medium text-gray-700">No products matched.</p>
-          <p className="mt-1 text-sm text-gray-500">
-            Try fewer details &mdash; search &ldquo;iPhone 15&rdquo; instead of a
-            full specification.
+        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-4 py-10 text-center">
+          <p className="font-medium text-gray-700 dark:text-gray-300">{t('search.empty')}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {t('search.emptyHint')}
           </p>
         </div>
       )}
@@ -102,32 +103,32 @@ export default function Results() {
       {!loading &&
         !error &&
         data &&
-        MATCH_TIERS.map(({ key, title, blurb }) => (
+        MATCH_TIERS.map(({ key, titleKey, blurbKey }) => (
           <TierSection
             key={key}
-            title={title}
-            blurb={blurb}
+            title={t(titleKey)}
+            blurb={t(blurbKey)}
             products={data[key]}
             total={data.counts?.[key]}
           />
         ))}
 
       {!loading && !error && data && (page > 1 || data.has_more) && (
-        <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
+        <div className="mt-6 flex items-center justify-between border-t border-gray-200 dark:border-gray-800 pt-4">
           <button
             onClick={() => updateParams({ page: page - 1 })}
             disabled={page <= 1}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            className="rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 disabled:opacity-40"
           >
-            Previous
+            {t('common.previous')}
           </button>
-          <span className="text-sm text-gray-500">Page {page}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">Page {page}</span>
           <button
             onClick={() => updateParams({ page: page + 1 })}
             disabled={!data.has_more}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+            className="rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 disabled:opacity-40"
           >
-            Next
+            {t('common.next')}
           </button>
         </div>
       )}

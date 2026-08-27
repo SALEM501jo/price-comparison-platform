@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocale } from '../../hooks/useLocale';
 import { Link } from 'react-router-dom';
 import { addToWishlist, createAlert } from '../../api/prices';
 import { useAuth } from '../../hooks/useAuth';
@@ -12,6 +13,7 @@ import { DEFAULT_CURRENCY } from '../../utils/constants';
  * button that fails with a 401 after they click it.
  */
 export default function ProductActions({ productId, lowestTotal }) {
+  const { t } = useLocale();
   const { isAuthenticated } = useAuth();
 
   const [saved, setSaved] = useState(false);
@@ -30,8 +32,8 @@ export default function ProductActions({ productId, lowestTotal }) {
 
   if (!isAuthenticated) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-        <Link to="/login" className="font-medium text-blue-600 hover:underline">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+        <Link to="/login" className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
           Log in
         </Link>{' '}
         to save this product or set a price alert.
@@ -51,7 +53,7 @@ export default function ProductActions({ productId, lowestTotal }) {
       if (err.response?.status === 409) {
         setSaved(true);
       } else {
-        setMessage(extractApiError(err, 'Could not save this product.'));
+        setMessage(extractApiError(err, t('actions.saveError')));
       }
     } finally {
       setSavingWishlist(false);
@@ -67,7 +69,7 @@ export default function ProductActions({ productId, lowestTotal }) {
       setAlertSet(true);
       setShowAlertForm(false);
     } catch (err) {
-      setMessage(extractApiError(err, 'Could not create that alert.'));
+      setMessage(extractApiError(err, t('actions.alertError')));
     } finally {
       setSavingAlert(false);
     }
@@ -85,32 +87,36 @@ export default function ProductActions({ productId, lowestTotal }) {
               : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
           }`}
         >
-          {saved ? 'Saved to wishlist' : savingWishlist ? 'Saving…' : 'Save'}
+          {saved
+            ? t('actions.saved')
+            : savingWishlist
+              ? t('actions.saving')
+              : t('actions.save')}
         </button>
 
         {alertSet ? (
-          <span className="rounded-lg bg-green-100 px-4 py-2 text-sm font-medium text-green-800">
+          <span className="rounded-lg bg-green-100 dark:bg-green-900/40 px-4 py-2 text-sm font-medium text-green-800 dark:text-green-300">
             Alert set
           </span>
         ) : (
           <button
             onClick={() => setShowAlertForm((open) => !open)}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50"
           >
-            {showAlertForm ? 'Cancel' : 'Set price alert'}
+            {showAlertForm ? t('actions.cancel') : t('actions.setAlert')}
           </button>
         )}
 
         {saved && (
           <Link
             to="/wishlist"
-            className="self-center text-sm text-blue-600 hover:underline"
+            className="self-center text-sm text-brand-600 dark:text-brand-400 hover:underline"
           >
             View wishlist
           </Link>
         )}
         {alertSet && (
-          <Link to="/alerts" className="self-center text-sm text-blue-600 hover:underline">
+          <Link to="/alerts" className="self-center text-sm text-brand-600 dark:text-brand-400 hover:underline">
             View alerts
           </Link>
         )}
@@ -119,12 +125,12 @@ export default function ProductActions({ productId, lowestTotal }) {
       {showAlertForm && (
         <form
           onSubmit={handleCreateAlert}
-          className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4"
+          className="flex flex-wrap items-end gap-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4"
         >
           <div>
             <label
               htmlFor="target-price"
-              className="mb-1 block text-sm font-medium text-gray-700"
+              className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
               Tell me when it drops below
             </label>
@@ -137,23 +143,23 @@ export default function ProductActions({ productId, lowestTotal }) {
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 required
-                className="w-36 rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-36 rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
-              <span className="text-sm text-gray-500">{DEFAULT_CURRENCY}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">{DEFAULT_CURRENCY}</span>
             </div>
           </div>
           <button
             type="submit"
             disabled={savingAlert}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
-            {savingAlert ? 'Setting…' : 'Create alert'}
+            {savingAlert ? t('actions.settingAlert') : t('actions.createAlert')}
           </button>
         </form>
       )}
 
       {message && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
           {message}
         </p>
       )}

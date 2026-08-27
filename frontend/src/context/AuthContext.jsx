@@ -48,8 +48,8 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
-  const register = useCallback(async (email, password) => {
-    const data = await registerApi(email, password);
+  const register = useCallback(async (email, password, accountType = 'buyer') => {
+    const data = await registerApi(email, password, accountType);
     setUser(await getMe());
     return data;
   }, []);
@@ -65,6 +65,9 @@ export function AuthProvider({ children }) {
     user,
     isAuthenticated: Boolean(user),
     isAdmin: user?.role === 'admin',
+    // Admins count as merchants so they can reach the shop screens without a
+    // second account -- the API takes the same view. See require_merchant.
+    isMerchant: user?.role === 'merchant' || user?.role === 'admin',
     login,
     register,
     logout,

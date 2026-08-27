@@ -40,3 +40,14 @@ export const getPriceHistory = async (productId, config = {}) => {
   const { data } = await api.get(`/products/${productId}/history`, config);
   return data;
 };
+
+/**
+ * Products where shopping around saves the most.
+ *
+ * Not a discount off a list price -- we have no list price. It is the gap
+ * between the cheapest and dearest shop selling the same thing right now.
+ */
+export const getDeals = async (limit = 8, config = {}) => {
+  const { data } = await api.get('/products/deals', { ...config, params: { limit } });
+  return data;
+};

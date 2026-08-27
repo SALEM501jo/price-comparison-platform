@@ -68,13 +68,13 @@ export default function VerifyEmail() {
 
       {status === 'done' && (
         <>
-          <h1 className="text-xl font-semibold text-gray-900">Email confirmed</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Email confirmed</h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Your address is verified. Price alerts will now reach you.
           </p>
           <Link
             to="/"
-            className="mt-6 inline-block rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="mt-6 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
             Start searching
           </Link>
@@ -83,20 +83,20 @@ export default function VerifyEmail() {
 
       {(status === 'failed' || status === 'missing') && (
         <>
-          <h1 className="text-xl font-semibold text-gray-900">
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
             This link did not work
           </h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             It may have expired or already been used. Links work once and last
             24 hours.
           </p>
-          <p className="mt-4 text-sm text-gray-500">
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             Sign in and use <span className="font-medium">Resend the link</span> to
             get a new one.
           </p>
           <Link
             to="/login"
-            className="mt-6 inline-block rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="mt-6 inline-block rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50"
           >
             Go to login
           </Link>

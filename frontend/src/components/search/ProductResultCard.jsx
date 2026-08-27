@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import MatchBadge from './MatchBadge';
 import { formatPrice, formatStoreCount } from '../../utils/format';
+import { useLocale } from '../../hooks/useLocale';
 
 /**
  * One product in the results list.
@@ -10,22 +11,24 @@ import { formatPrice, formatStoreCount } from '../../utils/format';
  * lower sticker price and higher delivery is not the better deal.
  */
 export default function ProductResultCard({ product }) {
+  const { t } = useLocale();
   const inStock = product.store_count > 0;
+  const secondHand = (product.second_hand_store_count ?? 0) > 0;
 
   return (
     <Link
       to={`/product/${product.id}`}
-      className="block rounded-lg border border-gray-200 bg-white p-4 transition hover:border-blue-400 hover:shadow-sm"
+      className="block rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 transition hover:border-brand-400 hover:shadow-sm"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-medium text-gray-900">{product.canonical_name}</h3>
+            <h3 className="font-medium text-gray-900 dark:text-white">{product.canonical_name}</h3>
             <MatchBadge tier={product.match_tier} score={product.match_score} />
           </div>
 
           {product.brand && (
-            <p className="mt-0.5 text-xs uppercase tracking-wide text-gray-400">
+            <p className="mt-0.5 text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">
               {product.brand}
             </p>
           )}
@@ -36,7 +39,7 @@ export default function ProductResultCard({ product }) {
           {product.differences?.length > 0 && (
             <ul className="mt-2 space-y-0.5">
               {product.differences.map((difference) => (
-                <li key={difference} className="text-sm text-amber-700">
+                <li key={difference} className="text-sm text-amber-700 dark:text-amber-400">
                   {difference}
                 </li>
               ))}
@@ -44,22 +47,48 @@ export default function ProductResultCard({ product }) {
           )}
         </div>
 
+        {/* The headline figure is the NEW price. Second-hand stock is quoted
+            underneath rather than folded in, because a worn handset is not a
+            cheaper version of the same offer -- and if it were the headline,
+            every product with one used listing would look like a bargain. */}
         <div className="shrink-0 text-left sm:text-right">
           {inStock ? (
             <>
-              <p className="text-lg font-semibold text-gray-900">
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
                 {formatPrice(product.lowest_total_cost)}
               </p>
-              <p className="text-xs text-gray-500">
-                incl. delivery
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {t('common.inclDelivery')}
                 {product.best_deal_store ? ` · ${product.best_deal_store}` : ''}
               </p>
-              <p className="mt-1 text-xs text-gray-400">
-                {formatStoreCount(product.store_count)}
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                {formatStoreCount(product.store_count, t)}
               </p>
             </>
           ) : (
-            <p className="text-sm text-gray-400">Not in stock</p>
+            !secondHand && (
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                {t('common.notInStock')}
+              </p>
+            )
+          )}
+
+          {secondHand && (
+            <p className={`text-xs ${inStock ? 'mt-1.5 text-gray-500' : 'text-gray-700'}`}>
+              {inStock ? (
+                t('common.orUsedFrom', {
+                  price: formatPrice(product.second_hand_from),
+                })
+              ) : (
+                <>
+                  <span className="block text-lg font-semibold text-gray-900 dark:text-white">
+                    {formatPrice(product.second_hand_from)}
+                  </span>
+                  {t('common.usedOnly')} ·{' '}
+                  {formatStoreCount(product.second_hand_store_count, t)}
+                </>
+              )}
+            </p>
           )}
         </div>
       </div>

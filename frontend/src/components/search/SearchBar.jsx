@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useLocale } from '../../hooks/useLocale';
 
 // Example searches offered on the home page.
 //
@@ -9,8 +10,9 @@ import { useNavigate } from 'react-router-dom';
 // checks all three, so a catalogue change turns that into a failed check
 // rather than a dead first impression.
 //
-// The middle one deliberately returns an exact match AND similar ones, since
-// the tiering is the thing worth showing off.
+// NOT translated: they are product names, and a shopper types "iPhone 15"
+// into the box in either language. Rendering them in Arabic script would
+// produce a chip that does not match anything in the catalogue.
 const EXAMPLES = [
   'iPhone 15 128GB Black',
   'MacBook Air M2 256GB',
@@ -19,6 +21,7 @@ const EXAMPLES = [
 
 export default function SearchBar({ initialQuery = '', showExamples = false }) {
   const [query, setQuery] = useState(initialQuery);
+  const { t } = useLocale();
   const navigate = useNavigate();
 
   // NOTE: this box does not sync itself to `initialQuery` with an effect.
@@ -43,28 +46,35 @@ export default function SearchBar({ initialQuery = '', showExamples = false }) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search — try including storage and colour"
-            aria-label="Search for a product"
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder={t('search.placeholder')}
+            aria-label={t('search.placeholder')}
+            // dir="auto" so a query typed in Arabic aligns right and one
+            // typed in Latin aligns left, whichever language the UI is in --
+            // product names are almost always Latin even on the Arabic site.
+            dir="auto"
+            className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm transition placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500"
           />
           <button
             type="submit"
-            className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700"
+            className="rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           >
-            Search
+            {t('search.button')}
           </button>
         </div>
       </form>
 
       {showExamples && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-gray-400">Try:</span>
+          <span className="text-gray-400 dark:text-gray-500">
+            {t('search.try')}
+          </span>
           {EXAMPLES.map((example) => (
             <button
               key={example}
               type="button"
+              dir="ltr"
               onClick={() => submit(example)}
-              className="rounded-full bg-gray-100 px-3 py-1 text-gray-600 hover:bg-gray-200"
+              className="rounded-full bg-gray-100 px-3 py-1 text-gray-600 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               {example}
             </button>

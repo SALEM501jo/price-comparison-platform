@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useLocale } from '../../hooks/useLocale';
 import { formatPrice } from '../../utils/format';
 
 // One colour per store series. Chosen to stay distinguishable in greyscale
@@ -17,6 +18,7 @@ const PADDING = { top: 16, right: 16, bottom: 28, left: 56 };
  * of the whole bundle for one screen.
  */
 export default function PriceHistoryChart({ series }) {
+  const { t } = useLocale();
   const chart = useMemo(() => {
     const withData = (series ?? []).filter((s) => s.history?.length > 0);
     if (withData.length === 0) return null;
@@ -73,15 +75,14 @@ export default function PriceHistoryChart({ series }) {
 
   if (!chart) {
     return (
-      <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-        No price changes recorded yet. History builds up as stores change their
-        prices between scrapes.
+      <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+        {t('chart.noHistory')}
       </p>
     );
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
       <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -149,7 +150,7 @@ export default function PriceHistoryChart({ series }) {
 
       <ul className="mt-3 flex flex-wrap gap-4">
         {chart.series.map((s) => (
-          <li key={s.name} className="flex items-center gap-2 text-sm text-gray-600">
+          <li key={s.name} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <span
               className="inline-block h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: s.color }}

@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import { renderWithProviders as render } from '../../test/render';
 import { describe, expect, it } from 'vitest';
 import StorePriceTable from './StorePriceTable';
 

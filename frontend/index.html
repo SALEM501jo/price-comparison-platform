@@ -1,11 +1,48 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PriceCompare — Compare prices across Jordanian stores</title>
-      <meta name="description" content="Compare prices for the exact product you want across Jordanian retailers." />
+
+    <!-- Cairo carries Arabic and Latin, so the brand reads as one product in
+         either language. Preconnect because the wordmark is the first thing
+         painted and a font swap on the logo is very visible. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>احسن سعر — قارن الأسعار في الأردن</title>
+    <meta
+      name="description"
+      content="قارن أسعار المنتج الذي تريده بالضبط بين المتاجر الأردنية. Compare prices for the exact product you want across Jordanian retailers."
+    />
+
+    <!-- Applied before React mounts. Reading the stored choice in a component
+         means the first paint uses the wrong theme and direction, and the page
+         visibly flips a moment later. -->
+    <script>
+      (function () {
+        try {
+          var locale = localStorage.getItem('locale') || 'ar';
+          document.documentElement.lang = locale;
+          document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
+
+          var theme = localStorage.getItem('theme');
+          var prefersDark =
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (theme === 'dark' || (!theme && prefersDark)) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          /* private mode: fall through to the markup defaults */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

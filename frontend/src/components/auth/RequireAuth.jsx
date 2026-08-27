@@ -29,8 +29,8 @@ export default function RequireAuth({ children, requireAdmin = false }) {
   if (requireAdmin && !isAdmin) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <h1 className="text-xl font-semibold text-gray-900">Admin only</h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Admin only</h1>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           Your account does not have access to this page.
         </p>
       </div>

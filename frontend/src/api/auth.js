@@ -9,8 +9,15 @@ import api, { clearAccessToken, setAccessToken } from './axios';
  * that is held in memory rather than written to storage.
  */
 
-export const register = async (email, password) => {
-  const { data } = await api.post('/auth/register', { email, password });
+export const register = async (email, password, accountType = 'buyer') => {
+  // account_type is 'buyer' or 'merchant' only. The server maps it to a role
+  // rather than accepting a role name, so this value can never name a
+  // privileged one however it is tampered with.
+  const { data } = await api.post('/auth/register', {
+    email,
+    password,
+    account_type: accountType,
+  });
   setAccessToken(data.access_token);
   return data;
 };
@@ -58,4 +65,16 @@ export const verifyEmail = async (token) => {
  *  the address exists, so that it cannot be used to test who has an account. */
 export const resendVerification = async (email) => {
   await api.post('/auth/resend-verification', { email });
+};
+
+/** Ask for a password reset link. Always resolves -- the API never says whether the address exists. */
+export const forgotPassword = async (email) => {
+  const { data } = await api.post('/auth/forgot-password', { email });
+  return data;
+};
+
+/** Spend a reset link. Deliberately does NOT sign the user in. */
+export const resetPassword = async (token, password) => {
+  const { data } = await api.post('/auth/reset-password', { token, password });
+  return data;
 };

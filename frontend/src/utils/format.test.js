@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeAttributes, formatPrice, formatStoreCount } from './format';
 import { extractApiError, passwordProblems } from './errors';
+import translations from '../i18n/translations';
 
 describe('formatPrice', () => {
   it('formats to two decimals with the currency', () => {
@@ -21,16 +22,40 @@ describe('formatPrice', () => {
 });
 
 describe('formatStoreCount', () => {
+  // The English wording now lives in the translation table, so what this
+  // function still decides is WHICH key applies -- singular, plural, or the
+  // out-of-stock case. That choice is the logic worth pinning; the wording
+  // is content.
+  const t = (key, vars) => (vars ? `${key}:${vars.count}` : key);
+
   it('singularises one store', () => {
-    expect(formatStoreCount(1)).toBe('1 store');
+    expect(formatStoreCount(1, t)).toBe('common.storeOne');
   });
 
   it('pluralises more than one', () => {
-    expect(formatStoreCount(4)).toBe('4 stores');
+    expect(formatStoreCount(4, t)).toBe('common.stores:4');
   });
 
   it('says not in stock for zero', () => {
-    expect(formatStoreCount(0)).toBe('Not in stock');
+    expect(formatStoreCount(0, t)).toBe('common.notInStock');
+  });
+
+  it('renders real English through the actual table', () => {
+    const table = translations.en;
+    const real = (key, vars) =>
+      Object.entries(vars ?? {}).reduce(
+        (out, [name, value]) => out.replaceAll(`{${name}}`, String(value)),
+        table[key],
+      );
+    expect(formatStoreCount(4, real)).toBe('4 stores');
+    expect(formatStoreCount(1, real)).toBe('1 store');
+    expect(formatStoreCount(0, real)).toBe('Not in stock');
+  });
+
+  it('has an Arabic string for every one of those keys', () => {
+    for (const key of ['common.storeOne', 'common.stores', 'common.notInStock']) {
+      expect(translations.ar[key], `missing Arabic for ${key}`).toBeTruthy();
+    }
   });
 });
 

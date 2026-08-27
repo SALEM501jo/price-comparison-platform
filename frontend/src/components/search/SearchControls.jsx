@@ -1,7 +1,8 @@
+import { useLocale } from '../../hooks/useLocale';
 const SORT_OPTIONS = [
-  { value: 'price_asc', label: 'Cheapest first' },
-  { value: 'price_desc', label: 'Most expensive first' },
-  { value: 'name', label: 'Name (A–Z)' },
+  { value: 'price_asc', key: 'search.sort.priceAsc' },
+  { value: 'price_desc', key: 'search.sort.priceDesc' },
+  { value: 'name', key: 'search.sort.name' },
 ];
 
 /**
@@ -12,27 +13,33 @@ const SORT_OPTIONS = [
  * is the behaviour the tiers exist to prevent.
  */
 export default function SearchControls({ sort, onSortChange, total, counts }) {
+  const { t } = useLocale();
+
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm text-gray-500">
-        {total} {total === 1 ? 'product' : 'products'}
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        {total === 1 ? t('search.resultsOne') : t('search.results', { count: total })}
         {counts && (
-          <span className="ml-1 text-gray-400">
-            ({counts.exact} exact · {counts.close} close · {counts.similar} similar)
+          <span className="ml-1 text-gray-400 dark:text-gray-500">
+            {t('search.counts', {
+              exact: counts.exact,
+              close: counts.close,
+              similar: counts.similar,
+            })}
           </span>
         )}
       </p>
 
       <label className="flex items-center gap-2 text-sm">
-        <span className="text-gray-500">Sort within each group</span>
+        <span className="text-gray-500 dark:text-gray-400">{t('search.sortLabel')}</span>
         <select
           value={sort}
           onChange={(e) => onSortChange(e.target.value)}
-          className="rounded-lg border border-gray-300 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-gray-300 dark:border-gray-700 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500"
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
-              {option.label}
+              {t(option.key)}
             </option>
           ))}
         </select>

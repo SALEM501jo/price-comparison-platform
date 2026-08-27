@@ -12,20 +12,11 @@ export const ITEMS_PER_PAGE = 20;
 // Match tiers returned by GET /products/search, in display order.
 // Kept here so the labels live in one place rather than being retyped in
 // every component that renders a tier.
+// Translation KEYS, not English text. The wording lives in
+// src/i18n/translations.js so the tiers read correctly in both languages;
+// keeping copies here would guarantee the two drift apart.
 export const MATCH_TIERS = [
-  {
-    key: 'exact',
-    title: 'Exact match',
-    blurb: 'Everything you asked for',
-  },
-  {
-    key: 'close',
-    title: 'Close matches',
-    blurb: 'Same product, one detail differs',
-  },
-  {
-    key: 'similar',
-    title: 'Similar products',
-    blurb: 'Related, but not what you searched for',
-  },
+  { key: 'exact', titleKey: 'tier.exact', blurbKey: 'tier.exact.blurb' },
+  { key: 'close', titleKey: 'tier.close', blurbKey: 'tier.close.blurb' },
+  { key: 'similar', titleKey: 'tier.similar', blurbKey: 'tier.similar.blurb' },
 ];

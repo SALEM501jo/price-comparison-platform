@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { resendVerification } from '../../api/auth';
 import { useAuth } from '../../hooks/useAuth';
+import { useLocale } from '../../hooks/useLocale';
 
 /**
  * Prompt for a signed-in user who has not confirmed their address.
@@ -12,6 +13,7 @@ import { useAuth } from '../../hooks/useAuth';
  */
 export default function VerifyBanner() {
   const { user, isAuthenticated } = useAuth();
+  const { t } = useLocale();
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -28,22 +30,22 @@ export default function VerifyBanner() {
   };
 
   return (
-    <div className="border-b border-amber-200 bg-amber-50">
+    <div className="border-b border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
-        <span className="text-amber-900">
-          Confirm your email to receive price alerts.
+        <span className="text-amber-900 dark:text-amber-200">
+          {t('auth.verifyBanner')}
         </span>
         {sent ? (
-          <span className="font-medium text-amber-900">
-            Link sent — check your inbox.
+          <span className="font-medium text-amber-900 dark:text-amber-200">
+            {t('auth.linkSent')}
           </span>
         ) : (
           <button
             onClick={handleResend}
             disabled={sending}
-            className="font-medium text-amber-900 underline hover:no-underline disabled:opacity-50"
+            className="font-medium text-amber-900 underline hover:no-underline disabled:opacity-50 dark:text-amber-200"
           >
-            {sending ? 'Sending…' : 'Resend the link'}
+            {sending ? t('auth.sending') : t('auth.resendLink')}
           </button>
         )}
       </div>
