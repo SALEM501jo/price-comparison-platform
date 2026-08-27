@@ -182,6 +182,14 @@ export default function Admin() {
                   <th className="px-4 py-3 font-medium">Account</th>
                   <th className="px-4 py-3 font-medium">Contact</th>
                   <th className="px-4 py-3 font-medium">Listings</th>
+                  {/* TAPS, not calls -- a shopper pressing Call or WhatsApp.
+                      The header says so because this is the number a shop
+                      would be billed against, and the admin deciding what to
+                      charge needs to read it the same way the merchant does.
+                      Both screens take it from one query in contact_stats. */}
+                  <th className="px-4 py-3 font-medium" title="Shoppers who tapped Call, WhatsApp or Facebook. Not calls made, and not sales.">
+                    Taps (30d)
+                  </th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -224,6 +232,19 @@ export default function Admin() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{store.listing_count}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {store.contact_taps ?? 0}
+                      </span>
+                      {store.contact_taps > 0 && (
+                        <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                          {['call', 'whatsapp', 'facebook']
+                            .filter((c) => store.contact_taps_by_channel?.[c])
+                            .map((c) => `${c} ${store.contact_taps_by_channel[c]}`)
+                            .join(' · ')}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {store.is_verified ? (
                         <span className="text-green-700 dark:text-green-400">Verified</span>
@@ -246,7 +267,7 @@ export default function Admin() {
                   </tr>
                   {openStoreId === store.id && (
                     <tr>
-                      <td colSpan={6} className="bg-gray-50 dark:bg-gray-900 px-4 py-3">
+                      <td colSpan={7} className="bg-gray-50 dark:bg-gray-900 px-4 py-3">
                         {!storeListings[store.id] ? (
                           <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
                         ) : storeListings[store.id].length === 0 ? (

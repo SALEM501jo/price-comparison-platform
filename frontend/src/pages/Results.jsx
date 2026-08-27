@@ -16,6 +16,9 @@ export default function Results() {
   const query = searchParams.get('q') || '';
   const sort = searchParams.get('sort') || 'price_asc';
   const page = Number(searchParams.get('page') || 1);
+  // 'exact' in the URL means the shopper rejected our correction. It
+  // lives in the URL so the choice survives a reload and a shared link.
+  const exact = searchParams.get('exact') === '1';
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -33,7 +36,11 @@ export default function Results() {
       setError(null);
       try {
         setData(
-          await searchProducts(query, { sort, page }, { signal: controller.signal }),
+          await searchProducts(
+            query,
+            { sort, page, ...(exact ? { correct: false } : {}) },
+            { signal: controller.signal },
+          ),
         );
       } catch (err) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
@@ -45,7 +52,7 @@ export default function Results() {
 
     fetchResults();
     return () => controller.abort();
-  }, [query, sort, page, t]);
+  }, [query, sort, page, exact, t]);
 
   // Options live in the URL so a result page can be bookmarked and shared,
   // and the back button steps through them.
@@ -69,8 +76,27 @@ export default function Results() {
       </div>
 
       <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">
-        Results for &ldquo;{query}&rdquo;
+        {t('search.resultsFor', { query })}
       </h1>
+
+      {/* A spelling correction, stated rather than applied silently.
+          Answering a different question from the one asked, without saying
+          so, is how somebody ends up buying the wrong phone -- so the
+          corrected wording is shown, and the original stays one click away. */}
+      {!loading && !error && data?.interpretation?.corrected_query && (
+        <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+          {t('search.showingFor', {
+            corrected: data.interpretation.corrected_query,
+          })}{' '}
+          <button
+            type="button"
+            onClick={() => setSearchParams({ q: query, exact: '1' })}
+            className="text-brand-600 hover:underline dark:text-brand-400"
+          >
+            {t('search.searchInstead', { original: query })}
+          </button>
+        </p>
+      )}
 
       {!loading && !error && data?.total > 0 && (
         <SearchControls
@@ -122,7 +148,9 @@ export default function Results() {
           >
             {t('common.previous')}
           </button>
-          <span className="text-sm text-gray-500 dark:text-gray-400">Page {page}</span>
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {t('common.page', { page })}
+          </span>
           <button
             onClick={() => updateParams({ page: page + 1 })}
             disabled={!data.has_more}

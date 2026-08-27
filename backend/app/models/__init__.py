@@ -19,4 +19,5 @@ __all__ = [
     "EmailToken",
 ]
 from app.models.support import SupportMessage  # noqa: F401
+from app.models.contact_event import ContactEvent, ContactChannel  # noqa: F401
 from app.models.scrape_job import ScrapeJob  # noqa: F401

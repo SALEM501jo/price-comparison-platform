@@ -67,3 +67,15 @@ export const getStoreListings = async (storeId, config = {}) => {
   const { data } = await api.get(`/admin/stores/${storeId}/listings`, config);
   return data;
 };
+
+/**
+ * How many shoppers asked for this shop's number.
+ *
+ * TAPS, not calls: a tap is someone pressing Call or WhatsApp. Whether the
+ * phone rang, was answered, or led to a sale happens off this platform, and
+ * every label here says so.
+ */
+export const getMyStats = async (config = {}) => {
+  const { data } = await api.get('/merchant/stats', config);
+  return data;
+};

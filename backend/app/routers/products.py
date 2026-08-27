@@ -2,24 +2,29 @@
 Product search and comparison routes.
 """
 
-from fastapi import APIRouter, Depends, Query, Request, HTTPException
+from fastapi import APIRouter, Depends, Query, Request, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from typing import Optional, List
+from sqlalchemy import func, or_
+from typing import Literal, Optional, List
+
+from pydantic import BaseModel
 from app.database import get_db
 from app.dependencies import get_current_user_optional, get_rate_limited
 from app.models.product import Product
 from app.models.alias import ProductAlias
 from app.models.price import Price, PriceHistory
 from app.models.store import Store
+from app.models.contact_event import ContactEvent
 from app.schemas.product import (
     ProductDetailResponse,
     StorePriceResponse,
     PriceHistoryResponse,
     PriceHistoryPoint
 )
-from app.schemas.search import TieredSearchResponse
-from app.services.search import best_savings, search_products
+from app.schemas.search import SearchSuggestion, TieredSearchResponse
+from app.matching import normalize
+from app.matching import spelling
+from app.services.search import best_savings, escape_like, search_products
 from app.config import get_settings
 from app.services.cache import cached_json, catalogue_version, store_json
 import hashlib
@@ -36,6 +41,12 @@ async def search(
     sort: str = Query("price_asc", pattern=r"^(price_asc|price_desc|name)$"),
     page: int = Query(1, ge=1, le=100),
     limit: int = Query(20, ge=1, le=50),
+    correct: bool = Query(
+        True,
+        description="Set false to search exactly what was typed. This is what "
+        "the 'search instead for' link uses -- without it the server would "
+        "just re-apply the same correction and the link would do nothing.",
+    ),
     db: Session = Depends(get_db),
     _: None = Depends(get_rate_limited),
 ):
@@ -55,7 +66,9 @@ async def search(
     # listing or an admin verifying a store retires every cached result at
     # once instead of leaving search five minutes behind the product page.
     version = await catalogue_version()
-    fingerprint = f"{q.strip().lower()}|{category or ''}|{sort}|{page}|{limit}"
+    fingerprint = (
+        f"{q.strip().lower()}|{category or ''}|{sort}|{page}|{limit}|{correct}"
+    )
     cache_key = (
         f"search:v3:{version}:{hashlib.sha256(fingerprint.encode()).hexdigest()}"
     )
@@ -67,7 +80,13 @@ async def search(
         return TieredSearchResponse.model_validate(cached)
 
     response = search_products(
-        db, q, category=category, sort=sort, page=page, limit=limit
+        db,
+        q,
+        category=category,
+        sort=sort,
+        page=page,
+        limit=limit,
+        allow_correction=correct,
     )
     await store_json(cache_key, response.model_dump(mode="json"))
     return response
@@ -94,6 +113,78 @@ async def deals(
         return cached
 
     results = best_savings(db, limit=limit)
+    await store_json(cache_key, results)
+    return results
+
+
+@router.get("/suggest", response_model=List[SearchSuggestion])
+async def suggest(
+    q: str = Query(..., min_length=1, max_length=100),
+    limit: int = Query(8, ge=1, le=20),
+    db: Session = Depends(get_db),
+    _: None = Depends(get_rate_limited),
+):
+    """
+    Type-ahead suggestions, from the catalogue itself rather than a word list.
+
+    DECLARED BEFORE /{product_id} for the same reason /deals is: FastAPI
+    matches in order, so the dynamic route would otherwise swallow "suggest"
+    and fail validating it as an integer.
+
+    WHY SUGGEST REAL PRODUCT NAMES: the platform's whole argument is that a
+    shopper should state the exact variant -- "iPhone 15 128GB Black", not
+    "iPhone". A suggestion list made of real catalogue entries teaches that by
+    example, and every suggestion is guaranteed to return something, which a
+    generated word list cannot promise.
+
+    The query is normalised first, so an Arabic prefix reaches the Latin
+    product names it should: "ايفو" is folded to "iphone" before the LIKE.
+    """
+    typed = q.strip()
+    if not typed:
+        return []
+
+    # Fold Arabic and fix an obvious typo before matching -- otherwise the
+    # suggestions disappear at exactly the moment they are most useful, which
+    # is when the shopper has misspelled something.
+    folded = normalize(typed)
+    corrected, _fixes = spelling.correct(folded)
+
+    version = await catalogue_version()
+    cache_key = (
+        f"suggest:v1:{version}:{limit}:"
+        f"{hashlib.sha256(corrected.encode()).hexdigest()}"
+    )
+    cached = await cached_json(cache_key)
+    if cached is not None:
+        return cached
+
+    terms = {t for t in (folded, corrected, typed.lower()) if t}
+    conditions = [
+        Product.canonical_name.ilike(f"%{escape_like(term)}%", escape="\\")
+        for term in terms
+    ]
+
+    rows = (
+        db.query(Product)
+        # Only products search can actually return. A suggestion that leads to
+        # an empty result page is worse than no suggestion.
+        .filter(Product.match_category.isnot(None))
+        .filter(or_(*conditions))
+        .order_by(func.length(Product.canonical_name), Product.id)
+        .limit(limit)
+        .all()
+    )
+
+    results = [
+        SearchSuggestion(
+            product_id=product.id,
+            label=product.canonical_name,
+            brand=product.brand,
+            category=product.match_category,
+        ).model_dump()
+        for product in rows
+    ]
     await store_json(cache_key, results)
     return results
 
@@ -125,6 +216,7 @@ async def get_product(
     price_responses = []
     for price, alias, store in prices:
         price_responses.append(StorePriceResponse(
+            store_id=store.id,
             store_name=store.name,
             store_logo=store.logo_url,
             price=price.price,
@@ -213,3 +305,69 @@ async def get_price_history(
         )
         for alias_id, bucket in by_alias.items()
     ]
+
+
+class ContactTap(BaseModel):
+    """A shopper tapping Call, WhatsApp or Facebook on a shop's listing."""
+
+    store_id: int
+    product_id: Optional[int] = None
+    # A Literal, not the enum, so an unknown channel is a 422 at the edge
+    # rather than a string the handler has to remember to reject -- the same
+    # treatment /admin's RoleChange gets.
+    channel: Literal["call", "whatsapp", "facebook"]
+
+
+@router.post("/contact-event", status_code=status.HTTP_202_ACCEPTED)
+async def record_contact(
+    body: ContactTap,
+    db: Session = Depends(get_db),
+    _: None = Depends(get_rate_limited),
+):
+    """
+    Record that a shopper asked for a shop's number.
+
+    THIS IS THE ONLY EVIDENCE THE PLATFORM PRODUCES. There is no checkout, so
+    a tap is the last thing visible before the conversation moves to the
+    phone. Without it a merchant asked to pay has no answer to "what did I
+    get for this", which the project's own notes flag as the thing to build
+    before charging anyone.
+
+    Unauthenticated, because shoppers are not required to have accounts and
+    requiring one would measure only the minority who do.
+
+    ALWAYS 202, whatever happens -- including for a store id that does not
+    exist or is not publicly visible. This endpoint takes a store id from an
+    anonymous caller, so a 404 would turn it into a way to enumerate which
+    shops exist and which are still unverified. Nothing is written in those
+    cases; the response simply does not say so.
+
+    Stores NO personal data: see app/models/contact_event.py. The per-IP rate
+    limit is what makes casual inflation tedious; it cannot make it
+    impossible, which is exactly why the figure is reported as taps rather
+    than as calls or customers.
+    """
+    store = (
+        db.query(Store)
+        .filter(Store.id == body.store_id)
+        .filter(Store.visible_to_shoppers())
+        .first()
+    )
+    if store is None:
+        return {"status": "accepted"}
+
+    # A product id that is not real is dropped rather than rejected: the tap
+    # against the shop still happened and is the number that matters.
+    product_id = body.product_id
+    if product_id is not None:
+        exists = db.query(Product.id).filter(Product.id == product_id).first()
+        if exists is None:
+            product_id = None
+
+    db.add(
+        ContactEvent(
+            store_id=store.id, product_id=product_id, channel=body.channel
+        )
+    )
+    db.commit()
+    return {"status": "accepted"}

@@ -4,6 +4,11 @@ from datetime import datetime
 
 
 class StorePriceResponse(BaseModel):
+    # The id is exposed so the UI can attribute a Call/WhatsApp tap to the
+    # right shop. It identifies a SHOP, not a person, and the endpoint that
+    # receives it treats an unknown or hidden id as a no-op -- see
+    # /products/contact-event for why it cannot be used to enumerate stores.
+    store_id: int
     store_name: str
     store_logo: Optional[str]
     price: float

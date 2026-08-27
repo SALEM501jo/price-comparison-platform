@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLocale } from '../../hooks/useLocale';
+import SearchSuggestions from './SearchSuggestions';
 
 // Example searches offered on the home page.
 //
@@ -21,6 +22,10 @@ const EXAMPLES = [
 
 export default function SearchBar({ initialQuery = '', showExamples = false }) {
   const [query, setQuery] = useState(initialQuery);
+  // Suggestions are hidden until the box is focused AND the shopper has typed
+  // since the last submit, so arriving on /results does not immediately drop
+  // a list over the results they just asked for.
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { t } = useLocale();
   const navigate = useNavigate();
 
@@ -30,7 +35,16 @@ export default function SearchBar({ initialQuery = '', showExamples = false }) {
 
   const submit = (value) => {
     const trimmed = value.trim();
+    setShowSuggestions(false);
     if (trimmed) navigate(`/results?q=${encodeURIComponent(trimmed)}`);
+  };
+
+  // A suggestion IS a product, so it goes straight to that product rather
+  // than running a search that would only have to find it again.
+  const pickSuggestion = (item) => {
+    setQuery(item.label);
+    setShowSuggestions(false);
+    navigate(`/product/${item.product_id}`);
   };
 
   const handleSubmit = (e) => {
@@ -41,11 +55,20 @@ export default function SearchBar({ initialQuery = '', showExamples = false }) {
   return (
     <div className="w-full max-w-2xl">
       <form onSubmit={handleSubmit}>
-        <div className="flex gap-2">
+        <div className="relative flex gap-2">
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setShowSuggestions(true);
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setShowSuggestions(false)}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={showSuggestions}
+            aria-autocomplete="list"
             placeholder={t('search.placeholder')}
             aria-label={t('search.placeholder')}
             // dir="auto" so a query typed in Arabic aligns right and one
@@ -60,6 +83,16 @@ export default function SearchBar({ initialQuery = '', showExamples = false }) {
           >
             {t('search.button')}
           </button>
+
+          {showSuggestions && (
+            <div className="absolute inset-x-0 top-full">
+              <SearchSuggestions
+                query={query}
+                onPick={pickSuggestion}
+                onDismiss={() => setShowSuggestions(false)}
+              />
+            </div>
+          )}
         </div>
       </form>
 

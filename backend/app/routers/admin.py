@@ -28,6 +28,7 @@ from app.schemas.auth import UserResponse
 from app.schemas.merchant import ListingUpdate
 from app.database import SessionLocal
 from app.logging_config import get_security_logger
+from app.services import contact_stats
 from app.services.cache import bump_catalogue_version
 from app.models.scrape_job import ScrapeJob
 from app.services import jobs as job_queue
@@ -325,6 +326,9 @@ async def list_stores(
         user.id: user
         for user in db.query(User).filter(User.id.in_(owner_ids or [0])).all()
     }
+    # A third bulk lookup, in the same spirit as the two above: one grouped
+    # query for every store's taps rather than one per row.
+    taps = contact_stats.totals_for_stores(db, store_ids)
 
     rows = []
     for store in stores:
@@ -348,6 +352,17 @@ async def list_stores(
                 if owner
                 else None,
                 "created_at": store.created_at,
+                # How much traffic this shop is actually getting. An admin
+                # judging a claim, or deciding what a shop is worth charging,
+                # needs the number the merchant sees -- from the same query,
+                # so the two screens can never disagree.
+                #
+                # TAPS, not calls: see app/models/contact_event.py.
+                "contact_taps": taps.get(store.id, {}).get("total", 0),
+                "contact_taps_by_channel": taps.get(store.id, {}).get(
+                    "by_channel", {}
+                ),
+                "contact_taps_window_days": contact_stats.DEFAULT_WINDOW_DAYS,
             }
         )
     return rows

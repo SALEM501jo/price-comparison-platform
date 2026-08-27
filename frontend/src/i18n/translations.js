@@ -55,6 +55,11 @@ const translations = {
     'search.try': 'جرّب:',
     'search.results': '{count} منتج',
     'search.resultsOne': 'منتج واحد',
+    'search.showingFor': 'نعرض نتائج «{corrected}»',
+    'search.searchInstead': 'ابحث بدلاً من ذلك عن «{original}»',
+    'search.suggestions': 'اقتراحات',
+    'search.resultsFor': 'نتائج البحث عن «{query}»',
+    'common.page': 'صفحة {page}',
     'search.counts': '({exact} مطابق · {close} قريب · {similar} مشابه)',
     'search.sortLabel': 'الترتيب داخل كل مجموعة',
     'search.sort.priceAsc': 'الأرخص أولاً',
@@ -192,6 +197,22 @@ const translations = {
     'merchant.save': 'حفظ',
     'merchant.productCount': '{count} منتج',
     'merchant.productCountOne': 'منتج واحد',
+    // --- Contact taps -------------------------------------------------
+    // TAPS, not calls. A tap is a shopper pressing Call or WhatsApp; whether
+    // the phone rang or anyone bought anything happens off this platform.
+    // The wording matters because a merchant is billed against this number.
+    'stats.heading': 'وصول العملاء إليك',
+    'stats.window': 'آخر {days} يوماً',
+    'stats.taps': '{count} نقرة',
+    'stats.tapsOne': 'نقرة واحدة',
+    'stats.tapsNone': 'لا توجد نقرات بعد',
+    'stats.call': 'اتصال',
+    'stats.whatsapp': 'واتساب',
+    'stats.facebook': 'فيسبوك',
+    'stats.topProducts': 'الأكثر طلباً',
+    'stats.explainer':
+      'هذه نقرات على زر الاتصال أو واتساب — أي أن المتسوق طلب رقمك. لا نعرف إن تم الاتصال فعلاً أو تمت عملية بيع.',
+    'stats.unverifiedHint': 'متجرك غير موثّق بعد، لذلك أسعارك لا تظهر للمتسوقين ولن تصلك نقرات.',
     'merchant.loadError': 'تعذّر تحميل متجرك.',
     'merchant.saveError': 'تعذّر حفظ المنتج.',
 
@@ -286,6 +307,11 @@ const translations = {
     'search.try': 'Try:',
     'search.results': '{count} products',
     'search.resultsOne': '1 product',
+    'search.showingFor': 'Showing results for “{corrected}”',
+    'search.searchInstead': 'Search instead for “{original}”',
+    'search.suggestions': 'Suggestions',
+    'search.resultsFor': 'Results for “{query}”',
+    'common.page': 'Page {page}',
     'search.counts': '({exact} exact · {close} close · {similar} similar)',
     'search.sortLabel': 'Sort within each group',
     'search.sort.priceAsc': 'Cheapest first',
@@ -419,6 +445,19 @@ const translations = {
     'merchant.save': 'Save',
     'merchant.productCount': '{count} products',
     'merchant.productCountOne': '1 product',
+    // --- Contact taps -------------------------------------------------
+    'stats.heading': 'How shoppers reached you',
+    'stats.window': 'last {days} days',
+    'stats.taps': '{count} taps',
+    'stats.tapsOne': '1 tap',
+    'stats.tapsNone': 'No taps yet',
+    'stats.call': 'Call',
+    'stats.whatsapp': 'WhatsApp',
+    'stats.facebook': 'Facebook',
+    'stats.topProducts': 'Most asked about',
+    'stats.explainer':
+      'These are taps on Call or WhatsApp — a shopper asking for your number. We cannot see whether the call was made or anything was sold.',
+    'stats.unverifiedHint': 'Your shop is not verified yet, so your prices are hidden from shoppers and no taps will arrive.',
     'merchant.loadError': 'Could not load your shop.',
     'merchant.saveError': 'Could not save the product.',
 

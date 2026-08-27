@@ -1,5 +1,6 @@
 import { formatPrice, formatAge, isPriceStale } from '../../utils/format';
 import { useLocale } from '../../hooks/useLocale';
+import { recordContactTap } from '../../api/products';
 
 /**
  * Every store's price for one product, cheapest total first.
@@ -14,8 +15,22 @@ import { useLocale } from '../../hooks/useLocale';
  * actually rings.
  */
 
-function ContactLinks({ row }) {
+function ContactLinks({ row, productId }) {
   const links = [];
+
+  // Count the tap, then get out of the way.
+  //
+  // There is no checkout here, so this is the LAST thing the platform can
+  // observe before the conversation moves to a phone. It is what lets a shop
+  // be told "47 people asked for your number last month" instead of being
+  // asked to take the platform's word for its value.
+  //
+  // Deliberately NOT awaited and never allowed to throw: the visitor is
+  // leaving for their dialler and must not wait on an analytics write, and a
+  // lost row is worth far less than an interrupted purchase.
+  const tap = (channel) => {
+    recordContactTap(row.store_id, productId, channel);
+  };
 
   if (row.whatsapp) {
     // wa.me wants the international form without a plus or leading zero.
@@ -24,6 +39,7 @@ function ContactLinks({ row }) {
       <a
         key="whatsapp"
         href={`https://wa.me/${international}`}
+        onClick={() => tap('whatsapp')}
         target="_blank"
         rel="noopener noreferrer"
         className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700"
@@ -38,6 +54,7 @@ function ContactLinks({ row }) {
       <a
         key="phone"
         href={`tel:${row.phone}`}
+        onClick={() => tap('call')}
         className="rounded-md border border-gray-300 dark:border-gray-700 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50"
       >
         {row.phone}
@@ -50,6 +67,7 @@ function ContactLinks({ row }) {
       <a
         key="facebook"
         href={row.facebook_url}
+        onClick={() => tap('facebook')}
         target="_blank"
         rel="noopener noreferrer"
         className="text-brand-600 dark:text-brand-400 hover:underline"
@@ -98,7 +116,7 @@ function ConditionDetails({ row }) {
   );
 }
 
-export default function StorePriceTable({ prices, emptyMessage }) {
+export default function StorePriceTable({ prices, emptyMessage, productId }) {
   const { t } = useLocale();
 
   if (!prices?.length) {
@@ -191,7 +209,7 @@ export default function StorePriceTable({ prices, emptyMessage }) {
                 </td>
                 <td className="px-4 py-3 text-right">
                   {row.is_merchant ? (
-                    <ContactLinks row={row} />
+                    <ContactLinks row={row} productId={productId} />
                   ) : (
                     row.store_product_url && (
                       <a

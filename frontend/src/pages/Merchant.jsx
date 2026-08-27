@@ -9,6 +9,7 @@ import {
   updateListing,
   updateMyStore,
 } from '../api/merchant';
+import ContactStats from '../components/merchant/ContactStats';
 import Spinner from '../components/ui/Spinner';
 import { extractApiError } from '../utils/errors';
 import { formatAge, formatPrice, isPriceStale } from '../utils/format';
@@ -686,6 +687,10 @@ export default function Merchant() {
       )}
 
       <div className="space-y-6">
+        {/* First, because it answers the question a shop owner actually
+            opens this page with: is any of this working? */}
+        <ContactStats isVerified={store.is_verified} />
+
         <ContactPanel store={store} onSaved={setStore} />
 
         <AddListing

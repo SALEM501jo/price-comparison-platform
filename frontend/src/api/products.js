@@ -17,7 +17,7 @@ import api from './axios';
  * "different colour (blue, not black)".
  */
 export const searchProducts = async (query, options = {}, config = {}) => {
-  const { sort, page, limit, category } = options;
+  const { sort, page, limit, category, correct } = options;
   const { data } = await api.get('/products/search', {
     params: {
       q: query,
@@ -25,6 +25,9 @@ export const searchProducts = async (query, options = {}, config = {}) => {
       ...(page ? { page } : {}),
       ...(limit ? { limit } : {}),
       ...(category ? { category } : {}),
+      // Only sent when switching it OFF, so the ordinary request keeps the
+      // cache key it has always had.
+      ...(correct === false ? { correct: false } : {}),
     },
     ...config, // carries an AbortSignal so stale requests can be cancelled
   });
@@ -50,4 +53,39 @@ export const getPriceHistory = async (productId, config = {}) => {
 export const getDeals = async (limit = 8, config = {}) => {
   const { data } = await api.get('/products/deals', { ...config, params: { limit } });
   return data;
+};
+
+/**
+ * Type-ahead suggestions, drawn from the catalogue itself.
+ *
+ * Every suggestion is a real product, so clicking one is guaranteed to lead
+ * somewhere -- and it teaches by example that stating the variant
+ * ("iPhone 15 128GB Black") is what this site rewards.
+ */
+export const getSuggestions = async (query, config = {}) => {
+  const { data } = await api.get('/products/suggest', {
+    ...config,
+    params: { q: query, limit: 8 },
+  });
+  return data;
+};
+
+/**
+ * Record a shopper tapping Call, WhatsApp or Facebook on a shop's listing.
+ *
+ * FIRE AND FORGET, deliberately. This runs as the visitor leaves for their
+ * phone app, so it must never delay or block that -- and a failure here is a
+ * missing row in an analytics table, not something worth interrupting
+ * somebody's purchase for. Errors are swallowed for the same reason.
+ */
+export const recordContactTap = async (storeId, productId, channel) => {
+  try {
+    await api.post('/products/contact-event', {
+      store_id: storeId,
+      product_id: productId ?? null,
+      channel,
+    });
+  } catch {
+    // Analytics must never break the thing being measured.
+  }
 };

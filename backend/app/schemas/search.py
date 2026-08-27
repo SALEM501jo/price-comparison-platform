@@ -65,6 +65,19 @@ class SearchInterpretation(BaseModel):
         "results came from a plain name search instead.",
     )
 
+    # A spelling correction the server applied, if any. Reported rather than
+    # applied silently: answering a different question from the one asked,
+    # without saying so, is how somebody ends up buying the wrong phone.
+    corrected_query: Optional[str] = Field(
+        None,
+        description="The query actually searched, when it differs from what "
+        "was typed. Null when nothing was corrected.",
+    )
+    corrections: Dict[str, str] = Field(
+        default_factory=dict,
+        description="{typed: corrected} for each word changed",
+    )
+
 
 class TierCounts(BaseModel):
     """How many matched each tier BEFORE pagination.
@@ -94,3 +107,16 @@ class TieredSearchResponse(BaseModel):
     has_more: bool = Field(
         False, description="True when any tier has further pages"
     )
+
+
+class SearchSuggestion(BaseModel):
+    """One type-ahead suggestion.
+
+    Carries the product id as well as the label so a click can go straight to
+    the product rather than running a search that has to find it again.
+    """
+
+    product_id: int
+    label: str
+    brand: Optional[str] = None
+    category: Optional[str] = None

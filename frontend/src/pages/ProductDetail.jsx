@@ -148,6 +148,7 @@ export default function ProductDetail() {
       <StorePriceTable
         prices={newOffers}
         emptyMessage={t('product.noNewListings')}
+        productId={product.id}
       />
 
       {secondHandOffers.length > 0 && (
@@ -158,7 +159,7 @@ export default function ProductDetail() {
           <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
             {t('product.usedHint')}
           </p>
-          <StorePriceTable prices={secondHandOffers} />
+          <StorePriceTable prices={secondHandOffers} productId={product.id} />
         </>
       )}
 

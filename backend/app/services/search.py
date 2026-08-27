@@ -22,6 +22,7 @@ from sqlalchemy import distinct, func, or_
 from sqlalchemy.orm import Session
 
 from app.matching import CLOSE, EXACT, SIMILAR, parse, score_match
+from app.matching import spelling
 from app.models.alias import ProductAlias, comparison_group
 from app.models.price import Price
 from app.models.product import Product
@@ -85,17 +86,32 @@ def _candidates(
             return structured
 
     # Fallback: plain name search.
-    term = f"%{escape_like(raw_query)}%"
+    #
+    # BOTH the raw query and its normalised form are tried. For a Latin query
+    # they are near enough the same string and the second costs nothing. For
+    # an ARABIC one they are completely different: product names in the
+    # catalogue are Latin, so matching the raw Arabic against them finds
+    # nothing at all, while the normalised form has already been folded to
+    # canonical English tokens ("سوني" -> "sony"). Without this an Arabic
+    # query that does not parse structurally returns an empty page rather
+    # than the name matches it should.
+    terms = {raw_query.strip(), parsed.normalized}
+    conditions = []
+    for candidate_term in terms:
+        if not candidate_term:
+            continue
+        like = f"%{escape_like(candidate_term)}%"
+        conditions.append(Product.canonical_name.ilike(like, escape="\\"))
+        conditions.append(Product.brand.ilike(like, escape="\\"))
+
+    if not conditions:
+        return []
+
     fallback = db.query(Product)
     if category:
         fallback = fallback.filter(Product.category == category)
     return (
-        fallback.filter(
-            or_(
-                Product.canonical_name.ilike(term, escape="\\"),
-                Product.brand.ilike(term, escape="\\"),
-            )
-        )
+        fallback.filter(or_(*conditions))
         .limit(CANDIDATE_LIMIT)
         .all()
     )
@@ -225,6 +241,7 @@ def search_products(
     sort: str = DEFAULT_SORT,
     page: int = 1,
     limit: int = 20,
+    allow_correction: bool = True,
 ) -> TieredSearchResponse:
     """
     Run a tiered search and return results grouped by match quality.
@@ -246,18 +263,44 @@ def search_products(
     # who omits a word has not asserted its absence.
     parsed = parse(raw_query, require_evidence=False, apply_defaults=False)
 
+    # SPELLING, second. The correction is only accepted when it makes the
+    # query MORE understood than what was typed -- strictly more attributes
+    # extracted. Correcting whenever a word happens to be near a known one
+    # would let "iphone a16" drift to "a15", and the two are different
+    # products; requiring the correction to earn its place means a typo that
+    # changes nothing measurable is left exactly as the shopper wrote it.
+    #
+    # Runs AFTER the first parse, not before, so a query that already works
+    # never pays for it and can never be altered.
+    search_query = raw_query
+    corrected_query: str | None = None
+    corrections: dict[str, str] = {}
+
+    candidate_text, candidate_fixes = spelling.correct(raw_query)
+    if candidate_fixes and allow_correction:
+        candidate = parse(
+            candidate_text, require_evidence=False, apply_defaults=False
+        )
+        if len(candidate.specified) > len(parsed.specified):
+            parsed = candidate
+            search_query = candidate_text
+            corrected_query = candidate_text
+            corrections = candidate_fixes
+
     interpretation = SearchInterpretation(
         query=raw_query,
         category=parsed.category if parsed.specified else None,
         attributes=parsed.specified,
         structured=bool(parsed.specified),
+        corrected_query=corrected_query,
+        corrections=corrections,
     )
 
     empty = TieredSearchResponse(
         interpretation=interpretation, total=0, page=page, limit=limit, sort=sort
     )
 
-    candidates = _candidates(db, parsed, raw_query, category)
+    candidates = _candidates(db, parsed, search_query, category)
     if not candidates:
         return empty
 

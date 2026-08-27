@@ -47,6 +47,7 @@ from app.schemas.merchant import (
     StoreResponse,
     StoreUpdateRequest,
 )
+from app.services import contact_stats
 from app.services.cache import bump_catalogue_version
 from app.services.deduplication import DeduplicationEngine
 
@@ -406,3 +407,38 @@ async def delete_listing(
     db.commit()
     await bump_catalogue_version()
     return None
+
+
+@router.get("/stats")
+async def my_stats(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_merchant),
+):
+    """
+    How many shoppers asked for this shop's number.
+
+    THE POINT OF THE WHOLE FEATURE, and the answer to the question a merchant
+    asks before paying anything: what did this platform actually do for me.
+
+    Scoped to the caller's own store by _own_store, like every other route in
+    this module -- there is no store id to pass and therefore none to forget
+    to check.
+
+    WHAT THE NUMBERS MEAN: these are TAPS -- a shopper pressing Call or
+    WhatsApp -- not calls, and not sales. Whether the phone rang, was
+    answered, or led to a sale happens off this platform entirely. The labels
+    say taps because a merchant is being asked to pay against this figure, and
+    inflating it by calling it something it is not would be the fastest way to
+    lose the shop's trust the first time they compared it with their own call
+    log.
+    """
+    store = _own_store(db, current_user)
+    days = max(1, min(days, 365))
+
+    return {
+        "store_id": store.id,
+        "is_verified": store.is_verified,
+        **contact_stats.totals_for_store(db, store.id, days=days),
+        "top_products": contact_stats.per_product_for_store(db, store.id, days=days),
+    }
