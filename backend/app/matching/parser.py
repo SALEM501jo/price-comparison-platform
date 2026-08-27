@@ -15,19 +15,31 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from app.matching import arabic
 from app.matching.rules import UNSUPPORTED_CATEGORIES, CATEGORY_RULES, CategoryRules
 
 
 def normalize(text: str) -> str:
-    """
+    r"""
     Lowercase, turn punctuation into spaces, collapse whitespace.
 
     Deliberately does NOT strip "filler" words. The old implementation removed
     words like "smartphone" to help a whole-string similarity comparison; with
     targeted attribute extraction that step buys nothing and actively loses
     information (it also deleted "phone", which is a category signal).
+
+    ARABIC IS FOLDED HERE, at the single point both sides of the system pass
+    through. Putting it in the search router instead would translate queries
+    and not listings, so a merchant who typed their stock in Arabic would be
+    invisible to an Arabic search -- and the property that makes this engine
+    work is that both sides are parsed by one code path. See arabic.py.
+
+    It runs BEFORE the punctuation pass on purpose: Arabic diacritics are
+    combining marks, which are not alphanumeric, so [^\w\s] would replace each
+    with a space and split one word into three.
     """
-    text = re.sub(r"[^\w\s]", " ", text.lower())
+    text = arabic.prepare(text.lower())
+    text = re.sub(r"[^\w\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
