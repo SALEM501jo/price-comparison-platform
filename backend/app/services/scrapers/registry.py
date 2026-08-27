@@ -47,7 +47,16 @@ STORES: tuple[StoreConfig, ...] = (
         # rest are peripherals and games the matching rules do not cover.
         # known_categories_only filters them, so this cap applies to what is
         # KEPT, and the scraper pages the whole catalogue to find them.
-        max_products=150,
+        #
+        # RAISED FROM 150, which was the binding constraint rather than the
+        # safety net it was meant to be: the run was spending its whole
+        # allowance on laptops and phones and stopping before it reached this
+        # store's monitors. The catalogue held two monitors in total, both
+        # from AmmanCart, so a search for "27 inch 4K monitor 144hz" parsed
+        # perfectly and then matched nothing -- a whole category invisible
+        # because of one number. The cap still does its real job of stopping
+        # a bug from walking all 5,000 rows.
+        max_products=400,
     ),
     StoreConfig(
         code="ammancart",
