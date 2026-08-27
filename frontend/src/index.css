@@ -27,6 +27,44 @@
   .tnum {
     font-variant-numeric: tabular-nums;
   }
+
+  /* Tell the browser which theme it is painting.
+
+     This is not decoration. `color-scheme` is what makes the text CARET, the
+     number-input spinners, the select dropdown list, the scrollbars and
+     Chrome's autofill highlight follow the theme. None of those are reachable
+     from CSS, so without this line a dark page still gets a bright yellow
+     autofill block over the login fields. */
+  .dark {
+    color-scheme: dark;
+  }
+
+  /* Form controls in dark mode.
+
+     WHY THIS IS A BASE RULE AND NOT 32 CLASS STRINGS: Tailwind's preflight
+     sets `color: inherit` on input, textarea and select, so every field
+     inherited the dark theme's near-white body text -- while its background
+     stayed the browser default WHITE. rgb(243,244,246) on rgb(255,255,255) is
+     a contrast ratio of about 1.05:1, so typing was invisible in dark mode
+     across the whole application: login, registration, password reset, the
+     contact form, the search box and every merchant field.
+
+     Fixing it per component means remembering it on every future input, which
+     is exactly the kind of rule this project prefers to make structural. This
+     sits in @layer base, so any component that genuinely wants a different
+     field colour can still override it with a utility class.
+
+     Radios and checkboxes are excluded: they are not text-bearing, and giving
+     them a fill and a text colour makes them render as small grey boxes. */
+  .dark input:not([type='radio']):not([type='checkbox']):not([type='range']),
+  .dark textarea,
+  .dark select {
+    @apply border-gray-700 bg-gray-900 text-gray-100;
+  }
+
+  .dark ::placeholder {
+    @apply text-gray-500;
+  }
 }
 
 @layer utilities {
