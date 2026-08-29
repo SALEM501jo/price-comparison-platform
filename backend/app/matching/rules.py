@@ -192,6 +192,10 @@ PHONES = CategoryRules(
         # Product lines
         "iphone", "galaxy", "redmi", "poco", "pixel", "smartphone",
         "phone", "nova", "mate",
+        # "Mobile" is what half the Jordanian feeds call the category, and
+        # with the product_type now believed when it says no, a store that
+        # writes "Mobile" had its whole phone range read as unclassified.
+        "mobile",
     ),
     brand_detectors=(
         "oppo", "realme", "nokia", "honor", "xiaomi", "samsung",

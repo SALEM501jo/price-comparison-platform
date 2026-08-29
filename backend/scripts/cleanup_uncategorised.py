@@ -45,9 +45,16 @@ def main() -> int:
     db = SessionLocal()
     try:
         rows = db.execute(
-            text("select id, canonical_name, match_category from products")
+            text(
+                "select id, canonical_name, match_category, category "
+                "from products"
+            )
         ).fetchall()
-        doomed = [r for r in rows if parse(r[1]).category is None]
+        # Parsed WITH the store's product_type, exactly as ingest does --
+        # otherwise this script and the scraper disagree about what counts
+        # as a product, and the rows they disagree on are deleted and then
+        # re-created on the next run, for ever.
+        doomed = [r for r in rows if parse(r[1], hint=r[3]).category is None]
         doomed_ids = [r[0] for r in doomed]
 
         if not doomed_ids:

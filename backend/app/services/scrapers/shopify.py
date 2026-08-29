@@ -129,11 +129,20 @@ class ShopifyScraper(StoreScraper):
         search, so they were pure noise in the catalogue. One gate, applied
         once.
         """
-        for field in ("product_type", "title"):
-            value = (raw.get(field) or "").strip()
-            if value and parse(value).category:
-                return True
-        return False
+        product_type = (raw.get("product_type") or "").strip()
+        title = (raw.get("title") or "").strip()
+        if not title:
+            return False
+
+        # THE SAME CALL THE STORAGE SIDE MAKES, hint and all. Testing the
+        # product_type as free-standing TEXT was a subtly different gate: a
+        # "Covers & Cases" product_type resolved to nothing, so the title was
+        # tried on its own, "Totu Ring Lenss, Iphone 15" looked like a phone,
+        # and the listing was ingested -- then the storage side parsed it WITH
+        # the hint, refused it, and filed it with no category at all. Two
+        # gates, and everything between them became a row that search can
+        # never return.
+        return parse(title, hint=product_type or None).category is not None
 
     def _to_products(self, raw: dict) -> Iterator[ScrapedProduct]:
         """

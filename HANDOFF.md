@@ -85,6 +85,25 @@ Jado Mobile 2 (**test merchant, invented prices**).
 9. **NEW — Vite caches a broken module graph.** After editing 20+ files the dev
    server served stale modules and threw phantom errors. `rm -rf
    node_modules/.vite` and restart.
+10. **NEW — Docker Desktop crashes on its own stale socket.** Three times in
+    one session. It starts, its Inference manager (the Docker AI service)
+    tries to bind `%LOCALAPPDATA%\Docker\run\dockerInference`, finds a
+    zero-byte socket from the previous run, cannot delete it, and the backend
+    dies with an error dialog. The engine never comes up, so `postgres-local`
+    and `redis-local` never start and the whole stack looks broken for a
+    reason that has nothing to do with this project.
+
+    `EnableDockerAI` is already `false` in `settings-store.json` and the
+    Inference manager starts regardless — there is no setting for it in 4.78.
+
+    The sockets are orphaned AF_UNIX reparse points: `Remove-Item`,
+    `[System.IO.File]::Delete` and `del /f` all fail with "the file cannot be
+    accessed by the system". Renaming the parent directory works, and Docker
+    recreates it. That is what this does:
+
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File scripts\repair-docker.ps1
+    ```
 
 ---
 

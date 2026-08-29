@@ -78,7 +78,11 @@ def main() -> int:
         renamed = 0
 
         for product in products:
-            parsed = parse(product.canonical_name)
+            # WITH THE HINT, because ingest parses with it. Re-deriving
+            # without the store's own product_type would give a different
+            # answer from the one the scraper reaches, and the backfill
+            # would quietly undo the classification it is meant to repair.
+            parsed = parse(product.canonical_name, hint=product.category)
             attributes = parsed.specified
 
             better_name = readable_name(db, product)

@@ -64,8 +64,14 @@ def detect_category(text: str) -> str | None:
             return None
 
     def count(words) -> int:
+        # `s?` tolerates a plural. Stores write "Phones", "Mobiles" and
+        # "Monitors" as often as the singular, and \bphone\b matches none of
+        # them -- so a store that had classified its catalogue perfectly was
+        # read as having said nothing at all, and the title was guessed from
+        # instead. One character, and it is a rule rather than a second list
+        # of words to keep in step with the first.
         return sum(
-            1 for w in words if re.search(rf"\b{re.escape(w)}\b", normalized)
+            1 for w in words if re.search(rf"\b{re.escape(w)}s?\b", normalized)
         )
 
     # Strong evidence first: product lines and category words.
@@ -86,6 +92,48 @@ def detect_category(text: str) -> str | None:
         if hits > best_hits:
             best, best_hits = name, hits
     return best
+
+
+# Values that mean "nobody said", not "this is a thing of that kind".
+# "Uncategorized" is OUR OWN filler -- services/deduplication.py writes it when
+# a listing arrives with no product_type at all, which is every merchant
+# listing -- so treating it as the store's classification would let the
+# platform's own placeholder veto a real shop's phone.
+UNCLASSIFIED_HINTS = frozenset({"uncategorized", "uncategorised", "unknown", "n/a"})
+
+
+def _is_a_classification(hint: str) -> bool:
+    """Whether a product_type is a statement about what the thing is."""
+    return hint.strip().lower() not in UNCLASSIFIED_HINTS
+
+
+def classify_hint(hint: str) -> str | None:
+    """
+    Read a store's product_type as a LABEL, not as prose.
+
+    THE HEAD NOUN IS WHAT THE THING IS. In an English compound label the last
+    noun names the thing and the earlier words qualify it: a "Mobile Case" is
+    a case, a "Laptop Bag" is a bag, and "Covers & Cases" are covers. Scanning
+    the whole label for any category word gets all three exactly backwards --
+    it reads the qualifier as the subject and files a phone case as a phone.
+
+    This is grammar rather than a list of banned words, so it needs no
+    maintenance and covers labels nobody has seen yet. It is the same
+    distinction the project already makes between a store's classification and
+    an inference from a title, applied one level down.
+
+    Trailing model numbers are dropped first: iGeek files real handsets under
+    "iPhone 17", whose last token is a number that names nothing.
+
+    Used for the HINT ONLY. A title is prose -- "Apple iPhone 15 128GB Black"
+    has no head noun in this sense -- so titles keep the whole-string scan.
+    """
+    tokens = normalize(hint).split()
+    while tokens and any(ch.isdigit() for ch in tokens[-1]):
+        tokens.pop()
+    if not tokens:
+        return None
+    return detect_category(tokens[-1])
 
 
 @dataclass(frozen=True)
@@ -147,8 +195,33 @@ def parse(
     # "lenovo" is a laptop brand, then failed the laptop requires_any and
     # parsed to nothing at all -- with the store filing it under "Monitor"
     # the whole time.
-    if category is None and hint:
-        category = detect_category(hint)
+    #
+    # AND THE STATEMENT IS BELIEVED WHEN IT SAYS NO. Consulting the hint first
+    # was only half the decision: when it resolved to none of our categories
+    # the code fell through and guessed from the title anyway, which threw the
+    # store's answer away in exactly the case it was most useful. That is how
+    # a "Microwave Ovens" became a phone -- the store said what it was, and
+    # the word "Samsung" in the title was believed instead. Phone cases,
+    # screen protectors, SSDs, keyboards, a Nintendo game and a refrigerator
+    # all arrived the same way, and every one of them named a real handset or
+    # laptop in its title, so no amount of tightening requires_any could
+    # separate them: "IPHONE 15 PRO CASE" states a model exactly as a phone
+    # does.
+    #
+    # Measured over the 497-product catalogue: 74 listings are dropped, of
+    # which one is a genuine handset (a Samsung the store filed under
+    # "Connectivity"). The rest are accessories and appliances.
+    if category is None and hint and hint.strip():
+        if _is_a_classification(hint):
+            category = classify_hint(hint)
+            if category is None:
+                # The store classified this, and it is not one of ours.
+                return ParsedProduct(
+                    raw=text, normalized=normalized, category=None, attributes={}
+                )
+        else:
+            # A placeholder is the absence of a statement, not a statement.
+            category = None
     category = category or detect_category(text)
     rules: CategoryRules | None = CATEGORY_RULES.get(category) if category else None
 
