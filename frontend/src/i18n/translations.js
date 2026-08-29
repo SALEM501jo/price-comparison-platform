@@ -84,6 +84,8 @@ const translations = {
     'tier.similar': 'منتجات مشابهة',
     'tier.similar.blurb': 'قريب، لكنه ليس ما بحثت عنه',
     'tier.matchPercent': '{score}٪ تطابق',
+    'tier.nameMatch': 'مطابقة بالاسم',
+    'tier.nameMatchTitle': 'وجدناه بالاسم أو الماركة — لم نتمكن من ترتيبه حسب المواصفات.',
     'tier.scoreTitle': 'درجة التطابق: {score}٪',
 
     // --- Product page
@@ -338,6 +340,8 @@ const translations = {
     'tier.similar': 'Similar products',
     'tier.similar.blurb': 'Related, but not what you searched for',
     'tier.matchPercent': '{score}% match',
+    'tier.nameMatch': 'Name match',
+    'tier.nameMatchTitle': 'Found by name or brand — we could not rank this one on its specifications.',
     'tier.scoreTitle': 'Match score: {score}%',
 
     'product.back': 'Back to search',
