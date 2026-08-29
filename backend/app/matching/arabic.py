@@ -240,6 +240,44 @@ def transliterate(text: str) -> str:
     return text
 
 
+def expand_prefix(text: str) -> str:
+    """
+    Complete a partial Arabic word to the term it is starting to spell.
+
+    FOR TYPE-AHEAD ONLY, and deliberately not used by parse(). Suggestions
+    exist to answer half-typed input: "ايفو" is three quarters of "ايفون" and
+    a shopper expects iPhones before they finish the word. But GUESSING is
+    exactly what the parser must not do -- a search should answer what was
+    typed, not what we think was about to be typed -- so this stays on the
+    suggestion path where a wrong guess costs a dropdown row rather than a
+    wrong product.
+
+    Only expands when exactly one term starts with the fragment. Two
+    candidates means we do not know which, and a dropdown that flickers
+    between meanings is worse than one that waits for another keystroke.
+    """
+    if not has_arabic(text):
+        return text
+
+    folded = fold(text)
+    words = folded.split()
+    if not words:
+        return folded
+
+    last = words[-1]
+    if len(last) < 2 or last in TERMS:
+        return folded
+
+    matches = {
+        canonical
+        for term, canonical in TERMS.items()
+        if term.startswith(last)
+    }
+    if len(matches) == 1:
+        words[-1] = matches.pop()
+    return " ".join(words)
+
+
 def prepare(text: str) -> str:
     """
     Fold and translate, in that order.

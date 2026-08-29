@@ -154,6 +154,7 @@ const translations = {
     'merchant.phone': 'الهاتف',
     'merchant.whatsapp': 'واتساب',
     'merchant.facebook': 'صفحة فيسبوك',
+    'merchant.instagram': 'انستغرام',
     'merchant.optional': '(اختياري)',
     'merchant.registerShop': 'تسجيل المتجر',
     'merchant.registering': 'جارٍ التسجيل…',
@@ -209,6 +210,7 @@ const translations = {
     'stats.call': 'اتصال',
     'stats.whatsapp': 'واتساب',
     'stats.facebook': 'فيسبوك',
+    'stats.instagram': 'انستغرام',
     'stats.topProducts': 'الأكثر طلباً',
     'stats.explainer':
       'هذه نقرات على زر الاتصال أو واتساب — أي أن المتسوق طلب رقمك. لا نعرف إن تم الاتصال فعلاً أو تمت عملية بيع.',
@@ -401,6 +403,7 @@ const translations = {
     'merchant.phone': 'Phone',
     'merchant.whatsapp': 'WhatsApp',
     'merchant.facebook': 'Facebook page',
+    'merchant.instagram': 'Instagram',
     'merchant.optional': '(optional)',
     'merchant.registerShop': 'Register shop',
     'merchant.registering': 'Registering…',
@@ -454,6 +457,7 @@ const translations = {
     'stats.call': 'Call',
     'stats.whatsapp': 'WhatsApp',
     'stats.facebook': 'Facebook',
+    'stats.instagram': 'Instagram',
     'stats.topProducts': 'Most asked about',
     'stats.explainer':
       'These are taps on Call or WhatsApp — a shopper asking for your number. We cannot see whether the call was made or anything was sold.',

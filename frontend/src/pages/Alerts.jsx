@@ -97,7 +97,9 @@ export default function Alerts() {
               <li
                 key={alert.id}
                 className={`rounded-lg border bg-white dark:bg-gray-900 p-4 ${
-                  alert.is_met ? 'border-green-300 bg-green-50/50' : 'border-gray-200'
+                  alert.is_met
+                    ? 'border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30'
+                    : 'border-gray-200 dark:border-gray-800'
                 }`}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

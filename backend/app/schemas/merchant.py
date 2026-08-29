@@ -29,6 +29,12 @@ _FACEBOOK_URL = re.compile(
     r"^https://(?:www\.|m\.|web\.)?facebook\.com/[A-Za-z0-9._\-/%]+/?$"
 )
 
+# Same reasoning, same shape. Instagram handles are a single path segment, so
+# this is tighter than the Facebook pattern: no slashes inside the name.
+_INSTAGRAM_URL = re.compile(
+    r"^https://(?:www\.)?instagram\.com/[A-Za-z0-9._]+/?$"
+)
+
 
 def _normalise_phone(value: Optional[str]) -> Optional[str]:
     if value is None:
@@ -55,6 +61,9 @@ class StoreContact(BaseModel):
     phone: Optional[str] = Field(None, max_length=32)
     whatsapp: Optional[str] = Field(None, max_length=32)
     facebook_url: Optional[str] = Field(None, max_length=500)
+    # Optional, like the others. Many of these shops have an Instagram and no
+    # Facebook page at all.
+    instagram_url: Optional[str] = Field(None, max_length=500)
 
     @field_validator("phone", "whatsapp")
     @classmethod
@@ -70,6 +79,19 @@ class StoreContact(BaseModel):
         if not _FACEBOOK_URL.match(v):
             raise ValueError(
                 "Enter a full Facebook page URL, e.g. https://facebook.com/yourshop"
+            )
+        return v
+
+    @field_validator("instagram_url")
+    @classmethod
+    def validate_instagram(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not v.strip():
+            return None
+        v = v.strip()
+        if not _INSTAGRAM_URL.match(v):
+            raise ValueError(
+                "Enter a full Instagram profile URL, "
+                "e.g. https://instagram.com/yourshop"
             )
         return v
 
@@ -100,6 +122,7 @@ class StoreResponse(BaseModel):
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
     facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
     is_verified: bool
     verified_at: Optional[datetime] = None
     listing_count: int = 0

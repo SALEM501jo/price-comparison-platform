@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import re
 
+from app.matching import arabic
 from app.matching.rules import CATEGORY_RULES
 from app.matching.extractors import Keyword
 
@@ -92,6 +93,31 @@ def _build_vocabulary() -> frozenset[str]:
 VOCABULARY = _build_vocabulary()
 
 
+def _build_arabic_vocabulary() -> frozenset[str]:
+    """
+    The Arabic side, harvested from arabic.TERMS the same way.
+
+    WHY A SECOND VOCABULARY RATHER THAN ONE: a misspelled Arabic word is not
+    near any English word, and vice versa. Comparing "سمسونج" against "samsung"
+    is a distance of the whole string, so a single mixed pool would find
+    nothing while making every lookup slower. Script picks the pool.
+
+    Keys are already folded (see arabic.py), so a correction lands on the
+    spelling the transliterator can actually match.
+    """
+    tokens: set[str] = set()
+    for term in arabic.TERMS:
+        tokens.update(term.split())
+    return frozenset(t for t in tokens if len(t) >= 3)
+
+
+ARABIC_VOCABULARY = _build_arabic_vocabulary()
+
+# The definite article, written joined to its noun. "الايفون" should correct
+# and transliterate as readily as "ايفون".
+_ARTICLE = "ال"
+
+
 def _distance_within(a: str, b: str, budget: int) -> int | None:
     """
     Levenshtein distance, abandoned as soon as it exceeds `budget`.
@@ -130,9 +156,19 @@ def correct_token(token: str) -> str | None:
     None means "leave it alone", which is the answer for the overwhelming
     majority of tokens: words we already know, model codes, numbers, and words
     that are simply not close to anything.
+
+    Arabic tokens are corrected against the Arabic vocabulary and returned in
+    Arabic -- transliteration happens later, in normalize(). Correcting
+    straight to the English token here would work for search but would leave
+    the reported correction unreadable to the person who typed it: being told
+    that "سمسونج" was read as "samsung" explains nothing to an Arabic reader.
     """
     if any(ch.isdigit() for ch in token):
         return None  # model codes and capacities -- see the module docstring
+
+    if arabic.has_arabic(token):
+        return _correct_arabic(token)
+
     if token in VOCABULARY:
         return None  # already a word we know
     budget = _allowed_edits(len(token))
@@ -181,3 +217,59 @@ def correct(text: str) -> tuple[str, dict[str, str]]:
 
     corrected = re.sub(r"[^\W\d_]+", replace, text)
     return corrected, corrections
+
+
+def _correct_arabic(token: str) -> str | None:
+    """
+    The Arabic vocabulary word this token was probably meant to be.
+
+    Folded before comparing, because the vocabulary is stored folded: without
+    it "أيفون" and "ايفون" are one edit apart from each other and the budget
+    is spent on orthography instead of on the actual typo.
+
+    The definite article is tried both ways -- "الايفون" is the same word as
+    "ايفون" and must not be judged two edits away from it.
+    """
+    folded = arabic.fold(token)
+    if folded in ARABIC_VOCABULARY:
+        return None
+
+    stem = folded
+    prefix = ""
+    if folded.startswith(_ARTICLE) and folded[len(_ARTICLE):] in ARABIC_VOCABULARY:
+        return None  # "الايفون" -- already correct, article and all
+    if folded.startswith(_ARTICLE) and len(folded) > len(_ARTICLE) + 2:
+        stem = folded[len(_ARTICLE):]
+        prefix = _ARTICLE
+
+    budget = _allowed_edits(len(stem))
+    if budget == 0:
+        return None
+
+    best_distance = budget + 1
+    best: list[str] = []
+
+    for word in ARABIC_VOCABULARY:
+        distance = _distance_within(stem, word, budget)
+        if distance is None:
+            continue
+        if distance < best_distance:
+            best_distance, best = distance, [word]
+        elif distance == best_distance:
+            best.append(word)
+
+    if not best:
+        return None
+
+    if len(best) > 1:
+        # A tie between words that MEAN THE SAME THING is not a guess.
+        # "شاشت" is one edit from both "شاشه" and "شاشات", and both are the
+        # word for a monitor -- refusing there would fail the shopper to
+        # protect them from a distinction that does not exist. A tie between
+        # different meanings is still refused, which is the case the rule was
+        # written for.
+        meanings = {arabic.TERMS.get(word) for word in best}
+        if len(meanings) > 1 or None in meanings:
+            return None
+
+    return prefix + sorted(best)[0]

@@ -79,3 +79,15 @@ export const getMyStats = async (config = {}) => {
   const { data } = await api.get('/merchant/stats', config);
   return data;
 };
+
+/**
+ * Turn down a merchant claim.
+ *
+ * Not a delete: the shop, its listings and its history stay, and approving
+ * later clears the rejection. It moves the claim out of the pending queue so
+ * the same bad claim is not re-read on every visit.
+ */
+export const declineStore = async (storeId) => {
+  const { data } = await api.post(`/admin/stores/${storeId}/decline`);
+  return data;
+};

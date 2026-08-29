@@ -123,6 +123,7 @@ def _store_response(db: Session, store: Store) -> StoreResponse:
         phone=store.phone,
         whatsapp=store.whatsapp,
         facebook_url=store.facebook_url,
+        instagram_url=store.instagram_url,
         is_verified=store.is_verified,
         verified_at=store.verified_at,
         listing_count=count,
@@ -171,6 +172,7 @@ async def register_store(
         phone=payload.phone,
         whatsapp=payload.whatsapp,
         facebook_url=payload.facebook_url,
+        instagram_url=payload.instagram_url,
         is_verified=False,
         is_active=1,
     )

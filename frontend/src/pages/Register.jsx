@@ -84,8 +84,8 @@ export default function Register() {
                   key={option.value}
                   className={`cursor-pointer rounded-lg border p-3 text-left ${
                     accountType === option.value
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-300 hover:bg-gray-50'
+                      ? 'border-brand-600 bg-brand-50 dark:border-brand-500 dark:bg-brand-900/40'
+                      : 'border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800'
                   }`}
                 >
                   <input

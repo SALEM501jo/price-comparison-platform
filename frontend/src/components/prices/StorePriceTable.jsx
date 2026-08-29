@@ -62,6 +62,25 @@ function ContactLinks({ row, productId }) {
     );
   }
 
+  // Instagram sits alongside Facebook, not instead of it: a shop may have
+  // either or both, and for many of these shops Instagram IS the shopfront.
+  // Both are last-resort links -- a number that rings beats a profile to
+  // browse, so they only appear when there is no phone or WhatsApp.
+  if (!links.length && row.instagram_url) {
+    links.push(
+      <a
+        key="instagram"
+        href={row.instagram_url}
+        onClick={() => tap('instagram')}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-brand-600 hover:underline dark:text-brand-400"
+      >
+        Instagram
+      </a>,
+    );
+  }
+
   if (!links.length && row.facebook_url) {
     links.push(
       <a
@@ -156,7 +175,7 @@ export default function StorePriceTable({ prices, emptyMessage, productId }) {
             return (
               <tr
                 key={`${row.store_name}-${row.price}`}
-                className={isBest ? 'bg-green-50/60' : undefined}
+                className={isBest ? 'bg-green-50/60 dark:bg-green-950/30' : undefined}
               >
                 <td className="px-4 py-3">
                   <span className="font-medium text-gray-900 dark:text-white">{row.store_name}</span>

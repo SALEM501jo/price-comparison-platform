@@ -22,7 +22,7 @@ from app.schemas.product import (
     PriceHistoryPoint
 )
 from app.schemas.search import SearchSuggestion, TieredSearchResponse
-from app.matching import normalize
+from app.matching import arabic, normalize
 from app.matching import spelling
 from app.services.search import best_savings, escape_like, search_products
 from app.config import get_settings
@@ -144,11 +144,20 @@ async def suggest(
     if not typed:
         return []
 
-    # Fold Arabic and fix an obvious typo before matching -- otherwise the
-    # suggestions disappear at exactly the moment they are most useful, which
-    # is when the shopper has misspelled something.
-    folded = normalize(typed)
-    corrected, _fixes = spelling.correct(folded)
+    # ORDER MATTERS. Correct first, THEN normalise.
+    #
+    # Correcting after normalising was wrong for Arabic: normalize() is what
+    # transliterates, so a word corrected afterwards ("سمسونج" -> "سامسونج")
+    # was still Arabic when it reached a LIKE against Latin product names, and
+    # matched nothing. Correcting first lets the fix flow through the
+    # translation like any other word.
+    #
+    # expand_prefix then completes a half-typed Arabic word, which is the
+    # whole point of a type-ahead: "ايفو" should list iPhones before the
+    # shopper finishes typing "ايفون".
+    corrected_input, _fixes = spelling.correct(typed)
+    folded = normalize(corrected_input)
+    corrected = normalize(arabic.expand_prefix(corrected_input))
 
     version = await catalogue_version()
     cache_key = (
@@ -230,6 +239,7 @@ async def get_product(
             phone=store.phone,
             whatsapp=store.whatsapp,
             facebook_url=store.facebook_url,
+            instagram_url=store.instagram_url,
             is_merchant=store.is_merchant,
             condition=alias.condition,
             comparison_group=alias.comparison_group,
@@ -315,7 +325,7 @@ class ContactTap(BaseModel):
     # A Literal, not the enum, so an unknown channel is a 422 at the edge
     # rather than a string the handler has to remember to reject -- the same
     # treatment /admin's RoleChange gets.
-    channel: Literal["call", "whatsapp", "facebook"]
+    channel: Literal["call", "whatsapp", "facebook", "instagram"]
 
 
 @router.post("/contact-event", status_code=status.HTTP_202_ACCEPTED)

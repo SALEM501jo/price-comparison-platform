@@ -46,6 +46,7 @@ export default function ContactStats({ isVerified }) {
     ['call', 'stats.call'],
     ['whatsapp', 'stats.whatsapp'],
     ['facebook', 'stats.facebook'],
+    ['instagram', 'stats.instagram'],
   ];
 
   const describe = (count) => {
@@ -71,7 +72,7 @@ export default function ContactStats({ isVerified }) {
       {/* Every channel, including the ones at zero. "Nobody used WhatsApp"
           and "WhatsApp is not set up" need different actions from the shop
           owner, and hiding empty rows makes the two look identical. */}
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {channels.map(([key, label]) => (
           <div
             key={key}

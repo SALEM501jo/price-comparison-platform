@@ -20,7 +20,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models.contact_event import ContactEvent
+from app.models.contact_event import CONTACT_CHANNELS, ContactEvent
 from app.models.product import Product
 from app.models.store import Store
 from app.models.user import User, UserRole
@@ -236,7 +236,10 @@ class TestMerchantSeesOnlyTheirOwn:
             "/merchant/stats",
             headers={"Authorization": f"Bearer {token_for(client, owner.email)}"},
         )
-        assert set(response.json()["by_channel"]) == {"call", "whatsapp", "facebook"}
+        # Derived from the model rather than listed here: this assertion was
+        # written with three channels and broke the moment Instagram was added,
+        # which is the test going stale rather than the code going wrong.
+        assert set(response.json()["by_channel"]) == set(CONTACT_CHANNELS)
 
     def test_another_shops_taps_are_invisible(self, client, db_session, shop):
         """

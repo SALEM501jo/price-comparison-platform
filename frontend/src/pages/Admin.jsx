@@ -1,11 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { deleteUser, getPriceAnomalies, getStats, getUsers } from '../api/admin';
 import {
+  adminDeleteListing,
+  adminUpdateListing,
+  deleteUser,
+  getPriceAnomalies,
+  getStats,
+  getUsers,
+} from '../api/admin';
+import {
+  declineStore,
   getStoreListings,
   getStores,
   unverifyStore,
   verifyStore,
 } from '../api/merchant';
+import SupportMessages from '../components/admin/SupportMessages';
 import Spinner from '../components/ui/Spinner';
 import { useAuth } from '../hooks/useAuth';
 import { extractApiError } from '../utils/errors';
@@ -33,6 +42,138 @@ function StatCard({ label, value }) {
       <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-gray-500">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
     </div>
+  );
+}
+
+/**
+ * One merchant listing, editable by an admin.
+ *
+ * WHY AN ADMIN CAN EDIT A SHOP'S PRICE AT ALL: a wrong price is the single
+ * thing a comparison site must never show, and "email the shop and wait" is
+ * not a remedy. The backend route for this already existed and nothing in the
+ * UI ever reached it, so in practice the only way to fix a bad price was a
+ * query against the database.
+ *
+ * It calls /admin/listings/{id}, NOT the merchant route. That separation is
+ * deliberate: the merchant route resolves the store from the signed-in user
+ * and therefore cannot touch another shop's data, and an `if admin` branch
+ * inside it would destroy exactly that guarantee. Every edit here is logged
+ * with the admin's id, because an administrator quietly changing a shop's
+ * advertised price is precisely the action that has to be answerable later.
+ */
+function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
+  const [price, setPrice] = useState(
+    listing.price != null ? String(listing.price) : '',
+  );
+  const [busy, setBusy] = useState(false);
+
+  const dirty = price !== '' && Number(price) !== listing.price;
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      onChanged(await adminUpdateListing(listing.id, { price: Number(price) }));
+    } catch (err) {
+      onError(extractApiError(err, 'Could not update that listing.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleStock = async () => {
+    setBusy(true);
+    try {
+      onChanged(
+        await adminUpdateListing(listing.id, {
+          availability: !listing.availability,
+        }),
+      );
+    } catch (err) {
+      onError(extractApiError(err, 'Could not update that listing.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (
+      !window.confirm(
+        `Remove "${listing.name}" from this shop? Its price history goes with it and this cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await adminDeleteListing(listing.id);
+      onRemoved(listing.id);
+    } catch (err) {
+      onError(extractApiError(err, 'Could not remove that listing.'));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <span className="font-medium text-gray-900 dark:text-white">
+        {listing.name}
+      </span>
+      {listing.condition !== 'new' && (
+        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+          {listing.condition}
+          {listing.battery_health != null && ` \u00b7 ${listing.battery_health}%`}
+        </span>
+      )}
+      <span className="text-xs text-gray-400 dark:text-gray-500">
+        matched to &ldquo;{listing.matched_product}&rdquo;
+      </span>
+      {listing.damage_notes && (
+        <span className="text-xs text-amber-700 dark:text-amber-400">
+          {listing.damage_notes}
+        </span>
+      )}
+
+      <span className="ms-auto flex items-center gap-1.5">
+        <input
+          type="number"
+          min="0.001"
+          step="0.001"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          aria-label={`Price for ${listing.name}`}
+          className="w-24 rounded-md border border-gray-300 px-2 py-1 text-xs dark:border-gray-700"
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={busy || !dirty}
+          className="rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={toggleStock}
+          disabled={busy}
+          title="Click to change"
+          className={`rounded-md px-2 py-1 text-xs font-medium disabled:opacity-40 ${
+            listing.availability
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+              : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+          }`}
+        >
+          {listing.availability ? 'In stock' : 'Out of stock'}
+        </button>
+        <button
+          type="button"
+          onClick={remove}
+          disabled={busy}
+          className="text-xs text-red-600 hover:text-red-700 disabled:opacity-40"
+        >
+          Remove
+        </button>
+      </span>
+    </li>
   );
 }
 
@@ -97,6 +238,36 @@ export default function Admin() {
   // Approving a claim on a name and an email alone is guesswork. What a shop
   // actually sells is the evidence. Fetched on demand rather than for every
   // row, since most rows are never opened.
+  const handleDecline = async (store) => {
+    // Worth one confirmation: it is a judgement about somebody's business,
+    // and although it is reversible the shop sees the effect immediately.
+    if (
+      !window.confirm(
+        `Decline "${store.name}"? Their prices stay hidden from shoppers. ` +
+          'You can approve them later if they send proof.',
+      )
+    ) {
+      return;
+    }
+    try {
+      const result = await declineStore(store.id);
+      setStores((current) =>
+        current.map((row) =>
+          row.id === store.id
+            ? {
+                ...row,
+                is_verified: false,
+                review_status: result.review_status,
+                rejected_at: new Date().toISOString(),
+              }
+            : row,
+        ),
+      );
+    } catch (err) {
+      setError(extractApiError(err, 'Could not decline that store.'));
+    }
+  };
+
   const toggleStoreListings = async (storeId) => {
     if (openStoreId === storeId) {
       setOpenStoreId(null);
@@ -121,7 +292,16 @@ export default function Admin() {
         : await unverifyStore(store.id);
       setStores((current) =>
         current.map((row) =>
-          row.id === store.id ? { ...row, is_verified: result.is_verified } : row,
+          row.id === store.id
+            ? {
+                ...row,
+                is_verified: result.is_verified,
+                review_status: result.is_verified ? 'verified' : 'pending',
+                // Approving clears a decline, so the row must stop showing
+                // one -- the server has already cleared the column.
+                rejected_at: null,
+              }
+            : row,
         ),
       );
     } catch (err) {
@@ -238,7 +418,7 @@ export default function Admin() {
                       </span>
                       {store.contact_taps > 0 && (
                         <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                          {['call', 'whatsapp', 'facebook']
+                          {['call', 'whatsapp', 'facebook', 'instagram']
                             .filter((c) => store.contact_taps_by_channel?.[c])
                             .map((c) => `${c} ${store.contact_taps_by_channel[c]}`)
                             .join(' · ')}
@@ -246,23 +426,54 @@ export default function Admin() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {store.is_verified ? (
+                      {/* Three states. "Declined" is the one that was missing:
+                          without it a rejected claim looked identical to one
+                          nobody had reviewed, and the queue never emptied. */}
+                      {store.review_status === 'verified' ? (
                         <span className="text-green-700 dark:text-green-400">Verified</span>
+                      ) : store.review_status === 'declined' ? (
+                        <span
+                          className="text-red-600 dark:text-red-400"
+                          title={
+                            store.rejected_at
+                              ? `Declined ${new Date(store.rejected_at).toLocaleDateString()}`
+                              : 'Declined'
+                          }
+                        >
+                          Declined
+                        </span>
                       ) : (
                         <span className="text-amber-700 dark:text-amber-400">Pending</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleVerify(store, !store.is_verified)}
-                        className={
-                          store.is_verified
-                            ? 'text-xs text-red-600 hover:text-red-700'
-                            : 'rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700'
-                        }
-                      >
-                        {store.is_verified ? 'Withdraw' : 'Approve'}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleVerify(store, !store.is_verified)}
+                          className={
+                            store.is_verified
+                              ? 'text-xs text-red-600 hover:text-red-700'
+                              : 'rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700'
+                          }
+                        >
+                          {store.is_verified
+                            ? 'Withdraw'
+                            : store.review_status === 'declined'
+                              ? 'Approve anyway'
+                              : 'Approve'}
+                        </button>
+                        {/* Only offered while the claim is still open. A
+                            verified shop is withdrawn, not declined, and a
+                            claim already declined has nothing to decline. */}
+                        {store.review_status === 'pending' && (
+                          <button
+                            onClick={() => handleDecline(store)}
+                            className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                          >
+                            Decline
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                   {openStoreId === store.id && (
@@ -277,36 +488,29 @@ export default function Admin() {
                         ) : (
                           <ul className="space-y-1.5">
                             {storeListings[store.id].map((listing) => (
-                              <li key={listing.id} className="text-sm">
-                                <span className="font-medium text-gray-900 dark:text-white">
-                                  {listing.name}
-                                </span>
-                                {listing.condition !== 'new' && (
-                                  <span className="ml-2 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs text-amber-800 dark:text-amber-300">
-                                    {listing.condition}
-                                    {listing.battery_health != null &&
-                                      ` \u00b7 ${listing.battery_health}%`}
-                                  </span>
-                                )}
-                                <span className="ml-2 text-gray-600 dark:text-gray-400">
-                                  {listing.price != null
-                                    ? `${listing.price} JOD`
-                                    : 'no price'}
-                                </span>
-                                {!listing.availability && (
-                                  <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                                    out of stock
-                                  </span>
-                                )}
-                                <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                                  matched to &ldquo;{listing.matched_product}&rdquo;
-                                </span>
-                                {listing.damage_notes && (
-                                  <span className="ml-2 text-xs text-amber-700 dark:text-amber-400">
-                                    {listing.damage_notes}
-                                  </span>
-                                )}
-                              </li>
+                              <AdminListingRow
+                                key={listing.id}
+                                listing={listing}
+                                onChanged={(updated) =>
+                                  setStoreListings((current) => ({
+                                    ...current,
+                                    [store.id]: current[store.id].map((row) =>
+                                      row.id === updated.id
+                                        ? { ...row, ...updated }
+                                        : row,
+                                    ),
+                                  }))
+                                }
+                                onRemoved={(id) =>
+                                  setStoreListings((current) => ({
+                                    ...current,
+                                    [store.id]: current[store.id].filter(
+                                      (row) => row.id !== id,
+                                    ),
+                                  }))
+                                }
+                                onError={setError}
+                              />
                             ))}
                           </ul>
                         )}
@@ -320,6 +524,10 @@ export default function Admin() {
           </div>
         )}
       </section>
+
+      {/* Above price anomalies: a person waiting for a reply outranks a
+          number that moved. */}
+      <SupportMessages />
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">

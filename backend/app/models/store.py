@@ -59,11 +59,28 @@ class Store(Base):
     phone = Column(String(32))
     whatsapp = Column(String(32))
     facebook_url = Column(String(500))
+    # Instagram is where a lot of small Jordanian phone shops actually keep
+    # their shopfront -- often instead of a Facebook page rather than as well
+    # as one -- so a shop with only an Instagram had no way to show it.
+    instagram_url = Column(String(500))
 
     # False until an admin confirms the claim. Scraped stores are seeded
     # verified because their prices come from their own public feed.
     is_verified = Column(Boolean, nullable=False, default=False)
     verified_at = Column(DateTime(timezone=True))
+
+    # When a claim was REJECTED, as distinct from not yet looked at.
+    #
+    # WHY A THIRD STATE: with only is_verified there was no way to say no. A
+    # fake claim stayed in the pending queue forever, indistinguishable from
+    # one nobody had reviewed yet, so the queue could never be cleared and an
+    # admin had to re-read the same bad claim on every visit.
+    #
+    # A timestamp rather than a flag, for the same reason email_verified_at is
+    # one: "when" answers questions a boolean cannot, and costs the same.
+    # Cleared on approval, so declining is reversible -- a shop that sends
+    # proof after being turned down is approved, not stuck.
+    rejected_at = Column(DateTime(timezone=True))
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -94,6 +111,22 @@ class Store(Base):
             Store.is_active == 1,
             or_(Store.owner_user_id.is_(None), Store.is_verified.is_(True)),
         )
+
+    @property
+    def review_status(self) -> str:
+        """
+        Where a merchant claim stands: verified, declined, or pending.
+
+        Derived rather than stored, so it cannot disagree with the columns it
+        is derived from.
+        """
+        if not self.is_merchant:
+            return "scraped"
+        if self.is_verified:
+            return "verified"
+        if self.rejected_at is not None:
+            return "declined"
+        return "pending"
 
     @property
     def is_publicly_visible(self) -> bool:

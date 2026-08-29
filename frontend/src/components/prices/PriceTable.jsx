@@ -14,7 +14,7 @@ export default function PriceTable({ products }) {
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
           {products.map((product) => (
-            <tr key={product.id} className="hover:bg-gray-50">
+            <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
               <td className="px-4 py-3">
                 <Link
                   to={`/product/${product.id}`}

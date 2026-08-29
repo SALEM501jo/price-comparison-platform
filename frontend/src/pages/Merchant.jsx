@@ -30,6 +30,7 @@ function StoreRegistration({ onCreated }) {
     phone: '',
     whatsapp: '',
     facebook_url: '',
+    instagram_url: '',
   });
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -47,6 +48,7 @@ function StoreRegistration({ onCreated }) {
           phone: form.phone || null,
           whatsapp: form.whatsapp || null,
           facebook_url: form.facebook_url || null,
+          instagram_url: form.instagram_url || null,
         }),
       );
     } catch (err) {
@@ -120,6 +122,23 @@ function StoreRegistration({ onCreated }) {
             value={form.facebook_url}
             onChange={(e) => setForm({ ...form, facebook_url: e.target.value })}
             placeholder="https://facebook.com/yourshop"
+            className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+
+        {/* Optional, like Facebook. Plenty of these shops have an Instagram
+            and no Facebook page at all, so it is offered alongside rather
+            than instead. */}
+        <div>
+          <label htmlFor="instagram" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('merchant.instagram')}{' '}
+            <span className="text-gray-400 dark:text-gray-500">{t('merchant.optional')}</span>
+          </label>
+          <input
+            id="instagram"
+            value={form.instagram_url}
+            onChange={(e) => setForm({ ...form, instagram_url: e.target.value })}
+            placeholder="https://instagram.com/yourshop"
             className="mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
@@ -266,8 +285,8 @@ function AddListing({ onAdded }) {
             key={value}
             className={`cursor-pointer rounded-lg border px-3 py-1.5 text-sm ${
               form.condition === value
-                ? 'border-blue-600 bg-blue-50 font-medium text-blue-700'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                ? 'border-brand-600 bg-brand-50 font-medium text-brand-700 dark:border-brand-500 dark:bg-brand-900/40 dark:text-brand-300'
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
             }`}
           >
             <input
@@ -284,7 +303,7 @@ function AddListing({ onAdded }) {
       </div>
 
       {isSecondHand && (
-        <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 p-3">
+        <div className="mt-3 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/30 p-3">
           <p className="mb-3 text-xs text-amber-900 dark:text-amber-200">
             {t('merchant.usedNote')}
           </p>
@@ -530,6 +549,7 @@ function ContactPanel({ store, onSaved }) {
     phone: store.phone ?? '',
     whatsapp: store.whatsapp ?? '',
     facebook_url: store.facebook_url ?? '',
+    instagram_url: store.instagram_url ?? '',
   });
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
@@ -546,6 +566,7 @@ function ContactPanel({ store, onSaved }) {
           phone: form.phone || null,
           whatsapp: form.whatsapp || null,
           facebook_url: form.facebook_url || null,
+          instagram_url: form.instagram_url || null,
         }),
       );
       setSaved(true);
@@ -561,7 +582,7 @@ function ContactPanel({ store, onSaved }) {
       <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {t('merchant.contactHeading')}
       </h2>
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <input
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -581,6 +602,13 @@ function ContactPanel({ store, onSaved }) {
           onChange={(e) => setForm({ ...form, facebook_url: e.target.value })}
           placeholder={t('merchant.facebook')}
           aria-label={t('merchant.facebook')}
+          className="rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+        <input
+          value={form.instagram_url}
+          onChange={(e) => setForm({ ...form, instagram_url: e.target.value })}
+          placeholder={t('merchant.instagram')}
+          aria-label={t('merchant.instagram')}
           className="rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
       </div>

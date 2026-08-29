@@ -31,6 +31,7 @@ from app.logging_config import get_security_logger
 from app.services import contact_stats
 from app.services.cache import bump_catalogue_version
 from app.models.scrape_job import ScrapeJob
+from app.models.support import SupportMessage
 from app.services import jobs as job_queue
 from app.services.scrapers import STORES, store_by_code
 
@@ -304,8 +305,14 @@ async def list_stores(
     """Every store, with what an admin needs in order to judge a claim."""
     query = db.query(Store)
     if pending_only:
+        # "Pending" means NOT YET DECIDED. A declined claim is decided, and
+        # leaving it here is what made the queue impossible to clear -- the
+        # same bad claim was re-read on every visit because nothing recorded
+        # that somebody had already said no.
         query = query.filter(
-            Store.owner_user_id.isnot(None), Store.is_verified.is_(False)
+            Store.owner_user_id.isnot(None),
+            Store.is_verified.is_(False),
+            Store.rejected_at.is_(None),
         )
 
     stores = query.order_by(Store.id).all()
@@ -344,6 +351,11 @@ async def list_stores(
                 "phone": store.phone,
                 "whatsapp": store.whatsapp,
                 "facebook_url": store.facebook_url,
+                "instagram_url": store.instagram_url,
+                # Derived on the model, so the screen cannot disagree with the
+                # columns it is drawn from: verified | pending | declined.
+                "review_status": store.review_status,
+                "rejected_at": store.rejected_at,
                 # The account behind the claim. An admin checking whether a
                 # shop is genuine needs to know who is asking, and whether
                 # they bothered to confirm their address.
@@ -386,6 +398,10 @@ async def verify_store(
 
     store.is_verified = True
     store.verified_at = datetime.now(timezone.utc)
+    # Approval clears a previous decline, so turning a shop down is reversible
+    # -- one that sends proof afterwards is approved, not stuck in a state it
+    # cannot leave.
+    store.rejected_at = None
     db.commit()
     await bump_catalogue_version()
 
@@ -425,6 +441,60 @@ async def unverify_store(
         "target": store.name,
     })
     return {"id": store.id, "name": store.name, "is_verified": False}
+
+
+@router.post("/stores/{store_id}/decline")
+async def decline_store(
+    store_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """
+    Turn down a merchant claim.
+
+    WHY THIS EXISTS: verification had two states, and neither of them was
+    "no". A claim that was obviously fake -- a shop whose listings are
+    handbags, an account whose email was never confirmed -- could only be
+    approved or left alone, so it sat in the pending queue forever, looking
+    exactly like a claim nobody had got to yet. The queue could never be
+    cleared, and every admin visit meant re-reading the same rejections.
+
+    DECLINING IS NOT DELETING. The store, its listings and its history all
+    stay; they simply remain invisible to shoppers, which they already were.
+    Deleting would take a real shop's data with it on a judgement call that
+    might be wrong, and would let the same claim be re-registered from scratch
+    with no record that it had been refused before.
+
+    Reversible: approving clears the rejection.
+    """
+    store = db.query(Store).filter(Store.id == store_id).first()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    if not store.is_merchant:
+        raise HTTPException(
+            status_code=400,
+            detail="Scraped stores have no claim to decline",
+        )
+
+    store.is_verified = False
+    store.verified_at = None
+    store.rejected_at = datetime.now(timezone.utc)
+    db.commit()
+    # Its prices were already hidden, but a store that was verified and is
+    # now declined has to leave the cached results too.
+    await bump_catalogue_version()
+
+    logger.warning("Admin declined a merchant store", extra={
+        "admin_id": admin.id,
+        "action": "admin_decline_store",
+        "target": store.name,
+    })
+    return {
+        "id": store.id,
+        "name": store.name,
+        "is_verified": False,
+        "review_status": store.review_status,
+    }
 
 
 @router.get("/stores/{store_id}/listings")
@@ -651,3 +721,100 @@ async def admin_delete_listing(
     db.commit()
     await bump_catalogue_version()
     return None
+
+
+# --- Support messages -------------------------------------------------------
+#
+# The contact form has always STORED its messages -- the row is the record and
+# the email is only a notification about it -- but nothing ever read them back.
+# In development EMAIL_BACKEND=console throws the notification away, and
+# SUPPORT_EMAIL is optional in production, so for anyone without SMTP wired up
+# a support request went into the database and was never seen by a human. That
+# is worse than not having a contact form, because the person who wrote in is
+# waiting for an answer.
+
+
+@router.get("/support-messages")
+async def list_support_messages(
+    handled: bool | None = Query(
+        None, description="Filter by handled state; omit for everything"
+    ),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Messages sent through the contact form, newest first."""
+    query = db.query(SupportMessage)
+    if handled is not None:
+        query = query.filter(SupportMessage.handled.is_(handled))
+
+    rows = (
+        query.order_by(SupportMessage.created_at.desc(), SupportMessage.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    # The sender's account, when they had one. Resolved in one lookup rather
+    # than per row -- the same N+1 shape removed from the store listing above.
+    user_ids = [row.user_id for row in rows if row.user_id]
+    users = {
+        user.id: user.email
+        for user in db.query(User).filter(User.id.in_(user_ids or [0])).all()
+    }
+
+    unhandled = (
+        db.query(func.count(SupportMessage.id))
+        .filter(SupportMessage.handled.is_(False))
+        .scalar()
+    )
+
+    return {
+        "unhandled": unhandled,
+        "messages": [
+            {
+                "id": row.id,
+                # The address to REPLY to, which is deliberately not the same
+                # as the account: someone locked out writes from whatever
+                # address they can still reach.
+                "email": row.email,
+                "subject": row.subject,
+                "body": row.body,
+                "created_at": row.created_at,
+                "handled": row.handled,
+                "account_email": users.get(row.user_id),
+            }
+            for row in rows
+        ],
+    }
+
+
+@router.post("/support-messages/{message_id}/handled")
+async def set_support_message_handled(
+    message_id: int,
+    handled: bool = True,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """
+    Mark a message dealt with, or put it back.
+
+    Reversible on purpose: "handled" is a note to the next admin, not an
+    archive, and marking the wrong row should not lose it.
+    """
+    message = (
+        db.query(SupportMessage).filter(SupportMessage.id == message_id).first()
+    )
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    message.handled = handled
+    db.commit()
+
+    logger.info("Admin updated a support message", extra={
+        "admin_id": admin.id,
+        "action": "admin_support_handled",
+        "target": f"message {message.id} -> handled={handled}",
+    })
+    return {"id": message.id, "handled": message.handled}

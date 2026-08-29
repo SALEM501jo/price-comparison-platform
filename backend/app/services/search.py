@@ -311,9 +311,22 @@ def search_products(
         if result.is_usable:
             scored.append((candidate, result))
 
-    if not scored and not parsed.specified:
-        # Unstructured query (e.g. "playstation"): the scorer has nothing to
-        # work with, so surface the name matches rather than nothing at all.
+    if not scored:
+        # Nothing cleared the 70% bar. Surface the candidates unscored, in the
+        # lowest tier, rather than showing an empty page.
+        #
+        # WHY THIS NOW COVERS STRUCTURED QUERIES TOO. It used to require that
+        # the query parsed to nothing at all, which left a whole class of
+        # searches dead: a query naming only GATE attributes has plenty of
+        # meaning and no score. "iphone a16" resolves to brand=apple and
+        # nothing else -- A16 is the chip, and phones do not carry a processor
+        # attribute -- so every candidate was excluded for having no scoreable
+        # agreement, and a shopper who had named a brand we stock was told
+        # nothing matched.
+        #
+        # The tier is honest about what these are: they arrive as "similar"
+        # with no score and no difference list, which is exactly what they
+        # are -- name and brand matches the engine could not rank.
         scored = [(c, _unscored()) for c in candidates]
 
     price_map = price_summary(db, (c.id for c, _ in scored))

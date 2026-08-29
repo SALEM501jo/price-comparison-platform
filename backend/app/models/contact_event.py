@@ -45,6 +45,7 @@ class ContactChannel(str, enum.Enum):
     call = "call"
     whatsapp = "whatsapp"
     facebook = "facebook"
+    instagram = "instagram"
 
 
 # Stored as text, not a database enum: the project's standing decision, because

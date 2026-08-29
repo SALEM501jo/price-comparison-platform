@@ -27,6 +27,7 @@ class StorePriceResponse(BaseModel):
     phone: Optional[str] = None
     whatsapp: Optional[str] = None
     facebook_url: Optional[str] = None
+    instagram_url: Optional[str] = None
 
     # True when the price was submitted by the shop rather than scraped from
     # its own feed. Worth surfacing: a merchant price is only as fresh as the
