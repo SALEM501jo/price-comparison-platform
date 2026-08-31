@@ -91,7 +91,9 @@ export default function ProductDetail() {
     <div className="mx-auto max-w-4xl px-4 py-8">
       <Link
         to="/"
-        className="mb-4 inline-block text-sm text-brand-600 dark:text-brand-400 hover:underline"
+        // min-h-11 rather than inline-block: a 20px-tall back link is the
+        // second most-tapped thing on this page and was the smallest.
+        className="mb-2 -ms-2 inline-flex min-h-11 items-center rounded-md px-2 text-sm text-brand-600 hover:bg-gray-50 hover:underline dark:text-brand-400 dark:hover:bg-gray-800"
       >
         &larr; {t('product.back')}
       </Link>

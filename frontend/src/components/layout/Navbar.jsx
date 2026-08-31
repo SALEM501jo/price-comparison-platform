@@ -12,7 +12,7 @@ const linkClass = ({ isActive }) =>
   }`;
 
 const iconButton =
-  'inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 px-2.5 text-sm ' +
+  'inline-flex h-11 items-center gap-1.5 rounded-lg border border-gray-200 px-3 text-sm ' +
   'text-gray-600 transition hover:bg-gray-50 hover:text-gray-900 ' +
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ' +
   'dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white';

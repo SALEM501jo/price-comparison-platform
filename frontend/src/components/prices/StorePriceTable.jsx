@@ -3,6 +3,26 @@ import { useLocale } from '../../hooks/useLocale';
 import { recordContactTap } from '../../api/products';
 
 /**
+ * A thumb-sized hit area for the contact links.
+ *
+ * WHY THIS EXISTS AS A CONSTANT: these are the only buttons on the site that
+ * complete a purchase. There is no checkout -- a shopper compares, taps Call
+ * or WhatsApp, and the rest happens on the phone -- so if these are hard to
+ * hit, nothing else on the page matters.
+ *
+ * Measured at 375px before this: 24px and 26px tall. That clears the WCAG 2.2
+ * AA floor of 24px by a hair and falls well short of both platform
+ * guidelines, which are what actually govern whether a thumb lands on it --
+ * Apple's HIG says 44pt and Material says 48dp.
+ *
+ * min-h-11 is 44px. inline-flex + items-center keeps the label centred as the
+ * box grows, so the button gets bigger without the text moving.
+ */
+const TAP_TARGET =
+  'inline-flex min-h-11 items-center justify-center rounded-md px-3 ' +
+  'text-xs font-medium transition';
+
+/**
  * Every store's price for one product, cheapest total first.
  *
  * The backend already sorts by total cost, but the sort is repeated here so
@@ -42,7 +62,7 @@ function ContactLinks({ row, productId }) {
         onClick={() => tap('whatsapp')}
         target="_blank"
         rel="noopener noreferrer"
-        className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700"
+        className={`${TAP_TARGET} bg-green-600 text-white hover:bg-green-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500`}
       >
         WhatsApp
       </a>,
@@ -55,7 +75,7 @@ function ContactLinks({ row, productId }) {
         key="phone"
         href={`tel:${row.phone}`}
         onClick={() => tap('call')}
-        className="rounded-md border border-gray-300 dark:border-gray-700 px-2.5 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50"
+        className={`${TAP_TARGET} border border-gray-300 text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800`}
       >
         {row.phone}
       </a>,
@@ -74,7 +94,7 @@ function ContactLinks({ row, productId }) {
         onClick={() => tap('instagram')}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-brand-600 hover:underline dark:text-brand-400"
+        className={`${TAP_TARGET} border border-gray-300 text-brand-600 hover:bg-gray-50 dark:border-gray-700 dark:text-brand-400 dark:hover:bg-gray-800`}
       >
         Instagram
       </a>,
@@ -89,7 +109,7 @@ function ContactLinks({ row, productId }) {
         onClick={() => tap('facebook')}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-brand-600 dark:text-brand-400 hover:underline"
+        className={`${TAP_TARGET} border border-gray-300 text-brand-600 hover:bg-gray-50 dark:border-gray-700 dark:text-brand-400 dark:hover:bg-gray-800`}
       >
         Facebook page
       </a>,
@@ -237,7 +257,7 @@ export default function StorePriceTable({ prices, emptyMessage, productId }) {
                         // noreferrer/noopener stops the opened store page from
                         // reaching back into this tab via window.opener.
                         rel="noopener noreferrer"
-                        className="text-brand-600 dark:text-brand-400 hover:underline"
+                        className="inline-flex min-h-11 items-center justify-center rounded-md px-3 text-brand-600 hover:bg-gray-50 hover:underline dark:text-brand-400 dark:hover:bg-gray-800"
                       >
                         {t('table.visit')}
                       </a>

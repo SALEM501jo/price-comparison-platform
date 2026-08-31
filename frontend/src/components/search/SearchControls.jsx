@@ -35,7 +35,7 @@ export default function SearchControls({ sort, onSortChange, total, counts }) {
         <select
           value={sort}
           onChange={(e) => onSortChange(e.target.value)}
-          className="rounded-lg border border-gray-300 dark:border-gray-700 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="min-h-11 rounded-lg border border-gray-300 px-2 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-gray-700"
         >
           {SORT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>

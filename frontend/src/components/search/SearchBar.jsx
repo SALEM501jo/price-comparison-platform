@@ -107,7 +107,7 @@ export default function SearchBar({ initialQuery = '', showExamples = false }) {
               type="button"
               dir="ltr"
               onClick={() => submit(example)}
-              className="rounded-full bg-gray-100 px-3 py-1 text-gray-600 transition hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="inline-flex min-h-11 items-center rounded-full bg-gray-100 px-4 text-gray-600 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               {example}
             </button>
