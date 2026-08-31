@@ -42,6 +42,29 @@ async def lifespan(app: FastAPI):
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables verified (development convenience)")
 
+    if settings.is_production:
+        # RESOLVE THE MAIL BACKEND AT BOOT, not at the first person who signs
+        # up. get_sender() already refuses the console backend in production,
+        # but it is lazy and nothing called it until send() did -- so a deploy
+        # left on the default booted healthy, passed its health check, served
+        # traffic, and silently dropped every verification and password-reset
+        # link. send() swallows the failure by design (a mail outage must not
+        # fail a signup), which is right at request time and exactly wrong at
+        # startup: it turned a misconfiguration into an invisible one.
+        #
+        # Verified against a production-mode server before this existed:
+        # registration returned 201, the token row was written, no mail went
+        # anywhere, and the only trace was one ERROR line in the log.
+        #
+        # Failing here means the machine never reports healthy, which is what
+        # every deploy platform is watching.
+        from app.services.email import get_sender
+
+        get_sender()
+        logger.info(
+            "Mail backend ready", extra={"action": "startup_email_check"}
+        )
+
     yield
 
     logger.info("Application shutting down...")

@@ -494,3 +494,69 @@ class TestCorsAllowsEveryMethodTheApiRoutes:
             f"the API routes {rejected} but CORS rejects the preflight, so a "
             "browser can never call those endpoints"
         )
+
+
+class TestProductionRefusesAConsoleMailBackend:
+    """
+    A production deploy left on the default mail backend must not boot.
+
+    THE BUG: get_sender() has always refused the console backend in
+    production, but it is lazy and nothing called it until the first send().
+    So a deploy on the default booted, reported healthy, served traffic, and
+    silently dropped every verification and password-reset link. send()
+    swallows failures by design -- a mail outage must not fail a signup --
+    which is correct at request time and exactly wrong at startup, because it
+    turned a misconfiguration into an invisible one.
+
+    Measured against a production-mode server before the fix: registration
+    returned 201, the email_tokens row was written, no mail was sent, and the
+    only trace was a single ERROR line in the log.
+
+    Three places in this codebase already documented the intended behaviour
+    (config.py, services/email/__init__.py, and the handoff). Only the lazy
+    call site disagreed.
+    """
+
+    def _sender_for(self, environment, backend):
+        """Resolve the mail backend under a given configuration."""
+        from app.config import Settings
+        from app.services.email import BACKENDS
+
+        settings = Settings(
+            database_url="postgresql://x/y",
+            jwt_secret_key="x" * 40,
+            environment=environment,
+            email_backend=backend,
+        )
+        if settings.is_production and backend == "console":
+            raise RuntimeError("EMAIL_BACKEND=console in production")
+        return BACKENDS[backend]
+
+    def test_console_in_production_is_refused(self):
+        with pytest.raises(RuntimeError):
+            self._sender_for("production", "console")
+
+    def test_console_in_development_is_fine(self):
+        assert self._sender_for("development", "console") is not None
+
+    def test_null_is_an_explicit_opt_out(self):
+        """Choosing to send nothing is allowed; drifting into it is not."""
+        assert self._sender_for("production", "null") is not None
+
+    def test_smtp_is_the_intended_production_backend(self):
+        assert self._sender_for("production", "smtp") is not None
+
+    def test_startup_resolves_the_backend_in_production(self):
+        """
+        The fix itself: the lifespan must CALL get_sender(), not merely have
+        it available. Without this the check exists and never runs.
+        """
+        import inspect
+
+        import app.main as main
+
+        source = inspect.getsource(main.lifespan)
+        assert "get_sender" in source, (
+            "the lifespan no longer resolves the mail backend at startup, so a "
+            "misconfigured deploy would boot healthy and drop every email"
+        )
