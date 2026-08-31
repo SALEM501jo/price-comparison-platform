@@ -2,3 +2,6 @@
 *.pem
 *.key
 secrets/
+# Database dumps taken before destructive cleanups. Local only -- they
+# contain every account and price in the database.
+backups/

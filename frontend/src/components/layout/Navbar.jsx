@@ -5,7 +5,7 @@ import { useTheme } from '../../hooks/useTheme';
 import Logo from './Logo';
 
 const linkClass = ({ isActive }) =>
-  `text-sm transition ${
+  `inline-flex min-h-11 items-center text-sm transition ${
     isActive
       ? 'font-semibold text-brand-700 dark:text-brand-400'
       : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
@@ -126,7 +126,7 @@ export default function Navbar() {
           ) : (
             <Link
               to="/login"
-              className="rounded-lg bg-brand-600 px-3.5 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700"
+              className="inline-flex min-h-11 items-center rounded-lg bg-brand-600 px-3.5 text-sm font-medium text-white transition hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               {t('nav.login')}
             </Link>

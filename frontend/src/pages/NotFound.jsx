@@ -10,7 +10,7 @@ export default function NotFound() {
       </h1>
       <Link
         to="/"
-        className="mt-2 inline-block text-brand-600 hover:underline dark:text-brand-400"
+        className="mt-2 inline-flex min-h-11 items-center text-brand-600 hover:underline dark:text-brand-400"
       >
         {t('common.backHome')}
       </Link>

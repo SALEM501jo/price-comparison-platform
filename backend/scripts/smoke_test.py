@@ -167,9 +167,34 @@ def main() -> int:
     if exact:
         check("exact match scores 100", exact[0]["match_score"] == 100.0)
         check("exact match has no differences", exact[0]["differences"] == [])
-        check("exact match aggregates several stores", exact[0]["store_count"] >= 2,
-              str(exact[0].get("store_count")))
         check("exact match names a best-deal store", bool(exact[0]["best_deal_store"]))
+
+    # AGGREGATION ACROSS STORES, checked against whatever product actually has
+    # more than one price rather than against a hardcoded handset.
+    #
+    # This used to assert that the iPhone 15 was stocked by two or more shops.
+    # That was true only because three MOCK stores carried invented prices for
+    # it; when they were removed before the first deploy the check failed, and
+    # what it was really testing -- that price_summary() aggregates -- was
+    # still perfectly true. A test that breaks when the fixtures change was
+    # testing the fixtures.
+    #
+    # /products/deals only contains products carried by more than one shop, so
+    # it is the honest source for this. An EMPTY deals list is reported rather
+    # than passed over: it means nothing on the site can be compared, which is
+    # a real finding about the catalogue even though it is not a code fault.
+    deals = client.get("/products/deals", params={"limit": 5})
+    if check("deals endpoint responds", deals.status_code == 200, deals.text):
+        rows = deals.json()
+        if rows:
+            check("a multi-store product aggregates its shops",
+                  rows[0]["store_count"] >= 2, str(rows[0].get("store_count")))
+            check("a multi-store product names the cheapest shop",
+                  bool(rows[0].get("best_deal_store")))
+        else:
+            check("CATALOGUE HAS NOTHING TO COMPARE "
+                  "(no product is stocked by two shops)", False,
+                  "not a code fault -- the catalogue needs more overlapping stores")
 
     # A different storage size is a DIFFERENT product, and must not be exact.
     other = client.get("/products/search", params={"q": "iPhone 15 512GB Black"})

@@ -50,7 +50,7 @@ export default function ForgotPassword() {
           </p>
           <Link
             to="/login"
-            className="mt-4 inline-block text-sm text-brand-600 hover:underline dark:text-brand-400"
+            className="mt-4 inline-flex min-h-11 items-center text-sm text-brand-600 hover:underline dark:text-brand-400"
           >
             {t('auth.backToLogin')}
           </Link>
@@ -77,13 +77,13 @@ export default function ForgotPassword() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+            className="w-full min-h-11 rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
           >
             {busy ? t('support.sending') : t('auth.sendResetLink')}
           </button>
           <Link
             to="/login"
-            className="block text-center text-sm text-brand-600 hover:underline dark:text-brand-400"
+            className="inline-flex min-h-11 w-full items-center justify-center text-sm text-brand-600 hover:underline dark:text-brand-400"
           >
             {t('auth.backToLogin')}
           </Link>

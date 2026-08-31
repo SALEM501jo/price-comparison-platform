@@ -20,7 +20,7 @@ export default function Logo({ compact = false }) {
   return (
     <Link
       to="/"
-      className="group flex items-center gap-2.5"
+      className="group flex min-h-11 items-center gap-2.5"
       aria-label={t('brand.name')}
     >
       <svg

@@ -96,7 +96,7 @@ export default function VerifyEmail() {
           </p>
           <Link
             to="/login"
-            className="mt-6 inline-block rounded-lg border border-gray-300 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50"
+            className="mt-6 inline-flex min-h-11 items-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             Go to login
           </Link>

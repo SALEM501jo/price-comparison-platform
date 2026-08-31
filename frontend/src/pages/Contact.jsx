@@ -125,7 +125,7 @@ export default function Contact() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
+            className="w-full min-h-11 rounded-lg bg-brand-600 px-4 py-2 font-semibold text-white hover:bg-brand-700 disabled:opacity-60"
           >
             {busy ? t('support.sending') : t('support.send')}
           </button>
