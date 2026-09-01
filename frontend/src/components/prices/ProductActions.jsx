@@ -81,10 +81,10 @@ export default function ProductActions({ productId, lowestTotal }) {
         <button
           onClick={handleSave}
           disabled={savingWishlist || saved}
-          className={`rounded-lg px-4 py-2 text-sm font-medium ${
+          className={`inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium ${
             saved
-              ? 'bg-green-100 text-green-800'
-              : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50'
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+              : 'bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50'
           }`}
         >
           {saved
@@ -95,8 +95,8 @@ export default function ProductActions({ productId, lowestTotal }) {
         </button>
 
         {alertSet ? (
-          <span className="rounded-lg bg-green-100 dark:bg-green-900/40 px-4 py-2 text-sm font-medium text-green-800 dark:text-green-300">
-            Alert set
+          <span className="inline-flex min-h-11 items-center rounded-lg bg-green-100 px-4 text-sm font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300">
+            {t('actions.alertSet')}
           </span>
         ) : (
           <button
@@ -112,12 +112,12 @@ export default function ProductActions({ productId, lowestTotal }) {
             to="/wishlist"
             className="self-center text-sm text-brand-600 dark:text-brand-400 hover:underline"
           >
-            View wishlist
+            {t('actions.viewWishlist')}
           </Link>
         )}
         {alertSet && (
           <Link to="/alerts" className="self-center text-sm text-brand-600 dark:text-brand-400 hover:underline">
-            View alerts
+            {t('actions.viewAlerts')}
           </Link>
         )}
       </div>
@@ -132,7 +132,7 @@ export default function ProductActions({ productId, lowestTotal }) {
               htmlFor="target-price"
               className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Tell me when it drops below
+              {t('actions.tellMeBelow')}
             </label>
             <div className="flex items-center gap-2">
               <input

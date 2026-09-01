@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import Spinner from '../ui/Spinner';
+import { useLocale } from '../../hooks/useLocale';
 
 /**
  * Gate a route behind authentication.
@@ -13,6 +14,7 @@ import Spinner from '../ui/Spinner';
  * 403 to non-admins regardless of what the browser thinks.
  */
 export default function RequireAuth({ children, requireAdmin = false }) {
+  const { t } = useLocale();
   const { isAuthenticated, isAdmin, loading } = useAuth();
   const location = useLocation();
 
@@ -29,9 +31,11 @@ export default function RequireAuth({ children, requireAdmin = false }) {
   if (requireAdmin && !isAdmin) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Admin only</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+          {t('auth.adminOnly')}
+        </h1>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          Your account does not have access to this page.
+          {t('auth.noAccess')}
         </p>
       </div>
     );

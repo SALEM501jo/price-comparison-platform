@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getSupportMessages, setSupportMessageHandled } from '../../api/admin';
 import { extractApiError } from '../../utils/errors';
+import { useLocale } from '../../hooks/useLocale';
 
 /**
  * Messages sent through the contact form.
@@ -18,6 +19,7 @@ import { extractApiError } from '../../utils/errors';
  * in from whatever address they can still reach.
  */
 export default function SupportMessages() {
+  const { t } = useLocale();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [showHandled, setShowHandled] = useState(false);
@@ -26,7 +28,7 @@ export default function SupportMessages() {
     getSupportMessages(includeHandled ? {} : { handled: false })
       .then(setData)
       .catch((err) =>
-        setError(extractApiError(err, 'Could not load the messages.')),
+        setError(extractApiError(err, t('support.loadError'))),
       );
   };
 
@@ -39,7 +41,7 @@ export default function SupportMessages() {
       await setSupportMessageHandled(message.id, !message.handled);
       load(showHandled);
     } catch (err) {
-      setError(extractApiError(err, 'Could not update that message.'));
+      setError(extractApiError(err, t('support.updateError')));
     }
   };
 
@@ -49,20 +51,21 @@ export default function SupportMessages() {
     <section className="mb-8">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Contact messages
+          {t('support.heading')}
           {data?.unhandled > 0 && (
             <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-              {data.unhandled} unread
+              {t('support.unread', { count: data.unhandled })}
             </span>
           )}
         </h2>
-        <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           <input
             type="checkbox"
+            className="h-5 w-5"
             checked={showHandled}
             onChange={(e) => setShowHandled(e.target.checked)}
           />
-          Show handled
+          {t('support.showHandled')}
         </label>
       </div>
 
@@ -74,7 +77,7 @@ export default function SupportMessages() {
 
       {messages.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-          Nothing waiting.
+          {t('support.nothingWaiting')}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -90,7 +93,7 @@ export default function SupportMessages() {
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div className="min-w-0">
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {message.subject || 'No subject'}
+                    {message.subject || t('support.noSubject')}
                   </span>
                   {/* mailto, because replying is the whole point of the
                       screen and retyping the address invites a typo. */}
@@ -105,16 +108,16 @@ export default function SupportMessages() {
                   {message.account_email &&
                     message.account_email !== message.email && (
                       <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                        (account: {message.account_email})
+                        {t('support.account', { email: message.account_email })}
                       </span>
                     )}
                 </div>
                 <button
                   type="button"
                   onClick={() => toggle(message)}
-                  className="shrink-0 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="inline-flex min-h-11 items-center shrink-0 justify-center rounded-md border border-gray-300 px-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
-                  {message.handled ? 'Reopen' : 'Mark handled'}
+                  {message.handled ? t('support.reopen') : t('support.markHandled')}
                 </button>
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">

@@ -225,7 +225,6 @@ class DeduplicationEngine:
             category=category or "Uncategorized",
             match_category=parsed.category,
             match_attributes=parsed.specified,
-            specs=parsed.specified,
         )
         self.db.add(new_product)
         self.db.commit()

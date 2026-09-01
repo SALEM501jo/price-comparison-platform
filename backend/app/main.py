@@ -19,7 +19,6 @@ from app.routers import (
     admin,
     auth,
     merchant,
-    mock_stores,
     prices,
     products,
     support,
@@ -149,11 +148,6 @@ app.include_router(prices.router, prefix="/prices", tags=["prices"])
 app.include_router(support.router, prefix="/support", tags=["support"])
 app.include_router(merchant.router, prefix="/merchant", tags=["merchant"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
-# Development only. These serve invented prices, and a deployed site
-# offering them next to real scraped data -- visible to anyone who opens
-# /docs -- reads as carelessness rather than as a fixture.
-if not settings.is_production:
-    app.include_router(mock_stores.router, prefix="/mock", tags=["mock stores"])
 
 
 @app.get("/health")

@@ -36,6 +36,7 @@ const TAP_TARGET =
  */
 
 function ContactLinks({ row, productId }) {
+  const { t } = useLocale();
   const links = [];
 
   // Count the tap, then get out of the way.
@@ -111,7 +112,7 @@ function ContactLinks({ row, productId }) {
         rel="noopener noreferrer"
         className={`${TAP_TARGET} border border-gray-300 text-brand-600 hover:bg-gray-50 dark:border-gray-700 dark:text-brand-400 dark:hover:bg-gray-800`}
       >
-        Facebook page
+        {t('common.facebookPage')}
       </a>,
     );
   }
@@ -207,7 +208,7 @@ export default function StorePriceTable({ prices, emptyMessage, productId }) {
                   {row.is_merchant && (
                     <span
                       className="ml-2 rounded-full bg-blue-50 dark:bg-brand-900/40 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-brand-400"
-                      title="Price submitted by the shop"
+                      title={t('common.priceFromShop')}
                     >
                       {t('table.localShop')}
                     </span>

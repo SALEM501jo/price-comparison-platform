@@ -43,7 +43,7 @@ export default function VerifyBanner() {
           <button
             onClick={handleResend}
             disabled={sending}
-            className="font-medium text-amber-900 underline hover:no-underline disabled:opacity-50 dark:text-amber-200"
+            className="inline-flex min-h-11 items-center font-medium text-amber-900 underline hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:opacity-50 dark:text-amber-200"
           >
             {sending ? t('auth.sending') : t('auth.resendLink')}
           </button>

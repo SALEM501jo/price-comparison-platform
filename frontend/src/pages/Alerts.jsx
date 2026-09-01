@@ -4,6 +4,7 @@ import { deleteAlert, getAlerts } from '../api/prices';
 import Spinner from '../components/ui/Spinner';
 import { extractApiError } from '../utils/errors';
 import { formatPrice } from '../utils/format';
+import { useLocale } from '../hooks/useLocale';
 
 /** How close the current price is to the target, as a percentage over it. */
 function gapToTarget(alert) {
@@ -14,6 +15,7 @@ function gapToTarget(alert) {
 }
 
 export default function Alerts() {
+  const { t } = useLocale();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -60,7 +62,9 @@ export default function Alerts() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">Price alerts</h1>
+      <h1 className="mb-1 text-xl font-semibold text-gray-900 dark:text-white">
+        {t('alerts.title')}
+      </h1>
       <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
         {alerts.length} active
         {met.length > 0 && (
@@ -78,15 +82,17 @@ export default function Alerts() {
 
       {alerts.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-4 py-12 text-center">
-          <p className="font-medium text-gray-700 dark:text-gray-300">No alerts yet.</p>
+          <p className="font-medium text-gray-700 dark:text-gray-300">
+            {t('alerts.none')}
+          </p>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Open a product and set a target price to be told when it drops.
+            {t('alerts.noneBlurb')}
           </p>
           <Link
             to="/"
             className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            Start searching
+            {t('common.startSearching')}
           </Link>
         </div>
       ) : (
@@ -129,7 +135,7 @@ export default function Alerts() {
 
                     {alert.is_met ? (
                       <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
-                        Target reached — buy now
+                        {t('alerts.targetReached')}
                       </p>
                     ) : (
                       gap !== null && (
@@ -142,9 +148,9 @@ export default function Alerts() {
 
                   <button
                     onClick={() => handleDelete(alert.id)}
-                    className="shrink-0 text-sm text-red-600 dark:text-red-400 hover:text-red-700"
+                    className="inline-flex min-h-11 items-center shrink-0 text-sm text-red-600 hover:text-red-700 dark:text-red-400"
                   >
-                    Delete
+                    {t('alerts.delete')}
                   </button>
                 </div>
               </li>

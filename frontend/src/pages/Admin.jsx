@@ -18,6 +18,7 @@ import SupportMessages from '../components/admin/SupportMessages';
 import Spinner from '../components/ui/Spinner';
 import { useAuth } from '../hooks/useAuth';
 import { extractApiError } from '../utils/errors';
+import { useLocale } from '../hooks/useLocale';
 
 // Merchants can write prices that shoppers see, so they get their own colour
 // rather than sharing the shopper grey.
@@ -27,13 +28,16 @@ const ROLE_STYLES = {
   user: 'bg-gray-100 text-gray-600',
 };
 
+// Translation KEYS, not English. The labels are resolved where `t` is in
+// scope; keeping the words here would have meant a second copy of them, and
+// the pair would drift the first time one was edited.
 const STAT_LABELS = {
-  users: 'Users',
-  products: 'Products',
-  stores: 'Stores',
-  aliases: 'Store listings',
-  prices: 'Current prices',
-  price_history_records: 'History records',
+  users: 'admin.stat.users',
+  products: 'admin.stat.products',
+  stores: 'admin.stat.stores',
+  aliases: 'admin.stat.aliases',
+  prices: 'admin.stat.prices',
+  price_history_records: 'admin.stat.history',
 };
 
 function StatCard({ label, value }) {
@@ -62,6 +66,7 @@ function StatCard({ label, value }) {
  * advertised price is precisely the action that has to be answerable later.
  */
 function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
+  const { t } = useLocale();
   const [price, setPrice] = useState(
     listing.price != null ? String(listing.price) : '',
   );
@@ -74,7 +79,7 @@ function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
     try {
       onChanged(await adminUpdateListing(listing.id, { price: Number(price) }));
     } catch (err) {
-      onError(extractApiError(err, 'Could not update that listing.'));
+      onError(extractApiError(err, t('admin.error.listing')));
     } finally {
       setBusy(false);
     }
@@ -89,7 +94,7 @@ function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
         }),
       );
     } catch (err) {
-      onError(extractApiError(err, 'Could not update that listing.'));
+      onError(extractApiError(err, t('admin.error.listing')));
     } finally {
       setBusy(false);
     }
@@ -108,7 +113,7 @@ function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
       await adminDeleteListing(listing.id);
       onRemoved(listing.id);
     } catch (err) {
-      onError(extractApiError(err, 'Could not remove that listing.'));
+      onError(extractApiError(err, t('admin.error.removeListing')));
       setBusy(false);
     }
   };
@@ -155,7 +160,7 @@ function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
           type="button"
           onClick={toggleStock}
           disabled={busy}
-          title="Click to change"
+          title={t('common.clickToChange')}
           className={`rounded-md px-2 py-1 text-xs font-medium disabled:opacity-40 ${
             listing.availability
               ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
@@ -178,6 +183,7 @@ function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
 }
 
 export default function Admin() {
+  const { t } = useLocale();
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
@@ -207,7 +213,7 @@ export default function Admin() {
         setError(null);
       } catch (err) {
         if (err.code === 'ERR_CANCELED') return;
-        setError(extractApiError(err, 'Could not load the dashboard.'));
+        setError(extractApiError(err, t('admin.error.dashboard')));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -215,7 +221,10 @@ export default function Admin() {
 
     load();
     return () => controller.abort();
-  }, []);
+    // `t` is a dependency because the error path renders a translated string:
+    // switching language while the dashboard is open should not leave the
+    // previous language's message on screen. The other pages here do the same.
+  }, [t]);
 
   const handleDeleteUser = async (id, email) => {
     // Deleting a user cascades to their wishlist, alerts and sessions, so it
@@ -228,7 +237,7 @@ export default function Admin() {
       await deleteUser(id);
     } catch (err) {
       setUsers(previous);
-      setError(extractApiError(err, 'Could not delete that user.'));
+      setError(extractApiError(err, t('admin.error.user')));
     }
   };
 
@@ -264,7 +273,7 @@ export default function Admin() {
         ),
       );
     } catch (err) {
-      setError(extractApiError(err, 'Could not decline that store.'));
+      setError(extractApiError(err, t('admin.error.decline')));
     }
   };
 
@@ -279,7 +288,7 @@ export default function Admin() {
       const data = await getStoreListings(storeId);
       setStoreListings((current) => ({ ...current, [storeId]: data.listings }));
     } catch (err) {
-      setError(extractApiError(err, 'Could not load the products for that shop.'));
+      setError(extractApiError(err, t('admin.error.shopListings')));
     }
   };
 
@@ -305,7 +314,7 @@ export default function Admin() {
         ),
       );
     } catch (err) {
-      setError(extractApiError(err, 'Could not update that store.'));
+      setError(extractApiError(err, t('admin.error.store')));
     }
   };
 
@@ -319,7 +328,9 @@ export default function Admin() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="mb-6 text-xl font-semibold text-gray-900 dark:text-white">Admin</h1>
+      <h1 className="mb-6 text-xl font-semibold text-gray-900 dark:text-white">
+        {t('admin.title')}
+      </h1>
 
       {error && (
         <div role="alert" className="mb-4 rounded bg-red-50 dark:bg-red-950/40 px-4 py-2 text-sm text-red-600 dark:text-red-400">
@@ -330,11 +341,11 @@ export default function Admin() {
       {stats && (
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            Platform
+            {t('admin.platform')}
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {Object.entries(stats).map(([key, value]) => (
-              <StatCard key={key} label={STAT_LABELS[key] ?? key} value={value} />
+              <StatCard key={key} label={t(STAT_LABELS[key] ?? key)} value={value} />
             ))}
           </div>
         </section>
@@ -342,35 +353,33 @@ export default function Admin() {
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Merchant stores
+          {t('admin.merchantStores')}
         </h2>
         <p className="mb-3 text-sm text-gray-500 dark:text-gray-400">
-          A merchant&rsquo;s prices stay out of search until the claim is
-          confirmed. Check that the account really belongs to the shop before
-          approving &mdash; anyone can register under any name.
+          {t('admin.merchantStoresBlurb')}
         </p>
         {merchantStores.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            No shops have registered yet.
+            {t('admin.noShops')}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
             <table className="min-w-full bg-white dark:bg-gray-900 text-sm">
               <thead className="bg-gray-50 dark:bg-gray-900 text-left text-gray-600 dark:text-gray-400">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Shop</th>
-                  <th className="px-4 py-3 font-medium">Account</th>
-                  <th className="px-4 py-3 font-medium">Contact</th>
-                  <th className="px-4 py-3 font-medium">Listings</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.shop')}</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.account')}</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.contact')}</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.listings')}</th>
                   {/* TAPS, not calls -- a shopper pressing Call or WhatsApp.
                       The header says so because this is the number a shop
                       would be billed against, and the admin deciding what to
                       charge needs to read it the same way the merchant does.
                       Both screens take it from one query in contact_stats. */}
-                  <th className="px-4 py-3 font-medium" title="Shoppers who tapped Call, WhatsApp or Facebook. Not calls made, and not sales.">
-                    Taps (30d)
+                  <th className="px-4 py-3 font-medium" title={t('admin.tapsHint')}>
+                    {t('admin.taps')}
                   </th>
-                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.status')}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -382,7 +391,7 @@ export default function Admin() {
                       <button
                         onClick={() => toggleStoreListings(store.id)}
                         className="font-medium text-brand-600 dark:text-brand-400 hover:underline"
-                        title="Show what this shop lists"
+                        title={t('admin.showListings')}
                       >
                         {store.name}
                       </button>
@@ -392,9 +401,9 @@ export default function Admin() {
                       {store.owner_verified_email === false && (
                         <span
                           className="ml-2 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-xs text-amber-800 dark:text-amber-300"
-                          title="This account has not confirmed its email address"
+                          title={t('admin.emailUnconfirmedHint')}
                         >
-                          email unconfirmed
+                          {t('admin.emailUnconfirmed')}
                         </span>
                       )}
                     </td>
@@ -430,7 +439,7 @@ export default function Admin() {
                           without it a rejected claim looked identical to one
                           nobody had reviewed, and the queue never emptied. */}
                       {store.review_status === 'verified' ? (
-                        <span className="text-green-700 dark:text-green-400">Verified</span>
+                        <span className="text-green-700 dark:text-green-400">{t('admin.verified')}</span>
                       ) : store.review_status === 'declined' ? (
                         <span
                           className="text-red-600 dark:text-red-400"
@@ -440,10 +449,10 @@ export default function Admin() {
                               : 'Declined'
                           }
                         >
-                          Declined
+                          {t('admin.declined')}
                         </span>
                       ) : (
-                        <span className="text-amber-700 dark:text-amber-400">Pending</span>
+                        <span className="text-amber-700 dark:text-amber-400">{t('admin.pending')}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -457,10 +466,10 @@ export default function Admin() {
                           }
                         >
                           {store.is_verified
-                            ? 'Withdraw'
+                            ? t('admin.withdraw')
                             : store.review_status === 'declined'
-                              ? 'Approve anyway'
-                              : 'Approve'}
+                              ? t('admin.approveAnyway')
+                              : t('admin.approve')}
                         </button>
                         {/* Only offered while the claim is still open. A
                             verified shop is withdrawn, not declined, and a
@@ -470,7 +479,7 @@ export default function Admin() {
                             onClick={() => handleDecline(store)}
                             className="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                           >
-                            Decline
+                            {t('admin.decline')}
                           </button>
                         )}
                       </div>
@@ -480,10 +489,10 @@ export default function Admin() {
                     <tr>
                       <td colSpan={7} className="bg-gray-50 dark:bg-gray-900 px-4 py-3">
                         {!storeListings[store.id] ? (
-                          <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">{t('admin.loading')}</p>
                         ) : storeListings[store.id].length === 0 ? (
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            This shop has not listed anything yet.
+                            {t('admin.shopHasNothing')}
                           </p>
                         ) : (
                           <ul className="space-y-1.5">
@@ -531,21 +540,21 @@ export default function Admin() {
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Price anomalies
+          {t('admin.priceAnomalies')}
         </h2>
         {anomalies.length === 0 ? (
           <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            No price moved more than 50% in the last 24 hours.
+            {t('admin.noAnomalies')}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
             <table className="min-w-full bg-white dark:bg-gray-900 text-sm">
               <thead className="bg-gray-50 dark:bg-gray-900 text-left text-gray-600 dark:text-gray-400">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Product</th>
-                  <th className="px-4 py-3 font-medium">Was</th>
-                  <th className="px-4 py-3 font-medium">Now</th>
-                  <th className="px-4 py-3 font-medium">Change</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.product')}</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.was')}</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.now')}</th>
+                  <th className="px-4 py-3 font-medium">{t('admin.change')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -567,15 +576,15 @@ export default function Admin() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Users ({users.length})
+          {t('admin.users', { count: users.length })}
         </h2>
         <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
           <table className="min-w-full bg-white dark:bg-gray-900 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900 text-left text-gray-600 dark:text-gray-400">
               <tr>
-                <th className="px-4 py-3 font-medium">ID</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Role</th>
+                <th className="px-4 py-3 font-medium">{t('admin.id')}</th>
+                <th className="px-4 py-3 font-medium">{t('admin.email')}</th>
+                <th className="px-4 py-3 font-medium">{t('admin.role')}</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -605,9 +614,9 @@ export default function Admin() {
                     ) : (
                       <button
                         onClick={() => handleDeleteUser(u.id, u.email)}
-                        className="text-sm text-red-600 dark:text-red-400 hover:text-red-700"
+                        className="inline-flex min-h-11 items-center text-sm text-red-600 hover:text-red-700 dark:text-red-400"
                       >
-                        Delete
+                        {t('admin.delete')}
                       </button>
                     )}
                   </td>

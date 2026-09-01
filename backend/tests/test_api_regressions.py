@@ -9,12 +9,7 @@ silently reverted.
 import asyncio
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db
 from app.main import app
 from app.models.alias import ProductAlias
 from app.models.price import Price
@@ -24,40 +19,6 @@ from app.models.user import User, UserRole
 
 PASSWORD = "TestPass123"
 
-
-@pytest.fixture
-def db_session():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    session = sessionmaker(bind=engine)()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-@pytest.fixture
-def client(db_session, monkeypatch):
-    # Neutralise the rate limiter so tests are deterministic without Redis.
-    # Both rate_limit() and strict_rate_limit() funnel through _enforce().
-    async def no_limit(*args, **kwargs):
-        return None
-
-    monkeypatch.setattr("app.security.rate_limiter._enforce", no_limit)
-
-    # The dev-convenience create_all() in the lifespan is bound to the real
-    # Postgres engine, not to the SQLite session injected below. Tests must not
-    # depend on a running database server.
-    monkeypatch.setattr(Base.metadata, "create_all", lambda *a, **k: None)
-
-    app.dependency_overrides[get_db] = lambda: db_session
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
 
 
 def register(client, email="user@example.com"):
@@ -412,11 +373,16 @@ class TestProductionSurface:
         assert docs == "/docs"
         assert spec == "/openapi.json"
 
-    def test_mock_routes_are_registered_in_development(self):
+    def test_the_mock_store_routes_are_gone_entirely(self):
         """
-        They serve invented prices, so a production build must not offer them
-        next to real scraped data. Verified against a container running with
-        ENVIRONMENT=production, where /mock/stores returns 404.
+        They used to be mounted in development only, because they served
+        invented prices and a deployed site offering those beside real scraped
+        data reads as carelessness.
+
+        Now they do not exist at all. The mock stores were deleted from the
+        catalogue before the first deploy, and code that outlives the data it
+        produced is just a second way to do something nobody should do -- a
+        reader finding two ingest paths has to work out which one is real.
 
         Enumerated from the OpenAPI spec rather than app.routes: newer FastAPI
         keeps included routers as nested _IncludedRouter objects instead of
@@ -424,9 +390,11 @@ class TestProductionSurface:
         """
         import app.main as main
 
-        assert not main.settings.is_production, "test env should be development"
         paths = main.app.openapi()["paths"]
-        assert any(p.startswith("/mock") for p in paths), "mock routes missing in dev"
+        assert not [p for p in paths if p.startswith("/mock")], (
+            "the mock store routes are back; the invented-price pipeline was "
+            "deleted deliberately"
+        )
 
 
 class TestCorsAllowsEveryMethodTheApiRoutes:

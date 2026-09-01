@@ -118,7 +118,7 @@ export default function Navbar() {
               </span>
               <button
                 onClick={handleLogout}
-                className="text-sm text-red-600 transition hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                className="inline-flex min-h-11 items-center text-sm text-red-600 transition hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:text-red-400 dark:hover:text-red-300"
               >
                 {t('nav.logout')}
               </button>

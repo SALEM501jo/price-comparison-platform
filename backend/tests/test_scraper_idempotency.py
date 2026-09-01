@@ -1,11 +1,18 @@
 """
-Regression tests for the scrape pipeline.
+Regression tests for the ingest pipeline.
 
 The bug these guard against: process_new_product() found the existing product
-via SKU but still called create_alias(), inserting a duplicate alias every run.
-The scraper then saw an alias with no Price attached and inserted a duplicate
-Price too. Four scrape runs produced four aliases and four prices per listing,
-so store_count inflated and PriceHistory never recorded a single change.
+via SKU but still called create_alias(), inserting a duplicate alias every
+run. The pipeline then saw an alias with no Price attached and inserted a
+duplicate Price too. Four runs produced four aliases and four prices per
+listing, so store_count inflated and PriceHistory never recorded a change.
+
+THESE USED TO DRIVE THE MOCK SCRAPER. That service existed to seed a
+catalogue before real scraping worked; it has been deleted along with the
+invented prices it produced, and driving IngestService directly is strictly
+better anyway -- it is the code that actually runs in production, and the
+fixtures below say plainly what a "listing" is instead of hiding it in a
+module-level dict that tests mutated and restored.
 """
 
 import pytest
@@ -16,7 +23,9 @@ from app.database import Base
 from app.models.alias import ProductAlias
 from app.models.price import Price, PriceHistory
 from app.models.product import Product
-from app.services.scraper import MOCK_STORE_DATA, ScraperService
+from app.models.store import Store
+from app.services.ingest import IngestService
+from app.services.scrapers import ScrapedProduct
 
 
 @pytest.fixture
@@ -30,6 +39,43 @@ def db():
         session.close()
 
 
+@pytest.fixture
+def store(db):
+    row = Store(name="SmartBuy", website="smartbuy-me.com", is_verified=True)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def listing(sku, name, price, category="Smart Phone"):
+    """One listing exactly as a store feed yields it."""
+    return ScrapedProduct(
+        store_product_id=sku,
+        name=name,
+        price=price,
+        currency="JOD",
+        availability=True,
+        url=f"https://smartbuy-me.com/products/{sku}",
+        brand="Apple",
+        category=category,
+    )
+
+
+FEED = [
+    listing("SB-1", "Apple iPhone 15 128GB 5G Smartphone - Black", 899.0),
+    listing("SB-2", "Apple iPhone 15 256GB 5G Smartphone - Blue", 999.0),
+    listing("SB-3", "Samsung Galaxy S24 128GB 5G - Graphite", 749.0),
+]
+
+
+def run(db, store, feed=None):
+    """One full pass of the feed through the real ingest path."""
+    service = IngestService(db)
+    for item in feed or FEED:
+        service.ingest_one(store, item)
+
+
 def counts(db):
     return {
         "products": db.query(Product).count(),
@@ -39,63 +85,73 @@ def counts(db):
     }
 
 
-class TestScrapeIsIdempotent:
-    def test_second_run_creates_no_duplicates(self, db):
-        scraper = ScraperService(db)
+class TestRepeatedRuns:
+    def test_a_single_run_creates_one_row_per_listing(self, db, store):
+        run(db, store)
+        assert counts(db)["aliases"] == len(FEED)
+        assert counts(db)["prices"] == len(FEED)
 
-        scraper.run_full_scrape()
-        after_first = counts(db)
-
-        scraper.run_full_scrape()
-        after_second = counts(db)
-
-        assert after_second["aliases"] == after_first["aliases"], (
-            "re-scraping duplicated aliases"
-        )
-        assert after_second["prices"] == after_first["prices"], (
-            "re-scraping duplicated prices"
-        )
-        assert after_second["products"] == after_first["products"], (
-            "re-scraping duplicated canonical products"
-        )
-
-    def test_repeated_runs_stay_stable(self, db):
-        scraper = ScraperService(db)
-        scraper.run_full_scrape()
+    def test_repeated_runs_stay_stable(self, db, store):
+        """
+        The actual regression. The scraper re-processes every listing on every
+        run; without the idempotency guard each pass inserted another alias
+        and another price.
+        """
+        run(db, store)
         baseline = counts(db)
 
         for _ in range(3):
-            scraper.run_full_scrape()
+            run(db, store)
 
         assert counts(db)["aliases"] == baseline["aliases"]
         assert counts(db)["prices"] == baseline["prices"]
+        assert counts(db)["products"] == baseline["products"]
 
-    def test_one_alias_per_listing(self, db):
-        ScraperService(db).run_full_scrape()
-        expected = sum(len(items) for items in MOCK_STORE_DATA.values())
-        assert db.query(ProductAlias).count() == expected
+    def test_one_alias_per_listing(self, db, store):
+        run(db, store)
+        assert db.query(ProductAlias).count() == len(FEED)
 
 
 class TestPriceHistory:
-    def test_price_change_is_recorded_once(self, db):
-        scraper = ScraperService(db)
-        scraper.run_full_scrape()
-        assert db.query(PriceHistory).count() == 0, "no history before any change"
-
-        # Simulate the store dropping its price on the next run.
-        listing = MOCK_STORE_DATA["dna"][0]
-        original = listing["price"]
-        listing["price"] = original - 50
-        try:
-            scraper.run_full_scrape()
-            history = db.query(PriceHistory).all()
-            assert len(history) == 1, "exactly one history row for one price change"
-            assert history[0].price == original, "history stores the OLD price"
-        finally:
-            listing["price"] = original
-
-    def test_unchanged_price_records_no_history(self, db):
-        scraper = ScraperService(db)
-        scraper.run_full_scrape()
-        scraper.run_full_scrape()
+    def test_no_history_before_anything_changes(self, db, store):
+        run(db, store)
         assert db.query(PriceHistory).count() == 0
+
+    def test_a_price_change_is_recorded_once(self, db, store):
+        run(db, store)
+
+        cheaper = [listing("SB-1", FEED[0].name, 849.0)] + FEED[1:]
+        run(db, store, cheaper)
+
+        history = db.query(PriceHistory).all()
+        assert len(history) == 1, "exactly one history row for one price change"
+        assert float(history[0].price) == 899.0, "history stores the OLD price"
+
+    def test_an_unchanged_price_records_no_history(self, db, store):
+        run(db, store)
+        run(db, store)
+        assert db.query(PriceHistory).count() == 0
+
+    def test_the_current_price_is_the_new_one(self, db, store):
+        run(db, store)
+        run(db, store, [listing("SB-1", FEED[0].name, 849.0)])
+
+        alias = (
+            db.query(ProductAlias)
+            .filter(ProductAlias.store_product_id == "SB-1")
+            .one()
+        )
+        price = db.query(Price).filter(Price.alias_id == alias.id).one()
+        assert float(price.price) == 849.0
+
+
+class TestTheStoreKeepsItsOwnNaming:
+    def test_a_renamed_listing_under_one_sku_does_not_duplicate(self, db, store):
+        """
+        A store can retitle a product without it becoming a second product:
+        the SKU is the identity, which is Layer 1 of the matching engine.
+        """
+        run(db, store, [listing("SB-1", "Apple iPhone 15 128GB Black", 899.0)])
+        run(db, store, [listing("SB-1", "iPhone 15 128GB (Black) 5G", 899.0)])
+
+        assert db.query(ProductAlias).count() == 1

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { verifyEmail } from '../api/auth';
 import Spinner from '../components/ui/Spinner';
+import { useLocale } from '../hooks/useLocale';
 
 /**
  * One attempt per token, shared across effect invocations.
@@ -34,6 +35,7 @@ function verifyOnce(token) {
  * users the email is meant to onboard.
  */
 export default function VerifyEmail() {
+  const { t } = useLocale();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
@@ -68,15 +70,17 @@ export default function VerifyEmail() {
 
       {status === 'done' && (
         <>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Email confirmed</h1>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+            {t('verify.confirmed')}
+          </h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Your address is verified. Price alerts will now reach you.
+            {t('verify.confirmedBlurb')}
           </p>
           <Link
             to="/"
             className="mt-6 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            Start searching
+            {t('common.startSearching')}
           </Link>
         </>
       )}
@@ -84,15 +88,13 @@ export default function VerifyEmail() {
       {(status === 'failed' || status === 'missing') && (
         <>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-            This link did not work
+            {t('verify.linkFailed')}
           </h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            It may have expired or already been used. Links work once and last
-            24 hours.
+            {t('verify.linkFailedBlurb')}
           </p>
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            Sign in and use <span className="font-medium">Resend the link</span> to
-            get a new one.
+            {t('verify.signInAndResend')}
           </p>
           <Link
             to="/login"

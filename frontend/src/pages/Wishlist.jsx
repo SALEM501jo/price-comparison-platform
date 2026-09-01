@@ -82,7 +82,7 @@ export default function Wishlist() {
             to="/"
             className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
           >
-            Start searching
+            {t('common.startSearching')}
           </Link>
         </div>
       ) : (
@@ -126,7 +126,7 @@ export default function Wishlist() {
                 <button
                   onClick={() => handleRemove(item.product_id)}
                   disabled={removing === item.product_id}
-                  className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 disabled:opacity-50"
+                  className="inline-flex min-h-11 items-center text-sm text-red-600 hover:text-red-700 disabled:opacity-50 dark:text-red-400"
                 >
                   {t('wishlist.remove')}
                 </button>

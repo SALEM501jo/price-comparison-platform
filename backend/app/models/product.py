@@ -15,7 +15,6 @@ class Product(Base):
 
     brand = Column(String(100), index=True)
     category = Column(String(100), index=True)
-    specs = Column(JSON)
     image_url = Column(String(500))
     description = Column(String(1000))
 

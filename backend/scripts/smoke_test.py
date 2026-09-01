@@ -7,7 +7,7 @@ actually boots and behaves outside the test environment.
 
 Usage:
     docker compose up -d
-    python -m app.services.scraper            # seed some products
+    python -m app.services.ingest             # fill the catalogue
     uvicorn app.main:app --port 8000
     python scripts/smoke_test.py
 """
@@ -163,7 +163,7 @@ def main() -> int:
 
     exact = body.get("exact", [])
     check("exact match found", len(exact) == 1,
-          f"got {len(exact)} -- run: python -m app.services.scraper")
+          f"got {len(exact)} -- run: python -m app.services.ingest")
     if exact:
         check("exact match scores 100", exact[0]["match_score"] == 100.0)
         check("exact match has no differences", exact[0]["differences"] == [])

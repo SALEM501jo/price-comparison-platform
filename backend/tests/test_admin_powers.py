@@ -8,48 +8,12 @@ exactly the kind of code nobody exercises until the day it matters.
 """
 
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db
-from app.main import app
-from app.models.alias import ProductAlias
-from app.models.price import Price, PriceHistory
-from app.models.store import Store
+from app.models.price import PriceHistory
 from app.models.user import User, UserRole
 
 PASSWORD = "TestPass123"
 
-
-@pytest.fixture
-def db_session():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    session = sessionmaker(bind=engine)()
-    try:
-        yield session
-    finally:
-        session.close()
-
-
-@pytest.fixture
-def client(db_session, monkeypatch):
-    async def no_limit(*args, **kwargs):
-        return None
-
-    monkeypatch.setattr("app.security.rate_limiter._enforce", no_limit)
-    monkeypatch.setattr(Base.metadata, "create_all", lambda *a, **k: None)
-
-    app.dependency_overrides[get_db] = lambda: db_session
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
 
 
 def signup(client, email, kind="buyer"):

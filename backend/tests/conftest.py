@@ -44,3 +44,86 @@ def no_response_cache(monkeypatch):
         "app.routers.products.store_json",
     ):
         monkeypatch.setattr(target, discard, raising=False)
+
+
+# --- Shared fixtures --------------------------------------------------------
+#
+# These were copy-pasted into eleven test files, byte for byte. That is not
+# just waste: a fixture duplicated eleven times is a fixture that gets FIXED
+# in one place and stays wrong in ten, and the next person adding a test
+# copies whichever version they happened to open.
+#
+# A test file that genuinely needs something different still defines its own;
+# a fixture declared in a module shadows the one here, so overriding costs
+# nothing and stays local to the file that needs it.
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.database import Base, get_db
+from app.main import app
+
+
+@pytest.fixture
+def db_session():
+    """
+    A fresh in-memory database per test.
+
+    StaticPool with check_same_thread=False because TestClient runs the app on
+    another thread: the default pool would hand that thread a DIFFERENT
+    connection, and an in-memory SQLite database belongs to its connection --
+    so the app would find none of the rows the test had just written.
+    """
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    session = sessionmaker(bind=engine)()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def db(db_session):
+    """
+    Alias for the suites that call it `db`.
+
+    Kept rather than renamed: the point of this change is to delete
+    duplication, not to churn every test that reads perfectly well already.
+    """
+    return db_session
+
+
+@pytest.fixture
+def client(db_session, monkeypatch):
+    """
+    A TestClient wired to the test database, with the rate limiter off.
+
+    THE LIMITER IS NEUTRALISED because it is real and shared: 5 auth requests
+    a minute against one Redis, so a suite that logs in a dozen times would
+    fail on request six for reasons that have nothing to do with the code
+    under test. Both rate_limit() and strict_rate_limit() funnel through
+    _enforce(), so one patch covers both. The limiter's own behaviour is
+    tested against the real server in scripts/e2e_test.py, where it belongs.
+
+    create_all is patched out because the dev-convenience call in the lifespan
+    is bound to the real Postgres engine, not to the SQLite session injected
+    here -- without this, running the suite would need a database server up.
+    """
+    async def no_limit(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("app.security.rate_limiter._enforce", no_limit)
+    monkeypatch.setattr(Base.metadata, "create_all", lambda *a, **k: None)
+
+    app.dependency_overrides[get_db] = lambda: db_session
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()

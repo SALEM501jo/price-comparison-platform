@@ -88,7 +88,7 @@ export default function PriceHistoryChart({ series }) {
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           className="h-auto w-full min-w-[520px]"
           role="img"
-          aria-label="Price history by store"
+          aria-label={t('common.priceHistoryByStore')}
         >
           {chart.yTicks.map((tick) => (
             <g key={tick.value}>

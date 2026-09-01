@@ -57,7 +57,6 @@ class ProductSearchResponse(BaseModel):
     brand: Optional[str]
     category: Optional[str]
     image_url: Optional[str]
-    specs: Optional[Dict]
     lowest_price: float
     highest_price: float
     store_count: int
@@ -71,11 +70,14 @@ class ProductDetailResponse(BaseModel):
     category: Optional[str]
     image_url: Optional[str]
     description: Optional[str]
-    # Structured attributes from app/matching. `specs` is the legacy column
-    # written by the old regex extractor and still holds its output shape
-    # ({"storage": "128", "model_year": "15"}), so clients should prefer this.
+    # Structured attributes from app/matching.
+    #
+    # There used to be a second field here, `specs`, holding the OLD regex
+    # extractor's output -- shapes like {"storage": "128", "model_year": "15"}
+    # that read as junk in a UI. Every client already preferred this one, so
+    # the column and the field were dropped rather than left as a trap for
+    # whoever read the schema next and picked the wrong one.
     attributes: Optional[Dict] = None
-    specs: Optional[Dict]
     prices: List[StorePriceResponse]
 
 
