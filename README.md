@@ -303,6 +303,8 @@ The two that modify data support `--dry-run`.
 | GET | `/products/{id}/history` | Price history |
 | GET/POST/DELETE | `/prices/wishlist` | Authenticated |
 | GET/POST/DELETE | `/prices/alerts` | Authenticated |
+| GET | `/products/{id}/photo` | Merchant photo, if a **verified** shop supplied one |
+| PUT/DELETE | `/merchant/listings/{id}/photo` | Merchant's own; re-encoded on upload |
 | GET | `/admin/*` | Admin only |
 | GET | `/mock/{store}/search` | Simulated store feeds |
 
@@ -349,6 +351,19 @@ value.
 
 `lowest_total_cost` is price **plus delivery** — a store with a lower sticker
 price and dearer delivery is not the better deal.
+
+**Product photos.** `image_url` is one resolved field, not a choice for the
+client to make: the shop's scraped image if there is one, else
+`/products/{id}/photo` when a verified merchant has uploaded a photo of the
+actual unit, else null so the UI can draw a placeholder rather than a broken
+image.
+
+Uploads are **decoded and re-encoded to WebP, never stored as sent** — which
+is what makes a polyglot file inert and what drops the GPS coordinates in a
+phone photo's EXIF. SVG is refused outright, decompression bombs are capped,
+and the declared Content-Type is ignored in favour of what the bytes actually
+decode to. The image bytes live in Postgres alongside the listing; see the
+handoff for why that beats object storage at this size.
 
 `interpretation` echoes what the server understood the query to mean. When a
 search surprises someone, the difference between *"we don't stock it"* and

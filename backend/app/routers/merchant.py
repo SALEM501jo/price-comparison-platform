@@ -26,7 +26,7 @@ from __future__ import annotations
 import hashlib
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -45,8 +45,9 @@ from app.schemas.merchant import (
     StoreResponse,
     StoreUpdateRequest,
 )
-from app.services import contact_stats
+from app.services import contact_stats, photos
 from app.services.cache import bump_catalogue_version
+from app.services.images import ImageRejected, MAX_UPLOAD_BYTES, process_upload
 from app.services.deduplication import DeduplicationEngine
 
 logger = get_security_logger("app.merchant")
@@ -110,6 +111,7 @@ def _listing_response(alias: ProductAlias, price: Optional[Price]) -> ListingRes
         damage_notes=alias.damage_notes,
         warranty_months=alias.warranty_months,
         listing_notes=alias.listing_notes,
+        has_photo=alias.photo is not None,
     )
 
 
@@ -407,6 +409,128 @@ async def delete_listing(
     db.commit()
     await bump_catalogue_version()
     return None
+
+
+def _own_listing(db: Session, user: User, listing_id: int) -> ProductAlias:
+    """
+    Resolve a listing the caller actually owns, or 404.
+
+    Extracted because the photo routes need exactly what the price routes
+    needed, and a second hand-written copy of a store-scoping filter is how
+    one of them eventually gets written without the filter.
+    """
+    store = _own_store(db, user)
+    alias = (
+        db.query(ProductAlias)
+        .filter(ProductAlias.id == listing_id)
+        .filter(ProductAlias.store_id == store.id)
+        .first()
+    )
+    if not alias:
+        # 404, not 403: same reason as the price routes -- a merchant has no
+        # business learning whether someone else's listing id exists.
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return alias
+
+
+@router.put("/listings/{listing_id}/photo", status_code=status.HTTP_204_NO_CONTENT)
+async def upload_listing_photo(
+    listing_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_merchant),
+    _: None = Depends(get_rate_limited),
+):
+    """
+    Attach a photo to one of this shop's listings.
+
+    PUT, not POST: one photo per listing, and uploading again replaces it.
+    That is what a shop owner correcting a bad shot means, and it makes the
+    request idempotent -- a retry after a dropped connection cannot leave two.
+
+    The file is decoded and RE-ENCODED before anything is stored; see
+    services/images.py for why that single step does most of the security
+    work here. Nothing the client claims about the file is believed.
+    """
+    alias = _own_listing(db, current_user, listing_id)
+
+    # Read with a hard ceiling rather than trusting Content-Length, which is
+    # a client-supplied number. Reading one byte past the limit is enough to
+    # know it was exceeded without holding the whole oversized body.
+    raw = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "too_large",
+                "message": f"The file is larger than {MAX_UPLOAD_BYTES // (1024 * 1024)}MB.",
+            },
+        )
+
+    try:
+        processed = process_upload(raw)
+    except ImageRejected as rejected:
+        # The CODE is what the client translates; the message is the fallback
+        # for anything without a translation yet. Same contract as match
+        # differences -- the server does not compose the sentence.
+        raise HTTPException(
+            status_code=422,
+            detail={"code": rejected.code, "message": str(rejected)},
+        ) from None
+
+    photos.save_photo(db, alias.id, processed)
+    db.commit()
+    await bump_catalogue_version()
+
+    logger.info("Merchant listing photo uploaded", extra={
+        "action": "merchant_photo_uploaded",
+        "target": f"listing {alias.id}",
+        "user_id": current_user.id,
+    })
+    return None
+
+
+@router.delete("/listings/{listing_id}/photo", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_listing_photo(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_merchant),
+):
+    """Remove a listing's photo. Scoped to the caller's store, as above."""
+    alias = _own_listing(db, current_user, listing_id)
+    photos.delete_photo(db, alias.id)
+    db.commit()
+    await bump_catalogue_version()
+    return None
+
+
+@router.get("/listings/{listing_id}/photo")
+async def get_my_listing_photo(
+    listing_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_merchant),
+):
+    """
+    The shop's own photo, verified or not.
+
+    The public route refuses to serve an unverified store's photo, which is
+    right for shoppers and useless for the shop owner -- they would have no
+    way to tell a failed upload from a pending claim. This one is scoped to
+    the caller, so it can show what they actually uploaded.
+    """
+    alias = _own_listing(db, current_user, listing_id)
+    photo = photos.photo_for_listing(db, alias.id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="No photo")
+    return Response(
+        content=photo.data,
+        media_type=photo.content_type,
+        headers={
+            "Cache-Control": "private, no-cache",
+            "ETag": f'"{photo.checksum}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/stats")

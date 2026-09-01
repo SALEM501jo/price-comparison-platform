@@ -139,6 +139,26 @@ const translations = {
     'match.attr.refresh': 'معدل التحديث',
     'match.attr.panel': 'نوع اللوحة',
 
+    // --- Product photos
+    'photo.label': 'صورة المنتج',
+    'photo.hint': 'صورة واضحة للجهاز نفسه. JPG أو PNG أو WebP، حتى {mb} ميجابايت.',
+    'photo.add': 'أضف صورة',
+    'photo.change': 'تغيير الصورة',
+    'photo.remove': 'حذف الصورة',
+    'photo.uploadError': 'تعذّر رفع الصورة. حاول مرة أخرى.',
+    'photo.errorType': 'اختر صورة بصيغة JPG أو PNG أو WebP.',
+    'photo.errorSize': 'الصورة أكبر من {mb} ميجابايت.',
+    // Refusals from the server, keyed by the code it sends. The server never
+    // composes this sentence -- same contract as the match explanations.
+    'photo.error.empty': 'الملف فارغ.',
+    'photo.error.too_large': 'حجم الملف أكبر من المسموح.',
+    'photo.error.svg': 'ملفات SVG غير مقبولة. ارفع صورة فوتوغرافية.',
+    'photo.error.not_an_image': 'هذا الملف ليس صورة يمكن قراءتها.',
+    'photo.error.unsupported_format': 'استخدم صورة بصيغة JPG أو PNG أو WebP.',
+    'photo.error.too_many_pixels': 'دقة الصورة عالية جداً.',
+    'product.noPhoto': 'لا توجد صورة',
+    'common.networkError': 'تعذّر الوصول إلى الخادم.',
+
     // --- Attribute values worth saying in Arabic.
     //
     // Colours and variants only. Model codes, brands and capacities stay
@@ -572,6 +592,24 @@ const translations = {
     'match.attr.resolution': 'resolution',
     'match.attr.refresh': 'refresh rate',
     'match.attr.panel': 'panel type',
+
+    // --- Product photos
+    'photo.label': 'Product photo',
+    'photo.hint': 'A clear shot of the actual unit. JPG, PNG or WebP, up to {mb}MB.',
+    'photo.add': 'Add photo',
+    'photo.change': 'Change photo',
+    'photo.remove': 'Remove photo',
+    'photo.uploadError': 'Could not upload the photo. Try again.',
+    'photo.errorType': 'Choose a JPG, PNG or WebP image.',
+    'photo.errorSize': 'The image is larger than {mb}MB.',
+    'photo.error.empty': 'The file is empty.',
+    'photo.error.too_large': 'The file is too large.',
+    'photo.error.svg': 'SVG files are not accepted. Upload a photograph.',
+    'photo.error.not_an_image': 'That file is not an image we can read.',
+    'photo.error.unsupported_format': 'Use a JPG, PNG or WebP photo.',
+    'photo.error.too_many_pixels': "The image's resolution is too high.",
+    'product.noPhoto': 'No photo',
+    'common.networkError': 'Cannot reach the server.',
 
     // --- Attribute values. English is the canonical form the engine already
     // speaks, so these exist to give the Arabic table something to be checked

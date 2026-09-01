@@ -270,3 +270,8 @@ class ListingResponse(BaseModel):
     matched_product_name: Optional[str] = None
     match_category: Optional[str] = None
     is_searchable: bool = True
+
+    # Whether this listing carries a photo. A flag rather than a URL: the
+    # dashboard fetches the image from the authenticated per-listing route,
+    # which is the only one that will serve a pending shop its own picture.
+    has_photo: bool = False

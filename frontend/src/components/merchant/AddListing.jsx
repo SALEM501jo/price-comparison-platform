@@ -1,8 +1,9 @@
 import { useState } from 'react';
 
-import { createListing } from '../../api/merchant';
+import { createListing, uploadListingPhoto } from '../../api/merchant';
 import { useLocale } from '../../hooks/useLocale';
-import { extractApiError } from '../../utils/errors';
+import { extractApiError, extractPhotoError } from '../../utils/errors';
+import PhotoPicker from './PhotoPicker';
 
 const BLANK_LISTING = {
   name: '',
@@ -27,6 +28,7 @@ const BLANK_LISTING = {
 export default function AddListing({ onAdded }) {
   const { t } = useLocale();
   const [form, setForm] = useState(BLANK_LISTING);
+  const [photo, setPhoto] = useState(null);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -56,8 +58,30 @@ export default function AddListing({ onAdded }) {
       }
 
       const created = await createListing(payload);
+
+      // TWO REQUESTS, IN THIS ORDER. A photo attaches to a listing id, so
+      // the listing has to exist first -- there is nothing to hang the image
+      // on until the server has assigned one.
+      //
+      // A failed photo does NOT fail the listing. The price is the thing a
+      // shopper needs and it is already saved; throwing here would leave a
+      // live listing behind an error message that says the save did not
+      // work. The merchant is told the photo specifically did not go up, and
+      // can add it from the list.
+      let photoError = null;
+      if (photo) {
+        try {
+          await uploadListingPhoto(created.id, photo);
+          created.has_photo = true;
+        } catch (err) {
+          photoError = extractPhotoError(err, t);
+        }
+      }
+
       setForm(BLANK_LISTING);
+      setPhoto(null);
       onAdded(created);
+      if (photoError) setError(photoError);
     } catch (err) {
       setError(extractApiError(err, t('merchant.saveError')));
     } finally {
@@ -113,6 +137,10 @@ export default function AddListing({ onAdded }) {
         >
           {saving ? t('merchant.saving') : t('merchant.add')}
         </button>
+      </div>
+
+      <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-800">
+        <PhotoPicker file={photo} onPick={setPhoto} disabled={saving} />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">

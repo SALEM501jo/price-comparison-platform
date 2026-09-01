@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from app.matching import CLOSE, EXACT, SIMILAR, parse, score_match
 from app.matching import spelling
 from app.models.product import Product
+from app.services import photos
 from app.services.pricing import price_summary
 from app.schemas.search import (
     MatchDifference,
@@ -119,7 +120,9 @@ def _candidates(
         .all()
     )
 
-def _to_response(product: Product, result, prices: dict | None) -> MatchedProduct:
+def _to_response(
+    product: Product, result, prices: dict | None, has_photo: bool = False
+) -> MatchedProduct:
     """
     Build one search result.
 
@@ -137,7 +140,7 @@ def _to_response(product: Product, result, prices: dict | None) -> MatchedProduc
         canonical_name=product.canonical_name,
         brand=product.brand,
         category=product.category,
-        image_url=product.image_url,
+        image_url=photos.display_image_url(product.id, product.image_url, has_photo),
         attributes=product.match_attributes or None,
         lowest_price=min(price_values) if price_values else None,
         highest_price=max(price_values) if price_values else None,
@@ -257,10 +260,18 @@ def search_products(
         scored = [(c, _unscored()) for c in candidates]
 
     price_map = price_summary(db, (c.id for c, _ in scored))
+    # One query for the whole page rather than one per card -- see
+    # photos.product_ids_with_photos.
+    photo_ids = photos.product_ids_with_photos(db, [c.id for c, _ in scored])
 
     buckets: dict[str, list[MatchedProduct]] = {EXACT: [], CLOSE: [], SIMILAR: []}
     for candidate, result in scored:
-        item = _to_response(candidate, result, price_map.get(candidate.id))
+        item = _to_response(
+            candidate,
+            result,
+            price_map.get(candidate.id),
+            candidate.id in photo_ids,
+        )
         buckets.setdefault(result.tier, []).append(item)
 
     counts = TierCounts(

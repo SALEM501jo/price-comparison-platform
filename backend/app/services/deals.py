@@ -13,6 +13,7 @@ from __future__ import annotations
 from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
+from app.services import photos
 from app.models.alias import ProductAlias
 from app.models.price import Price
 from app.models.product import Product
@@ -102,6 +103,8 @@ def best_savings(db: Session, limit: int = 8) -> list[dict]:
             cheapest_store[product.id] = (offer_total, store_name)
 
     deals = []
+    photo_ids = photos.product_ids_with_photos(db, list(summary.keys()))
+
     for product_id, row in summary.items():
         product = products.get(product_id)
         if product is None:
@@ -112,7 +115,9 @@ def best_savings(db: Session, limit: int = 8) -> list[dict]:
                 "id": product.id,
                 "canonical_name": product.canonical_name,
                 "brand": product.brand,
-                "image_url": product.image_url,
+                "image_url": photos.display_image_url(
+                    product.id, product.image_url, product.id in photo_ids
+                ),
                 "attributes": product.match_attributes or None,
                 "lowest_total_cost": float(row.lowest),
                 "highest_total_cost": float(row.dearest),

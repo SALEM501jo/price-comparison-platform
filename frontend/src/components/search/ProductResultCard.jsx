@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import MatchBadge from './MatchBadge';
 import { formatPrice, formatStoreCount } from '../../utils/format';
 import { describeDifference } from '../../utils/matchDifference';
+import ProductImage from '../ui/ProductImage';
 import { useLocale } from '../../hooks/useLocale';
 
 /**
@@ -22,7 +23,13 @@ export default function ProductResultCard({ product }) {
       className="block rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 transition hover:border-brand-400 hover:shadow-sm"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <ProductImage
+            src={product.image_url}
+            alt={product.canonical_name}
+            size="card"
+          />
+          <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-medium text-gray-900 dark:text-white">{product.canonical_name}</h3>
             <MatchBadge tier={product.match_tier} score={product.match_score} />
@@ -51,6 +58,7 @@ export default function ProductResultCard({ product }) {
               ))}
             </ul>
           )}
+          </div>
         </div>
 
         {/* The headline figure is the NEW price. Second-hand stock is quoted

@@ -2,7 +2,7 @@
 Product search and comparison routes.
 """
 
-from fastapi import APIRouter, Depends, Query, Request, HTTPException, status
+from fastapi import APIRouter, Depends, Query, Request, HTTPException, Response, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import Literal, Optional, List
@@ -24,6 +24,7 @@ from app.schemas.product import (
 from app.schemas.search import SearchSuggestion, TieredSearchResponse
 from app.matching import arabic, normalize
 from app.matching import spelling
+from app.services import photos
 from app.services.deals import best_savings
 from app.services.search import escape_like, search_products
 from app.config import get_settings
@@ -259,10 +260,61 @@ async def get_product(
         canonical_name=product.canonical_name,
         brand=product.brand,
         category=product.category,
-        image_url=product.image_url,
+        image_url=photos.display_image_url(
+            product.id,
+            product.image_url,
+            photos.photo_for_product(db, product.id) is not None,
+        ),
         description=product.description,
         attributes=product.match_attributes,
         prices=price_responses
+    )
+
+
+@router.get("/{product_id}/photo")
+async def get_product_photo(
+    product_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    _: None = Depends(get_rate_limited),
+):
+    """
+    A merchant photo for this product, if a visible shop supplied one.
+
+    ANONYMOUS ON PURPOSE, like every other part of the catalogue -- a shopper
+    browsing has no account. What it will not serve is an unverified shop's
+    photo: `photo_for_product` filters on the same predicate the prices do,
+    so a pending claim cannot put a picture on a product page.
+
+    Served with an ETag because these bytes come out of the database. A
+    thumbnail grid that revalidates is a page of 304s with no bodies; one
+    that does not is a page of blob reads on every scroll.
+    """
+    photo = photos.photo_for_product(db, product_id)
+    if not photo:
+        raise HTTPException(status_code=404, detail="No photo")
+
+    etag = f'"{photo.checksum}"'
+    if request.headers.get("if-none-match") == etag:
+        # 304 carries no body, which is the entire point -- the bytes are the
+        # expensive part and the browser already has them.
+        return Response(status_code=304, headers={"ETag": etag})
+
+    return Response(
+        content=photo.data,
+        media_type=photo.content_type,
+        headers={
+            "ETag": etag,
+            # Content-addressed by the ETag, so a long max-age is safe: a
+            # replaced photo changes the checksum and revalidates.
+            "Cache-Control": "public, max-age=86400",
+            # The image is served from the API's own origin, so belt and
+            # braces on top of the re-encode: never let a browser sniff these
+            # bytes into something executable, and never render them as a
+            # document.
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+        },
     )
 
 

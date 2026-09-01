@@ -26,3 +26,11 @@ bcrypt==4.2.0
 httpx==0.27.2
 redis==5.1.0
 python-multipart==0.0.32
+
+# Image processing for merchant photo uploads. Pillow is not optional here:
+# every uploaded file is DECODED AND RE-ENCODED rather than stored as sent,
+# which is what makes a polyglot file (a valid image that is also a valid
+# script) inert, and what drops EXIF -- shop photos are taken on phones and
+# carry GPS coordinates, which is exactly the personal data this project
+# stores nowhere else.
+Pillow==12.3.0

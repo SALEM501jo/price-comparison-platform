@@ -89,6 +89,17 @@ class ProductAlias(Base):
     prices = relationship("Price", back_populates="alias", cascade="all, delete-orphan")
     price_history = relationship("PriceHistory", back_populates="alias", cascade="all, delete-orphan")
 
+    # uselist=False: the unique constraint on listing_photos.alias_id already
+    # makes this one-to-one, and letting SQLAlchemy hand back a list would
+    # invite callers to write photo[0] against an invariant the database
+    # already guarantees.
+    photo = relationship(
+        "ListingPhoto",
+        back_populates="alias",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
     __table_args__ = (
         # Defence in depth for the duplicate-alias bug: the scraper used to
         # insert a new alias on every run. The Python-side guard is the fast

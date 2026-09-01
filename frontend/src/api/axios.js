@@ -44,6 +44,21 @@ api.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+
+  // A FILE UPLOAD MUST NOT CARRY THE JSON CONTENT-TYPE ABOVE.
+  //
+  // The instance default is applied to every request, multipart included, and
+  // it overwrites the `multipart/form-data; boundary=...` the browser would
+  // otherwise write. Without the boundary the server cannot split the body
+  // into fields, so a perfectly good upload arrives as "file: Field required".
+  //
+  // Deleting it here rather than in each caller: this is invisible from the
+  // call site, it looks like a server bug when it happens, and the next
+  // upload endpoint someone adds would hit it again.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   return config;
 });
 

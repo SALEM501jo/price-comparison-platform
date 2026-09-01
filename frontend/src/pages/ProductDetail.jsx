@@ -5,6 +5,8 @@ import PriceHistoryChart from '../components/prices/PriceHistoryChart';
 import ProductActions from '../components/prices/ProductActions';
 import StorePriceTable from '../components/prices/StorePriceTable';
 import { formatPrice } from '../utils/format';
+import { attributeName, translateValue } from '../utils/matchDifference';
+import ProductImage from '../components/ui/ProductImage';
 import { useLocale } from '../hooks/useLocale';
 import Spinner from '../components/ui/Spinner';
 
@@ -98,7 +100,15 @@ export default function ProductDetail() {
         &larr; {t('product.back')}
       </Link>
 
-      <header className="mb-6">
+      <header className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-start">
+        <ProductImage
+          src={product.image_url}
+          alt={product.canonical_name}
+          size="hero"
+          className="sm:w-56 sm:shrink-0"
+        />
+
+        <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
           {product.canonical_name}
         </h1>
@@ -114,10 +124,14 @@ export default function ProductDetail() {
               .map(([key, value]) => (
                 <span
                   key={key}
+                  // Same vocabulary as the search chips and the match
+                  // explanations. These read "black" and "color" in the
+                  // Arabic UI until they used it.
+                  dir="auto"
                   className="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs text-gray-700 dark:text-gray-300"
-                  title={key}
+                  title={attributeName(key, t)}
                 >
-                  {value}
+                  {translateValue(value, t)}
                 </span>
               ))}
           </div>
@@ -126,6 +140,7 @@ export default function ProductDetail() {
         {product.description && (
           <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">{product.description}</p>
         )}
+        </div>
       </header>
 
       <div className="mb-6">

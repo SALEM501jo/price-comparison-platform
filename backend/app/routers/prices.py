@@ -22,6 +22,7 @@ from app.schemas.price import (
     PriceAlertResponse,
     WishlistItemResponse,
 )
+from app.services import photos
 from app.services.pricing import offers_for, price_summary
 
 router = APIRouter()
@@ -95,6 +96,7 @@ async def get_wishlist(
     )
 
     prices = price_summary(db, (product.id for _, product in rows))
+    photo_ids = photos.product_ids_with_photos(db, [p.id for _, p in rows])
 
     return [
         WishlistItemResponse(
@@ -102,7 +104,9 @@ async def get_wishlist(
             product_id=product.id,
             name=product.canonical_name,
             brand=product.brand,
-            image_url=product.image_url,
+            image_url=photos.display_image_url(
+                product.id, product.image_url, product.id in photo_ids
+            ),
             lowest_price=min(offers_for(prices, product.id)["prices"])
             if offers_for(prices, product.id).get("prices")
             else None,

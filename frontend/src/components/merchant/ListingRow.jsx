@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { deleteListing, updateListing } from '../../api/merchant';
+import ListingPhotoCell from './ListingPhotoCell';
 import { useLocale } from '../../hooks/useLocale';
 import { extractApiError } from '../../utils/errors';
 import { formatAge, formatPrice, isPriceStale } from '../../utils/format';
@@ -67,6 +68,9 @@ export default function ListingRow({ listing, onChanged, onRemoved }) {
   return (
     <tr className="align-top">
       <td className="px-4 py-3">
+        <div className="flex items-start gap-3">
+        <ListingPhotoCell listing={listing} onChanged={onChanged} />
+        <div className="min-w-0 flex-1">
         <span className="font-medium text-gray-900 dark:text-white">{listing.name}</span>
         {listing.condition !== 'new' && (
           <span className="ml-2 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
@@ -106,6 +110,8 @@ export default function ListingRow({ listing, onChanged, onRemoved }) {
           </span>
         )}
         {error && <span className="mt-0.5 block text-xs text-red-700 dark:text-red-300">{error}</span>}
+        </div>
+        </div>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { formatPrice } from '../../utils/format';
+import ProductImage from '../ui/ProductImage';
 import { useLocale } from '../../hooks/useLocale';
 
 /**
@@ -51,9 +52,16 @@ export default function DealsGrid({ deals, loading }) {
             </span>
           </div>
 
-          <p className="line-clamp-2 flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
-            {deal.canonical_name}
-          </p>
+          <div className="flex flex-1 items-start gap-3">
+            <ProductImage
+              src={deal.image_url}
+              alt={deal.canonical_name}
+              size="thumb"
+            />
+            <p className="line-clamp-3 flex-1 text-sm font-medium text-gray-900 dark:text-gray-100">
+              {deal.canonical_name}
+            </p>
+          </div>
 
           <div className="mt-3">
             <p className="text-lg font-bold text-gray-900 tnum dark:text-white">

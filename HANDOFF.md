@@ -42,13 +42,13 @@ there is no checkout anywhere.
 
 | | |
 |---|---|
-| Backend tests | **592** — `cd backend && pytest -q` |
-| Frontend tests | **70** — `cd frontend && npm test` |
+| Backend tests | **625** — `cd backend && pytest -q` |
+| Frontend tests | **88** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
 | Smoke checks | **57/57** — `python scripts/smoke_test.py` |
 | Known CVEs | **0** — `pip-audit -r requirements.txt` |
-| Migrations | **12**, head `c5a71d3e9f04`, verified up **and** down |
+| Migrations | **13**, head `ee543f078cff`, verified up **and** down |
 | Working tree | clean |
 
 **Data — all test data was deleted before deploy.** 4 accounts, 3 stores, 423
@@ -322,6 +322,75 @@ The endpoint always answers 202, including for unknown or unverified stores,
 writing nothing — otherwise an anonymous endpoint taking a store id becomes a
 way to enumerate which shops exist.
 
+### Product photos — `app/services/images.py`, `photos.py`
+
+**Every image on the site is new.** Before this, the frontend rendered no
+`<img>` at all: 418 of 423 products already carried a scraped `image_url` and
+not one was displayed. Rendering them is most of what changed visually.
+
+**Merchant photos are per LISTING, not per product.** `Product.image_url` is
+one scraped URL on the row every shop shares, which is right for a press shot
+of a model and wrong for a merchant twice over: two shops selling the same
+handset would compete for one column, and a merchant's photo is evidence about
+ONE UNIT — the same reason battery health and damage live on the alias.
+
+**Display order: scraped wins, then the oldest merchant photo, then a
+placeholder.** Oldest is deliberate — the rule has to be deterministic, and it
+must not reward re-uploading, or whose picture sits on a shared product
+becomes something merchants compete over by spamming.
+
+**The bytes are in Postgres**, in their own table. Same reasoning as the scrape
+queue: object storage means a second service, a second set of credentials, a
+bucket policy and a CORS rule to solve what is a few hundred rows here. A
+re-encoded photo is 100–200KB, so a free 0.5GB database holds several
+thousand. `photos.py` is the seam — the only module that touches the bytes —
+so moving to R2 later is one file, not every caller. Its own table, not a
+column on `product_aliases`, because every search query touches that table and
+a bytea column gets dragged into any `SELECT *` that forgets to defer it.
+
+#### The upload is re-encoded, never stored as sent
+
+That single decision does most of the security work:
+
+- **Polyglots die.** A file that is a valid JPEG *and* carries a script is
+  still a valid JPEG — every header check passes it. Re-encoding writes a new
+  file from a pixel buffer, so the passenger is not copied across. There is a
+  test that builds exactly this file.
+- **EXIF dies with it.** Shop photos are taken on phones and carry GPS, which
+  is precisely the personal data this project stores nowhere else. Orientation
+  is applied **before** the metadata is dropped — strip the rotation flag
+  without acting on it and every portrait photo arrives on its side.
+- **SVG is refused by name**, not decoded. It is a script container that
+  executes on the origin serving it.
+- **Decompression bombs are refused** at 50 megapixels. A 2MB PNG can decode
+  to gigabytes; Pillow's own default only warns.
+- **The declared Content-Type is never believed.** What the file is gets
+  decided by decoding it.
+
+Output is always WebP — roughly half the bytes of equivalent JPEG, which
+matters when the budget is a free Postgres tier.
+
+**A photo obeys the same visibility rule as a price**: an unverified shop's
+photo is not served to shoppers, filtered in the query via
+`Store.visible_to_shoppers()`. The shop can still see its own through the
+authenticated route, or it could not tell a failed upload from a pending claim.
+
+**Refusals carry a CODE, not a sentence** — `{code, message}` — and the client
+writes the sentence. Same contract as the match explanations, for the same
+reason.
+
+**The merchant dashboard fetches its thumbnails as blobs**, not with an
+`<img src>`. The access token lives in a module variable rather than a cookie,
+so the browser cannot attach it to an image request it makes itself; an `<img>`
+aimed at that route just 401s.
+
+> **The trap that cost the most here:** `api/axios.js` sets
+> `Content-Type: application/json` as an *instance default*, which overwrites
+> the multipart boundary the browser needs to write. Every upload came back
+> `file: Field required` and looked like a server bug. The interceptor now
+> strips that header for `FormData` bodies, so the next upload endpoint cannot
+> hit it.
+
 ### Condition — new and used never mix
 
 A second-hand phone is not a cheaper new phone. New and used are tallied apart
@@ -511,14 +580,18 @@ no untranslated English in the Arabic table.
 1. **Not deployed.** Images build; no live URL. Biggest gap by far.
 2. **One product has more than one price.** See the warning at the top.
 3. **No merchants at all.** See the warning at the top.
-4. **Photo upload is not built.** The model is ready; it needs object storage.
-5. `Core 5-120U` parses, but **CPU generation is not captured** — an 8th-gen
+4. `Core 5-120U` parses, but **CPU generation is not captured** — an 8th-gen
    and a 14th-gen i7 both resolve to `i7`.
-6. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
+5. **Merchant photos are served from the API's own origin.** Re-encoding is
+   the control that matters and it is in place; a separate origin is the
+   defence in depth that is not.
+6. **Merchant photos are not moderated.** Nothing stops a verified shop
+   uploading something irrelevant.
+7. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
    Running them re-pollutes the database. `scripts/e2e_test.py` cleans up after
    itself; the other two do not. Run `scripts/cleanup_test_data.py --apply`
    afterwards.
-7. No email verification enforcement on *access* — gates outbound mail only
+8. No email verification enforcement on *access* — gates outbound mail only
    (deliberate).
 
 ---
@@ -592,9 +665,14 @@ the first 50 shops.
 - **Capture CPU generation** — needs a weight rebalance in `rules.py`.
 - **PWA** — manifest, icons, service worker. Installable, and the honest
   version of "make a mobile app".
-- **Photo upload** — after deploy, because it needs object storage. Re-encode
-  rather than store originals, reject SVG, strip EXIF, serve from another
-  origin.
+- **Serve photos from a separate origin.** Built, but they come from the
+  API's own origin today. Re-encoding is the real control and it is in place;
+  origin isolation is the defence in depth that is still missing, along with
+  `Content-Security-Policy` on the app itself.
+- **Moderate merchant photos.** Nothing stops a verified shop uploading
+  something irrelevant. Listings already have a separate admin moderation
+  route; photos should join it before the shop count gets past the point where
+  you would notice by looking.
 
 ---
 

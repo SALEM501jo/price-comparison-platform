@@ -12,7 +12,16 @@ import { LocaleProvider } from '../context/LocaleContext';
  */
 export function renderWithProviders(ui, { locale = 'en' } = {}) {
   window.localStorage.setItem('locale', locale);
-  return render(<LocaleProvider>{ui}</LocaleProvider>);
+  const result = render(<LocaleProvider>{ui}</LocaleProvider>);
+
+  // Testing Library's own rerender replaces the WHOLE tree, providers
+  // included, so a bare rerender(<Thing/>) unmounts LocaleProvider and the
+  // component throws "must be used within LocaleProvider". Re-wrapping here
+  // keeps rerender meaning what a caller expects: same providers, new props.
+  return {
+    ...result,
+    rerender: (next) => result.rerender(<LocaleProvider>{next}</LocaleProvider>),
+  };
 }
 
 // Deliberately NOT re-exporting all of @testing-library/react from here.
