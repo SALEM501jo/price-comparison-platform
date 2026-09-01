@@ -19,7 +19,7 @@ from app.models.product import Product
 from app.models.user import User
 from app.services import email as email_service
 from app.services.email import Message
-from app.services.search import offers_for, price_summary
+from app.services.pricing import offers_for, price_summary
 
 logger = logging.getLogger("app.notifications")
 settings = get_settings()

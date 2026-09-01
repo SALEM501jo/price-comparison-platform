@@ -1,5 +1,15 @@
 """
-Remove catalogue rows the matching engine cannot categorise.
+Delete products today's matching rules no longer recognise.
+
+WHAT IT ACTUALLY DOES, since the old name (cleanup_uncategorised) stopped
+describing it: this does NOT select rows whose match_category is null. It
+RE-PARSES every product with the current rules, including the store's own
+product_type hint, and deletes whichever ones the parser now rejects. That is
+a broader set -- it catches rows that carry a stale category as well as rows
+that carry none, and the televisions filed as phones were in the first group.
+
+Renamed because a script that deletes rows is the worst possible place for a
+name that understates its reach.
 
 WHY THIS EXISTS
 Two earlier ingest runs used looser rules than the ones now in rules.py:

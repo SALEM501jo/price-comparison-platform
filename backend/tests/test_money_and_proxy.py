@@ -18,7 +18,7 @@ from app.models.price import Price
 from app.models.product import Product
 from app.models.store import Store
 from app.security.rate_limiter import client_ip
-from app.services.search import offers_for, price_summary
+from app.services.pricing import offers_for, price_summary
 
 
 # --- Money ------------------------------------------------------------------

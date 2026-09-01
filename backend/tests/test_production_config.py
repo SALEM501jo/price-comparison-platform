@@ -17,8 +17,6 @@ refusal to start, so the machine never reports healthy and the platform rolls
 the deploy back.
 """
 
-import pytest
-
 from app.config import Settings
 
 BASE = {

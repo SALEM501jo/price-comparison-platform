@@ -30,7 +30,6 @@ import io
 import json
 import subprocess
 import sys
-import time
 import uuid
 
 sys.path.insert(0, ".")

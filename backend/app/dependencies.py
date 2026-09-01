@@ -4,7 +4,7 @@ SECURITY PRINCIPLE: Consistency. If auth is required, it should be IMPOSSIBLE
 to forget adding it. Centralized dependencies prevent human error.
 """
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 

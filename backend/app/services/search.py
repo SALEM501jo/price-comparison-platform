@@ -11,22 +11,24 @@ Two stages, deliberately separated:
 Doing the scoring in SQL is not possible (the weights live in the category
 rules), and doing the filtering in Python is what made the old engine load the
 entire table on every request.
+
+WHAT IS NO LONGER HERE: price aggregation moved to services/pricing.py and the
+home page's savings query to services/deals.py. Neither was searching, and
+both had callers -- the wishlist, the alert notifier, the deals endpoint --
+that had to import from a module called "search" to reach them.
 """
 
 from __future__ import annotations
 
-from decimal import Decimal
-from typing import Iterable
 
-from sqlalchemy import distinct, func, or_
+
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.matching import CLOSE, EXACT, SIMILAR, parse, score_match
 from app.matching import spelling
-from app.models.alias import ProductAlias, comparison_group
-from app.models.price import Price
 from app.models.product import Product
-from app.models.store import Store
+from app.services.pricing import price_summary
 from app.schemas.search import (
     MatchedProduct,
     SearchInterpretation,
@@ -115,90 +117,6 @@ def _candidates(
         .limit(CANDIDATE_LIMIT)
         .all()
     )
-
-
-def price_summary(db: Session, product_ids: Iterable[int]) -> dict[int, dict]:
-    """
-    Aggregate prices for many products in ONE query.
-
-    The previous implementation ran a three-table join per product inside the
-    result loop -- 20 results meant 21 round trips.
-
-    Public because the wishlist needs the same figures: it used to return a
-    hardcoded "lowest_price": 0 rather than duplicate the aggregation.
-    """
-    ids = list(product_ids)
-    if not ids:
-        return {}
-
-    rows = (
-        db.query(
-            ProductAlias.product_id.label("product_id"),
-            ProductAlias.condition,
-            Price.price,
-            Price.delivery_cost,
-            Price.availability,
-            Store.name.label("store_name"),
-        )
-        .join(Price, Price.alias_id == ProductAlias.id)
-        .join(Store, Store.id == ProductAlias.store_id)
-        .filter(ProductAlias.product_id.in_(ids))
-        # Unverified merchant stores are invisible here. Applied in the query
-        # rather than after it: this function produces the lowest price, the
-        # best-deal store name and the store count, so a row filtered out
-        # later would still have moved every one of those numbers.
-        .filter(Store.visible_to_shoppers())
-        .all()
-    )
-
-    summary: dict[int, dict] = {}
-    for row in rows:
-        # Out-of-stock listings are excluded from every statistic. Counting
-        # them in store_count while excluding them from the price range (the
-        # old behaviour) reported "4 stores" for a product buyable at one.
-        if not row.availability:
-            continue
-
-        # New and second-hand are tallied apart. Folded together, one worn
-        # handset makes every product carrying it look like a bargain, and
-        # "best deal" goes to the used unit every single time.
-        group = comparison_group(row.condition)
-        product_bucket = summary.setdefault(row.product_id, {})
-        bucket = product_bucket.setdefault(
-            group,
-            {"prices": [], "totals": [], "stores": set(), "best": None,
-             "best_total": None},
-        )
-        # Decimal throughout: mixing in a float 0.0 would silently promote
-        # the sum back to binary floating point and undo the point of the
-        # Numeric column.
-        total = (row.price or Decimal(0)) + (row.delivery_cost or Decimal(0))
-        bucket["prices"].append(row.price)
-        bucket["totals"].append(total)
-        bucket["stores"].add(row.store_name)
-        if bucket["best_total"] is None or total < bucket["best_total"]:
-            bucket["best_total"] = total
-            bucket["best"] = row.store_name
-
-    return summary
-
-
-def offers_for(summary: dict, product_id: int, group: str = "new") -> dict:
-    """
-    One product's figures for one comparison group.
-
-    Defaults to NEW, and every caller outside search relies on that default:
-    the wishlist's "lowest price", and — more consequentially — whether a
-    price alert has been met.
-
-    WHY ALERTS TRACK NEW STOCK: a shopper who asked to be told when an
-    iPhone 15 drops below 700 meant a phone, not a phone with 81% battery and
-    a cracked back. Firing on second-hand stock would make the feature
-    untrustworthy in the one direction that matters, because the alert cannot
-    be un-sent. A shopper who wants used prices is browsing, not waiting.
-    """
-    return (summary.get(product_id) or {}).get(group) or {}
-
 
 def _to_response(product: Product, result, prices: dict | None) -> MatchedProduct:
     """
@@ -373,115 +291,3 @@ def _unscored():
     from app.matching.scorer import MatchResult
 
     return MatchResult(score=0.0, tier=SIMILAR, comparisons=())
-
-
-def best_savings(db: Session, limit: int = 8) -> list[dict]:
-    """
-    Products where shopping around saves the most.
-
-    WHAT MAKES A "DEAL" HERE: not a discount off some list price -- we have no
-    list price, and inventing one would be dishonest. The saving is the gap
-    between the cheapest and the dearest shop selling the same product right
-    now, which is the only claim this platform can actually stand behind: buy
-    it at the wrong shop and you pay this much more.
-
-    Restricted to NEW stock and to products carried by at least two shops. A
-    used unit against a sealed one is not a saving, and a single-shop product
-    has nothing to compare.
-
-    TWO BOUNDED QUERIES, NOT ONE UNBOUNDED SCAN. The first version pulled
-    every listing in the catalogue into Python and grouped it in a dict --
-    480 rows and 14ms at the time, but with no LIMIT anywhere, so the cost
-    grew with the catalogue and was paid again every time the five-minute
-    cache expired. The min/max/count now happen in the database, which is
-    what databases are for, and only the winning `limit` products are read
-    back. Cost is now a function of `limit`, not of catalogue size.
-    """
-    total = (Price.price + func.coalesce(Price.delivery_cost, 0)).label("total")
-    store_count = func.count(distinct(ProductAlias.store_id))
-
-    def visible_new(query):
-        """The filters that define a comparable offer. Applied to both passes."""
-        return (
-            query.join(Price, Price.alias_id == ProductAlias.id)
-            .join(Store, Store.id == ProductAlias.store_id)
-            .filter(Price.availability.is_(True))
-            .filter(ProductAlias.condition == "new")
-            .filter(Store.visible_to_shoppers())
-        )
-
-    # Pass 1: let the database find the biggest gaps.
-    ranked = (
-        visible_new(
-            db.query(
-                ProductAlias.product_id.label("product_id"),
-                func.min(total).label("lowest"),
-                func.max(total).label("dearest"),
-                store_count.label("store_count"),
-            ).join(Product, Product.id == ProductAlias.product_id)
-        )
-        .filter(Product.match_category.isnot(None))
-        .group_by(ProductAlias.product_id)
-        # Two distinct shops, and a gap worth reporting.
-        .having(store_count >= 2)
-        .having(func.max(total) > func.min(total))
-        # Product id as a tie-break so the list is STABLE. Savings tie far more
-        # often than they look like they would -- a synthetic catalogue of
-        # 1,000 products produced only seven distinct savings, with 142
-        # products sharing the top one. Without a second key the front page
-        # reshuffles every time the cache expires, for no reason a visitor
-        # could see.
-        .order_by((func.max(total) - func.min(total)).desc(), ProductAlias.product_id)
-        .limit(limit)
-        .all()
-    )
-    if not ranked:
-        return []
-
-    summary = {row.product_id: row for row in ranked}
-
-    # Pass 2: read back only the winners, and find which shop is cheapest.
-    # Bounded by `limit` products, so a handful of rows however big the
-    # catalogue gets.
-    rows = visible_new(
-        db.query(Product, Store.name.label("store_name"), total).join(
-            ProductAlias, ProductAlias.product_id == Product.id
-        )
-    ).filter(Product.id.in_(list(summary))).all()
-
-    cheapest_store: dict[int, tuple] = {}
-    products: dict[int, Product] = {}
-    for product, store_name, offer_total in rows:
-        products[product.id] = product
-        best = cheapest_store.get(product.id)
-        if best is None or offer_total < best[0]:
-            cheapest_store[product.id] = (offer_total, store_name)
-
-    deals = []
-    for product_id, row in summary.items():
-        product = products.get(product_id)
-        if product is None:
-            continue
-        saving = row.dearest - row.lowest
-        deals.append(
-            {
-                "id": product.id,
-                "canonical_name": product.canonical_name,
-                "brand": product.brand,
-                "image_url": product.image_url,
-                "attributes": product.match_attributes or None,
-                "lowest_total_cost": float(row.lowest),
-                "highest_total_cost": float(row.dearest),
-                "saving": float(saving),
-                # Percentage off the dearest price, which is what a shopper
-                # avoids paying rather than a markup off some invented RRP.
-                "saving_percent": round(float(saving / row.dearest * 100), 1),
-                "best_deal_store": cheapest_store.get(product_id, (None, None))[1],
-                "store_count": row.store_count,
-            }
-        )
-
-    # Same ordering as the database applied, re-established because the second
-    # pass rebuilt the list from a dict. Id breaks ties so the order is stable.
-    deals.sort(key=lambda d: (-d["saving"], d["id"]))
-    return deals

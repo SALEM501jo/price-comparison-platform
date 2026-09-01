@@ -22,7 +22,7 @@ from app.schemas.price import (
     PriceAlertResponse,
     WishlistItemResponse,
 )
-from app.services.search import offers_for, price_summary
+from app.services.pricing import offers_for, price_summary
 
 router = APIRouter()
 

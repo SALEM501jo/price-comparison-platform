@@ -324,7 +324,7 @@ no untranslated English in the Arabic table.
 238 products the current parser rejects are still in the dev database.
 
 ```bash
-cd backend && .venv/Scripts/python.exe scripts/cleanup_uncategorised.py --apply
+cd backend && .venv/Scripts/python.exe scripts/prune_unparseable_products.py --apply
 ```
 
 Dry-runs by default; refuses if any row is referenced by a wishlist or alert.

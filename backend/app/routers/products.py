@@ -9,7 +9,7 @@ from typing import Literal, Optional, List
 
 from pydantic import BaseModel
 from app.database import get_db
-from app.dependencies import get_current_user_optional, get_rate_limited
+from app.dependencies import get_rate_limited
 from app.models.product import Product
 from app.models.alias import ProductAlias
 from app.models.price import Price, PriceHistory
@@ -24,7 +24,8 @@ from app.schemas.product import (
 from app.schemas.search import SearchSuggestion, TieredSearchResponse
 from app.matching import arabic, normalize
 from app.matching import spelling
-from app.services.search import best_savings, escape_like, search_products
+from app.services.deals import best_savings
+from app.services.search import escape_like, search_products
 from app.config import get_settings
 from app.services.cache import cached_json, catalogue_version, store_json
 import hashlib

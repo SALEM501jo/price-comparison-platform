@@ -24,7 +24,6 @@ data that strangers read, so two more questions follow:
 from __future__ import annotations
 
 import hashlib
-from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,7 +35,6 @@ from app.logging_config import get_security_logger
 from app.matching import parse
 from app.models.alias import ProductAlias
 from app.models.price import Price, PriceHistory
-from app.models.product import Product
 from app.models.store import Store
 from app.models.user import User, UserRole
 from app.schemas.merchant import (
