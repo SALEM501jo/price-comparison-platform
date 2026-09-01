@@ -131,6 +131,116 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
 
+    # Values that ship in .env.example. Live in production they mean somebody
+    # copied the template and deployed it.
+    _PLACEHOLDER_SECRETS = frozenset({
+        "change_this_to_a_random_32_char_hex_string",
+        "your_secret_key_here",
+        "changeme",
+    })
+
+    @staticmethod
+    def _is_local(url: str) -> bool:
+        return any(host in (url or "").lower()
+                   for host in ("localhost", "127.0.0.1", "0.0.0.0", "::1"))
+
+    def production_problems(self) -> tuple[list[str], list[str]]:
+        """
+        What is wrong with this configuration for a public deployment.
+
+        Returns (errors, warnings). Errors refuse the boot; warnings are
+        logged and the app starts.
+
+        WHY THIS EXISTS. Every setting below defaults to something correct for
+        a laptop and wrong for the internet, and -- apart from the mail backend
+        -- each one fails SILENTLY. A deploy that forgets TRUSTED_HOSTS serves
+        traffic happily while accepting any Host header. One that forgets
+        APP_BASE_URL sends verification links pointing at localhost, so every
+        new account is unverifiable and the only symptom is users not
+        completing signup. Nothing in a health check notices either.
+
+        The mail backend already proved the fix: turn the silent
+        misconfiguration into a refusal to start, so the machine never reports
+        healthy and the deploy platform rolls back. This applies the same rule
+        to the rest of them.
+
+        THE SPLIT BETWEEN ERROR AND WARNING is whether a correct deployment
+        could legitimately look like this. Nobody deliberately runs a public
+        site with TRUSTED_HOSTS=*; somebody might legitimately run one with no
+        reverse proxy in front, so the proxy count is a warning rather than a
+        refusal -- and the rate limiter detects that case at runtime instead,
+        where it can see an actual X-Forwarded-For header.
+        """
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        if not self.is_production:
+            return errors, warnings
+
+        if "*" in self.trusted_host_list:
+            errors.append(
+                "TRUSTED_HOSTS is '*'. Set it to your real hostnames "
+                "(api.example.com,example.com) or the app accepts any Host "
+                "header, which is cache-poisoning and password-reset "
+                "phishing waiting to happen."
+            )
+
+        if self._is_local(self.app_base_url):
+            errors.append(
+                f"APP_BASE_URL is {self.app_base_url!r}. Every verification "
+                "and password-reset link would point at localhost, so no new "
+                "account could ever be confirmed. Set it to the FRONTEND's "
+                "public address."
+            )
+
+        origins = self.cors_origins
+        if not origins:
+            errors.append(
+                "ALLOWED_ORIGINS is empty, so the browser will refuse every "
+                "request the frontend makes to this API."
+            )
+        elif all(self._is_local(o) for o in origins):
+            errors.append(
+                f"ALLOWED_ORIGINS is still {origins}. The deployed frontend "
+                "is not on localhost, so CORS would block it entirely."
+            )
+
+        if self.jwt_secret_key in self._PLACEHOLDER_SECRETS:
+            errors.append(
+                "JWT_SECRET_KEY is the value from .env.example. Anyone with "
+                "the repository can mint an admin token. Generate one with: "
+                "openssl rand -hex 32"
+            )
+
+        if self.trusted_proxy_count <= 0:
+            warnings.append(
+                "TRUSTED_PROXY_COUNT is 0. If anything sits in front of this "
+                "app (a load balancer, Fly's edge, Cloudflare), every visitor "
+                "shares ONE rate-limit bucket and the 101st request in any "
+                "minute returns 429 to everybody. Set it to the number of "
+                "proxies. If the app really is exposed directly, 0 is right."
+            )
+
+        if not self.support_email:
+            warnings.append(
+                "SUPPORT_EMAIL is unset. Contact-form messages are still "
+                "stored and readable in /admin, but nobody is notified."
+            )
+
+        if (self.email_backend or "").lower() == "null":
+            warnings.append(
+                "EMAIL_BACKEND=null. No verification or password-reset mail "
+                "will be sent to anyone. Deliberate, but worth knowing."
+            )
+
+        if self.cookie_samesite.lower() == "none" and not self.cookie_is_secure:
+            errors.append(
+                "COOKIE_SAMESITE=none requires a Secure cookie; browsers "
+                "reject the combination outright and sessions would not work."
+            )
+
+        return errors, warnings
+
     @property
     def cookie_is_secure(self) -> bool:
         """

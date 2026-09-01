@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 # Redis client - singleton, created once, reused for all requests
 _redis_client = None
 
+# One warning per process about a proxy the configuration does not know about.
+_warned_about_proxy = False
+
 
 async def get_redis():
     """
@@ -55,6 +58,25 @@ def client_ip(request: Request) -> str:
 
     hops = settings.trusted_proxy_count
     if hops <= 0:
+        # A STATIC CHECK CANNOT KNOW whether a proxy is in front of us; this
+        # can. An X-Forwarded-For header arriving while the count is 0 is
+        # proof that something IS forwarding, and that every visitor is
+        # therefore sharing one rate-limit bucket keyed on the proxy's own
+        # address -- so the 101st request in any minute returns 429 to
+        # everybody and the site looks like it has fallen over.
+        #
+        # Logged once per process rather than per request: this is a
+        # deployment mistake, not an event, and a line on every request would
+        # bury the thing it is warning about.
+        global _warned_about_proxy
+        if not _warned_about_proxy and request.headers.get("x-forwarded-for"):
+            _warned_about_proxy = True
+            logger.error(
+                "TRUSTED_PROXY_COUNT is 0 but requests carry X-Forwarded-For. "
+                "Every visitor is sharing one rate-limit bucket; set it to the "
+                "number of proxies in front of this app.",
+                extra={"action": "proxy_misconfigured"},
+            )
         return peer
 
     forwarded = request.headers.get("x-forwarded-for")

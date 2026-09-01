@@ -43,6 +43,35 @@ async def lifespan(app: FastAPI):
         logger.info("Database tables verified (development convenience)")
 
     if settings.is_production:
+        # THE REST OF THE PRODUCTION CONFIGURATION, checked the same way and
+        # for the same reason: every one of these defaults to something right
+        # for a laptop and wrong for the internet, and all of them fail
+        # SILENTLY. A deploy that forgets TRUSTED_HOSTS serves traffic while
+        # accepting any Host header; one that forgets APP_BASE_URL emails
+        # verification links pointing at localhost, so nobody can ever confirm
+        # an account and the only symptom is signups that never complete.
+        # Nothing in a health check notices either.
+        errors, warnings = settings.production_problems()
+        for warning in warnings:
+            logger.warning(
+                "Production configuration warning: %s",
+                warning,
+                extra={"action": "startup_config_warning"},
+            )
+        if errors:
+            for error in errors:
+                logger.critical(
+                    "Production configuration error: %s",
+                    error,
+                    extra={"action": "startup_config_error"},
+                )
+            raise RuntimeError(
+                "Refusing to start: "
+                + str(len(errors))
+                + " production setting(s) would fail silently. "
+                + " | ".join(errors)
+            )
+
         # RESOLVE THE MAIL BACKEND AT BOOT, not at the first person who signs
         # up. get_sender() already refuses the console backend in production,
         # but it is lazy and nothing called it until send() did -- so a deploy
