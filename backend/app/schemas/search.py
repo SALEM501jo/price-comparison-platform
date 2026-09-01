@@ -12,6 +12,31 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class MatchDifference(BaseModel):
+    """One attribute on which a candidate differs from the query.
+
+    Deliberately NOT a sentence. The server used to send "different colour
+    (blue, not black)" ready-made, which meant the explanation the whole
+    tiered-search feature exists to produce arrived in English on an
+    Arabic-first site, past the reach of any client translation.
+
+    The client composes the sentence from these fields. `attribute` is the
+    stable machine name -- the key a translation table can be written
+    against -- while `label` is the English wording, kept so a consumer with
+    no translation table of its own still has something to print.
+    """
+
+    attribute: str = Field(..., description="Machine name, e.g. 'color'")
+    label: str = Field(..., description="English wording, e.g. 'colour'")
+    query_value: str = Field(..., description="What the shopper asked for")
+    candidate_value: Optional[str] = Field(
+        None,
+        description="What this product has. Null means the listing does not "
+        "state it, which is a different fact from having a different value "
+        "and reads as a different sentence.",
+    )
+
+
 class MatchedProduct(BaseModel):
     id: int
     canonical_name: str
@@ -43,9 +68,10 @@ class MatchedProduct(BaseModel):
     # Match explanation
     match_score: float = Field(..., description="0-100, weighted attribute agreement")
     match_tier: str = Field(..., description="exact | close | similar")
-    differences: List[str] = Field(
+    differences: List[MatchDifference] = Field(
         default_factory=list,
-        description="Why this is not exact, e.g. 'different colour (blue, not black)'",
+        description="Which attributes differ, and how. The client turns these "
+        "into a sentence in the reader's language.",
     )
 
 

@@ -140,19 +140,45 @@ class TestTieredResults:
 
 
 class TestExplainability:
+    """
+    The engine reports WHICH attribute differed and WHAT the two values were.
+
+    It deliberately does not compose a sentence. These assertions are on the
+    structure for that reason: an assertion on English prose here is exactly
+    what let the explanation stay English-only on an Arabic-first site.
+    """
+
     def test_exact_match_has_no_differences(self):
         result = score_match(parse(QUERY), parse("Apple iPhone 11 Pro 128GB Black"))
-        assert result.differences == []
+        assert result.differences == ()
 
-    def test_difference_is_described_in_words(self):
+    def test_difference_names_the_attribute_and_both_values(self):
         result = score_match(
             parse(QUERY), parse("Apple iPhone 11 Pro 128GB Midnight Green")
         )
-        assert result.differences == ["different colour (midnight green, not black)"]
+        (colour,) = result.differences
+        assert colour.name == "color"
+        assert colour.label == "colour"
+        assert colour.query_value == "black"
+        assert colour.candidate_value == "midnight green"
 
-    def test_storage_difference_is_described(self):
+    def test_storage_difference_is_reported(self):
         result = score_match(parse(QUERY), parse("Apple iPhone 11 Pro 256GB Black"))
-        assert result.differences == ["different storage (256gb, not 128gb)"]
+        (storage,) = result.differences
+        assert storage.name == "storage"
+        assert (storage.query_value, storage.candidate_value) == ("128gb", "256gb")
+
+    def test_unstated_attribute_is_null_not_absent(self):
+        """
+        "The listing does not say" and "the listing says something else" are
+        different facts, and they read as different sentences. A null
+        candidate_value is what lets the client tell them apart.
+        """
+        result = score_match(parse(QUERY), parse("Apple iPhone 11 Pro 128GB"))
+        (colour,) = result.differences
+        assert colour.name == "color"
+        assert colour.query_value == "black"
+        assert colour.candidate_value is None
 
 
 # --- Gates and edge cases --------------------------------------------------
@@ -198,12 +224,14 @@ class TestGateExplainability:
             parse("Samsung Galaxy S24 128GB Black"),
         )
         assert result.tier == EXCLUDED
-        assert result.differences == ["different brand (samsung, not apple)"]
+        (brand,) = result.differences
+        assert brand.name == "brand"
+        assert (brand.query_value, brand.candidate_value) == ("apple", "samsung")
 
     def test_category_mismatch_is_excluded_without_crashing(self):
         result = score_match(parse("iPhone 15 Pro"), parse("MacBook Pro M3"))
         assert result.tier == EXCLUDED
-        assert result.differences == []
+        assert result.differences == ()
 
 
 class TestColourSynonyms:

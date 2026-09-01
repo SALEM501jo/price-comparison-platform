@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import MatchBadge from './MatchBadge';
 import { formatPrice, formatStoreCount } from '../../utils/format';
+import { describeDifference } from '../../utils/matchDifference';
 import { useLocale } from '../../hooks/useLocale';
 
 /**
@@ -35,12 +36,17 @@ export default function ProductResultCard({ product }) {
 
           {/* The reason this is not an exact match. This is the whole point of
               the tiered results: the shopper can tell at a glance whether the
-              difference matters to them. */}
+              difference matters to them -- which means it has to be in the
+              language they are reading. The server sends the attribute and the
+              two values; the sentence is composed here. */}
           {product.differences?.length > 0 && (
             <ul className="mt-2 space-y-0.5">
               {product.differences.map((difference) => (
-                <li key={difference} className="text-sm text-amber-700 dark:text-amber-400">
-                  {difference}
+                <li
+                  key={difference.attribute}
+                  className="text-sm text-amber-700 dark:text-amber-400"
+                >
+                  {describeDifference(difference, t)}
                 </li>
               ))}
             </ul>

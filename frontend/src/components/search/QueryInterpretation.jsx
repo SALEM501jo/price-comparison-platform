@@ -1,4 +1,5 @@
 import { describeAttributes } from '../../utils/format';
+import { attributeName, translateValue } from '../../utils/matchDifference';
 import { useLocale } from '../../hooks/useLocale';
 
 /**
@@ -36,11 +37,21 @@ export default function QueryInterpretation({ interpretation }) {
         .map(([key, value]) => (
           <span
             key={key}
-            dir="ltr"
+            // "auto", not "ltr": the browser reads the direction off the first
+            // strong character, so "iphone 16" and "128gb" still run
+            // left-to-right inside the RTL page while a translated value like
+            // "أسود" runs the way it is written. A hard "ltr" was correct only
+            // while every value was Latin.
+            dir="auto"
             className="rounded bg-brand-50 px-2 py-0.5 font-medium text-brand-800 dark:bg-brand-900/40 dark:text-brand-300"
-            title={key}
+            // The chip said "black" in the Arabic UI while the card below it
+            // said "أسود" for the same value, and the tooltip named the
+            // attribute in English -- as the machine name, "color", not even
+            // the label. Same vocabulary as the difference lines, so the two
+            // cannot disagree on one screen again.
+            title={attributeName(key, t)}
           >
-            {value}
+            {translateValue(value, t)}
           </span>
         ))}
     </div>

@@ -42,8 +42,8 @@ there is no checkout anywhere.
 
 | | |
 |---|---|
-| Backend tests | **591** — `cd backend && pytest -q` |
-| Frontend tests | **43** — `cd frontend && npm test` |
+| Backend tests | **592** — `cd backend && pytest -q` |
+| Frontend tests | **70** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
 | Smoke checks | **57/57** — `python scripts/smoke_test.py` |
@@ -128,6 +128,14 @@ in Arabic. Nothing in the UI is English-only any more.
     every `scrollWidth > clientWidth` overflow check trivially true. Set an
     explicit viewport with `resize_window` before believing any layout
     measurement.
+12. **The browser pane's console buffer is sticky per tab.** It survives
+    navigation, a dev-server restart and a cleared Vite cache, so a fixed
+    error keeps being reported as though it were live — the message even
+    keeps citing the *old* `?v=` dep hash, which is the tell. This is the
+    mirror image of trap 9 and wastes time the same way: there, the browser
+    was behind the source; here, only the log was. **Confirm against the DOM
+    (`javascript_tool`) or a fresh tab before believing a console error**, and
+    read the dep hash in the stack trace.
 
 ---
 
@@ -383,6 +391,38 @@ rate-limit bucket. Logged once per process.
 
 `backend/.env.production.example` lists every value with the failure it causes.
 
+### Tier explanations are composed in the CLIENT
+
+`differences` used to arrive from the API as finished English prose --
+`"different colour (blue, not black)"` -- built by `AttributeComparison.reason()`.
+That put the one piece of text the tiers exist to produce permanently in
+English, on a site whose default language is Arabic, where no frontend
+translation could reach it.
+
+The API now sends `{attribute, label, query_value, candidate_value}` and
+`utils/matchDifference.js` writes the sentence. **A null `candidate_value`
+means the listing states nothing**, which is a different fact from stating
+something else and reads as a different sentence -- collapsing the two would
+tell a shopper the phone is the wrong colour when nobody knows what colour it
+is.
+
+**One translation key per attribute, not one template with a `{label}` slot.**
+Arabic adjectives agree with their noun: it is `لون مختلف` but `ذاكرة مختلفة`.
+A single template would be wrong on every feminine attribute, and a sentence
+that is grammatical half the time reads worse than English does.
+
+**Only colours and variants are translated as values.** A model code, a brand
+and a capacity are written in Latin on a Jordanian shelf and in the Arabic
+listings we scrape, so "translating" `128GB` would invent a spelling nobody
+uses. Anything with no entry falls through unchanged.
+
+The same vocabulary backs the query-interpretation chips, which had the same
+bug in a quieter place: the chip read `black` while the card under it read
+`أسود`, and its tooltip named the attribute as the machine name `color`. Two
+tests copy the colour, variant and attribute lists out of `rules.py` and fail
+when the engine gains a value the table cannot say -- nothing else connects
+Python vocabulary to a JavaScript table.
+
 ### i18n — `src/i18n/translations.js`
 
 A plain lookup table, no dependency. Arabic is the **fallback locale**. Locale
@@ -474,16 +514,11 @@ no untranslated English in the Arabic table.
 4. **Photo upload is not built.** The model is ready; it needs object storage.
 5. `Core 5-120U` parses, but **CPU generation is not captured** — an 8th-gen
    and a 14th-gen i7 both resolve to `i7`.
-6. **Tier explanations are English-only by construction.**
-   `AttributeComparison.reason()` builds the sentence server-side, so
-   "different colour (blue, not black)" reaches the Arabic UI in English and no
-   frontend translation can reach it. The fix is returning the structured
-   fields the API already has and composing the sentence in the client.
-7. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
+6. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
    Running them re-pollutes the database. `scripts/e2e_test.py` cleans up after
    itself; the other two do not. Run `scripts/cleanup_test_data.py --apply`
    afterwards.
-8. No email verification enforcement on *access* — gates outbound mail only
+7. No email verification enforcement on *access* — gates outbound mail only
    (deliberate).
 
 ---
@@ -552,7 +587,6 @@ the first 50 shops.
 
 ### 4. Smaller, well-defined work
 
-- **Structured tier explanations** (limitation 6) — the last English-only text.
 - **Split `Admin.jsx`** — 631 lines, now the largest file in the project. Same
   treatment the admin router got: stats, stores, listings, users.
 - **Capture CPU generation** — needs a weight rebalance in `rules.py`.

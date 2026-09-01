@@ -30,6 +30,7 @@ from app.matching import spelling
 from app.models.product import Product
 from app.services.pricing import price_summary
 from app.schemas.search import (
+    MatchDifference,
     MatchedProduct,
     SearchInterpretation,
     TierCounts,
@@ -147,7 +148,15 @@ def _to_response(product: Product, result, prices: dict | None) -> MatchedProduc
         second_hand_store_count=len(second_hand.get("stores") or ()),
         match_score=result.score,
         match_tier=result.tier,
-        differences=result.differences,
+        differences=[
+            MatchDifference(
+                attribute=c.name,
+                label=c.label,
+                query_value=c.query_value,
+                candidate_value=c.candidate_value,
+            )
+            for c in result.differences
+        ],
     )
 
 

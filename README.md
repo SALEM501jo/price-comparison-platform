@@ -315,25 +315,37 @@ the interesting fields:
     "query": "iPhone 15 256GB Black",
     "category": "phones",
     "attributes": {"brand": "apple", "model": "iphone 15",
-                   "variant": "base", "storage": "256gb", "color": "black"},
-    "structured": true
+                   "storage": "256gb", "color": "black"},
+    "structured": true, "corrected_query": null, "corrections": {}
   },
   "exact": [],
   "close": [{
     "canonical_name": "Apple iPhone 15 256GB 5G - Blue",
     "match_score": 90.0,
-    "differences": ["different colour (blue, not black)"],
-    "lowest_total_cost": 977.5, "best_deal_store": "SmartBuy", "store_count": 2
+    "differences": [{"attribute": "color", "label": "colour",
+                     "query_value": "black", "candidate_value": "blue"}],
+    "lowest_total_cost": 933.82, "best_deal_store": "SmartBuy", "store_count": 1
   }],
   "similar": [{
     "canonical_name": "Apple iPhone 15 128GB 5G Smartphone - Black",
-    "match_score": 75.0,
-    "differences": ["different storage (128gb, not 256gb)"],
-    "lowest_total_cost": 877.5, "best_deal_store": "SmartBuy", "store_count": 4
+    "match_score": 76.0,
+    "differences": [{"attribute": "storage", "label": "storage",
+                     "query_value": "256gb", "candidate_value": "128gb"}],
+    "lowest_total_cost": 891.25, "best_deal_store": "SmartBuy", "store_count": 1
   }],
   "total": 2
 }
 ```
+
+`differences` is structured rather than prose, and that is a deliberate
+reversal. The server used to send the finished sentence -- `"different colour
+(blue, not black)"` -- which put the one piece of text the tiers exist to
+produce permanently in English, on a site whose default language is Arabic.
+A sentence is a rendering decision; the API reports which attribute differed
+and what the two values were, and the client writes it in the reader's
+language. A null `candidate_value` means the listing does not state the
+attribute at all, which reads as a different sentence from having a different
+value.
 
 `lowest_total_cost` is price **plus delivery** — a store with a lower sticker
 price and dearer delivery is not the better deal.

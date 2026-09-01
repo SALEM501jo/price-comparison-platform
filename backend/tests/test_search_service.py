@@ -119,10 +119,17 @@ class TestExplanations:
         assert result.exact[0].differences == []
 
     def test_close_match_explains_itself(self, catalogue):
+        """
+        The API carries the fields, not the sentence. The sentence is written
+        in the client, which is the only place that knows what language the
+        shopper is reading.
+        """
         result = search_products(catalogue, QUERY)
-        assert result.close[0].differences == [
-            "different colour (midnight green, not black)"
-        ]
+        (colour,) = result.close[0].differences
+        assert colour.attribute == "color"
+        assert colour.label == "colour"
+        assert colour.query_value == "black"
+        assert colour.candidate_value == "midnight green"
 
     def test_interpretation_reports_what_was_understood(self, catalogue):
         result = search_products(catalogue, QUERY)

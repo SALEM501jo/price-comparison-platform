@@ -88,6 +88,107 @@ const translations = {
     'tier.nameMatchTitle': 'وجدناه بالاسم أو الماركة — لم نتمكن من ترتيبه حسب المواصفات.',
     'tier.scoreTitle': 'درجة التطابق: {score}٪',
 
+    // --- Why a match is not exact
+    //
+    // ONE KEY PER ATTRIBUTE, not one template with a {label} slot. Arabic
+    // adjectives agree with their noun: it is "لون مختلف" but "ذاكرة مختلفة".
+    // A single "{label} مختلف" template would be wrong on every feminine
+    // attribute -- memory, resolution, variant, screen resolution -- and a
+    // sentence that is grammatical half the time reads worse than English.
+    'match.diff.brand.different': 'علامة تجارية مختلفة ({found} بدل {wanted})',
+    'match.diff.brand.missing': 'العلامة التجارية غير مذكورة',
+    'match.diff.model.different': 'طراز مختلف ({found} بدل {wanted})',
+    'match.diff.model.missing': 'الطراز غير مذكور',
+    'match.diff.variant.different': 'فئة مختلفة ({found} بدل {wanted})',
+    'match.diff.variant.missing': 'الفئة غير مذكورة',
+    'match.diff.storage.different': 'سعة تخزين مختلفة ({found} بدل {wanted})',
+    'match.diff.storage.missing': 'سعة التخزين غير مذكورة',
+    'match.diff.ram.different': 'ذاكرة مختلفة ({found} بدل {wanted})',
+    'match.diff.ram.missing': 'الذاكرة غير مذكورة',
+    'match.diff.color.different': 'لون مختلف ({found} بدل {wanted})',
+    'match.diff.color.missing': 'اللون غير مذكور',
+    'match.diff.cpu.different': 'معالج مختلف ({found} بدل {wanted})',
+    'match.diff.cpu.missing': 'المعالج غير مذكور',
+    'match.diff.size.different': 'حجم شاشة مختلف ({found} بدل {wanted})',
+    'match.diff.size.missing': 'حجم الشاشة غير مذكور',
+    'match.diff.resolution.different': 'دقة مختلفة ({found} بدل {wanted})',
+    'match.diff.resolution.missing': 'الدقة غير مذكورة',
+    'match.diff.refresh.different': 'معدل تحديث مختلف ({found} بدل {wanted})',
+    'match.diff.refresh.missing': 'معدل التحديث غير مذكور',
+    'match.diff.panel.different': 'نوع لوحة مختلف ({found} بدل {wanted})',
+    'match.diff.panel.missing': 'نوع اللوحة غير مذكور',
+    // Fallback for an attribute added to rules.py before this table caught
+    // up. Ungendered on purpose -- "the X differs" needs no agreement -- so a
+    // new attribute reads awkwardly rather than wrongly, and never as a raw
+    // key on the page.
+    'match.diff.different': 'يختلف في {label} ({found} بدل {wanted})',
+    'match.diff.missing': 'غير مذكور: {label}',
+
+    // --- Attribute names on their own, for the "we searched for" chips.
+    // Separate from the match.diff.* phrases above because those are whole
+    // sentences with the adjective already agreeing; these are bare nouns.
+    'match.attr.brand': 'العلامة التجارية',
+    'match.attr.model': 'الطراز',
+    'match.attr.variant': 'الفئة',
+    'match.attr.storage': 'سعة التخزين',
+    'match.attr.ram': 'الذاكرة',
+    'match.attr.color': 'اللون',
+    'match.attr.cpu': 'المعالج',
+    'match.attr.size': 'حجم الشاشة',
+    'match.attr.resolution': 'الدقة',
+    'match.attr.refresh': 'معدل التحديث',
+    'match.attr.panel': 'نوع اللوحة',
+
+    // --- Attribute values worth saying in Arabic.
+    //
+    // Colours and variants only. Model codes, brands and capacities stay
+    // Latin because that is how they are written on a Jordanian shelf and in
+    // every Arabic-language listing we scrape -- "iPhone 15" and "128GB" are
+    // not untranslated, they are the local spelling. Anything absent here
+    // falls through to the raw value, so this table can never blank a word.
+    'match.value.black': 'أسود',
+    'match.value.white': 'أبيض',
+    'match.value.silver': 'فضي',
+    'match.value.gold': 'ذهبي',
+    'match.value.blue': 'أزرق',
+    'match.value.red': 'أحمر',
+    'match.value.green': 'أخضر',
+    'match.value.purple': 'بنفسجي',
+    'match.value.pink': 'وردي',
+    'match.value.yellow': 'أصفر',
+    'match.value.orange': 'برتقالي',
+    'match.value.gray': 'رمادي',
+    'match.value.cream': 'كريمي',
+    'match.value.mint': 'نعناعي',
+    'match.value.beige': 'بيج',
+    'match.value.graphite': 'جرافيت',
+    'match.value.titanium': 'تيتانيوم',
+    'match.value.starlight': 'ستارلايت',
+    'match.value.lavender': 'لافندر',
+    'match.value.midnight': 'ميدنايت',
+    'match.value.rose_gold': 'ذهبي وردي',
+    'match.value.space_gray': 'رمادي فلكي',
+    'match.value.sierra_blue': 'أزرق سييرا',
+    'match.value.pacific_blue': 'أزرق باسيفيك',
+    'match.value.sky_blue': 'أزرق سماوي',
+    'match.value.midnight_green': 'أخضر ميدنايت',
+    'match.value.alpine_green': 'أخضر ألباين',
+    'match.value.deep_purple': 'بنفسجي غامق',
+    'match.value.natural_titanium': 'تيتانيوم طبيعي',
+    'match.value.blue_titanium': 'تيتانيوم أزرق',
+    'match.value.phantom_black': 'أسود فانتوم',
+    'match.value.base': 'أساسي',
+    'match.value.pro': 'برو',
+    'match.value.pro_max': 'برو ماكس',
+    'match.value.plus': 'بلس',
+    'match.value.ultra': 'ألترا',
+    'match.value.mini': 'ميني',
+    'match.value.max': 'ماكس',
+    'match.value.air': 'إير',
+    // Samsung's Fan Edition. Written FE on the box and in every Jordanian
+    // listing; spelling it out in Arabic would name a thing nobody sells.
+    'match.value.fe': 'FE',
+
     // --- Product page
     'product.back': 'رجوع للبحث',
     'product.new': 'جديد',
@@ -431,6 +532,91 @@ const translations = {
     'tier.nameMatch': 'Name match',
     'tier.nameMatchTitle': 'Found by name or brand — we could not rank this one on its specifications.',
     'tier.scoreTitle': 'Match score: {score}%',
+
+    // --- Why a match is not exact. One key per attribute; see the Arabic
+    // table for why this is not a single template.
+    'match.diff.brand.different': 'different brand ({found}, not {wanted})',
+    'match.diff.brand.missing': 'brand not listed',
+    'match.diff.model.different': 'different model ({found}, not {wanted})',
+    'match.diff.model.missing': 'model not listed',
+    'match.diff.variant.different': 'different variant ({found}, not {wanted})',
+    'match.diff.variant.missing': 'variant not listed',
+    'match.diff.storage.different': 'different storage ({found}, not {wanted})',
+    'match.diff.storage.missing': 'storage not listed',
+    'match.diff.ram.different': 'different memory ({found}, not {wanted})',
+    'match.diff.ram.missing': 'memory not listed',
+    'match.diff.color.different': 'different colour ({found}, not {wanted})',
+    'match.diff.color.missing': 'colour not listed',
+    'match.diff.cpu.different': 'different processor ({found}, not {wanted})',
+    'match.diff.cpu.missing': 'processor not listed',
+    'match.diff.size.different': 'different screen size ({found}, not {wanted})',
+    'match.diff.size.missing': 'screen size not listed',
+    'match.diff.resolution.different': 'different resolution ({found}, not {wanted})',
+    'match.diff.resolution.missing': 'resolution not listed',
+    'match.diff.refresh.different': 'different refresh rate ({found}, not {wanted})',
+    'match.diff.refresh.missing': 'refresh rate not listed',
+    'match.diff.panel.different': 'different panel type ({found}, not {wanted})',
+    'match.diff.panel.missing': 'panel type not listed',
+    'match.diff.different': 'different {label} ({found}, not {wanted})',
+    'match.diff.missing': '{label} not listed',
+
+    // --- Attribute names on their own, for the "we searched for" chips.
+    'match.attr.brand': 'brand',
+    'match.attr.model': 'model',
+    'match.attr.variant': 'variant',
+    'match.attr.storage': 'storage',
+    'match.attr.ram': 'memory',
+    'match.attr.color': 'colour',
+    'match.attr.cpu': 'processor',
+    'match.attr.size': 'screen size',
+    'match.attr.resolution': 'resolution',
+    'match.attr.refresh': 'refresh rate',
+    'match.attr.panel': 'panel type',
+
+    // --- Attribute values. English is the canonical form the engine already
+    // speaks, so these exist to give the Arabic table something to be checked
+    // against -- key parity is what stops a colour being translated on one
+    // side only.
+    'match.value.black': 'black',
+    'match.value.white': 'white',
+    'match.value.silver': 'silver',
+    'match.value.gold': 'gold',
+    'match.value.blue': 'blue',
+    'match.value.red': 'red',
+    'match.value.green': 'green',
+    'match.value.purple': 'purple',
+    'match.value.pink': 'pink',
+    'match.value.yellow': 'yellow',
+    'match.value.orange': 'orange',
+    'match.value.gray': 'gray',
+    'match.value.cream': 'cream',
+    'match.value.mint': 'mint',
+    'match.value.beige': 'beige',
+    'match.value.graphite': 'graphite',
+    'match.value.titanium': 'titanium',
+    'match.value.starlight': 'starlight',
+    'match.value.lavender': 'lavender',
+    'match.value.midnight': 'midnight',
+    'match.value.rose_gold': 'rose gold',
+    'match.value.space_gray': 'space gray',
+    'match.value.sierra_blue': 'sierra blue',
+    'match.value.pacific_blue': 'pacific blue',
+    'match.value.sky_blue': 'sky blue',
+    'match.value.midnight_green': 'midnight green',
+    'match.value.alpine_green': 'alpine green',
+    'match.value.deep_purple': 'deep purple',
+    'match.value.natural_titanium': 'natural titanium',
+    'match.value.blue_titanium': 'blue titanium',
+    'match.value.phantom_black': 'phantom black',
+    'match.value.base': 'base',
+    'match.value.pro': 'Pro',
+    'match.value.pro_max': 'Pro Max',
+    'match.value.plus': 'Plus',
+    'match.value.ultra': 'Ultra',
+    'match.value.mini': 'Mini',
+    'match.value.max': 'Max',
+    'match.value.air': 'Air',
+    'match.value.fe': 'FE',
 
     'product.back': 'Back to search',
     'product.new': 'New',

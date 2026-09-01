@@ -12,9 +12,11 @@ import api from './axios';
  *     total:   number
  *   }
  *
- * Each product carries match_score, match_tier and `differences` -- the
- * plain-English reasons it is not an exact match, e.g.
- * "different colour (blue, not black)".
+ * Each product carries match_score, match_tier and `differences`: one entry
+ * per attribute that did not match, as
+ * { attribute, label, query_value, candidate_value }. Structured rather than
+ * prose so the sentence can be written in the reader's language --
+ * see utils/matchDifference.js.
  */
 export const searchProducts = async (query, options = {}, config = {}) => {
   const { sort, page, limit, category, correct } = options;

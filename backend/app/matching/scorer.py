@@ -49,16 +49,6 @@ class AttributeComparison:
     candidate_value: str | None
     matched: bool
 
-    def reason(self) -> str:
-        if self.matched:
-            return f"same {self.label}"
-        if self.candidate_value is None:
-            return f"{self.label} not listed"
-        return (
-            f"different {self.label} "
-            f"({self.candidate_value}, not {self.query_value})"
-        )
-
 
 @dataclass(frozen=True)
 class MatchResult:
@@ -67,9 +57,21 @@ class MatchResult:
     comparisons: tuple[AttributeComparison, ...]
 
     @property
-    def differences(self) -> list[str]:
-        """Human-readable reasons this is not an exact match. For the UI."""
-        return [c.reason() for c in self.comparisons if not c.matched]
+    def differences(self) -> tuple[AttributeComparison, ...]:
+        """
+        The comparisons that did not match -- why this is not exact.
+
+        STRUCTURE, NOT PROSE. This used to return sentences like "different
+        colour (blue, not black)", composed here. That put the one piece of
+        text the tiered results exist to produce -- the explanation of WHY a
+        candidate differs -- permanently in English, on a site whose default
+        language is Arabic, where no frontend translation could reach it.
+
+        A sentence is a rendering decision and it belongs to whoever knows the
+        reader's language. The engine reports which attribute differed and
+        what the two values were; the client writes the sentence.
+        """
+        return tuple(c for c in self.comparisons if not c.matched)
 
     @property
     def is_usable(self) -> bool:
