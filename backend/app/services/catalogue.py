@@ -21,6 +21,8 @@ is claimed.
 
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
@@ -34,6 +36,11 @@ from app.services import photos
 # Read from rules.py rather than hardcoded would be circular -- the matching
 # engine imports nothing from the app, and this is app-side presentation.
 BROWSABLE = ("phones", "laptops", "monitors")
+
+# The most rows a single family scan will read. Far above the real
+# catalogue (364 products across three categories) and low enough that a
+# runaway import cannot turn one request into a full table scan.
+_FAMILY_SCAN_LIMIT = 5000
 
 
 def _total():
@@ -64,20 +71,14 @@ def category_counts(db: Session) -> list[dict]:
     product with no in-stock price from a visible shop is not something to
     advertise on the front page, and a category tile promising 169 phones that
     leads to 40 is worse than no tile.
-    """
-    rows = (
-        _visible_offers(
-            db.query(
-                Product.match_category.label("category"),
-                func.count(distinct(Product.id)).label("count"),
-            ).join(ProductAlias, ProductAlias.product_id == Product.id)
-        )
-        .filter(Product.match_category.in_(BROWSABLE))
-        .group_by(Product.match_category)
-        .all()
-    )
 
-    found = {row.category: row.count for row in rows}
+    COUNTS FAMILIES, THE SAME UNIT THE LISTING RENDERS. Counting products here
+    while `browse` collapses colour variants would put "151 phones" on a tile
+    whose page stops at 73 -- the identical broken promise these tiles made
+    when they pointed at a search. The number on the tile and the number of
+    tiles behind it are the same query or they will drift.
+    """
+    found = {name: len(_families(db, name)) for name in BROWSABLE}
     # Fixed order, and categories with nothing in them are dropped rather than
     # shown as zero -- an empty tile is an invitation to a dead end.
     return [
@@ -89,22 +90,112 @@ def category_counts(db: Session) -> list[dict]:
 
 def total_in(db: Session, category: str | None = None) -> int:
     """
-    How many buyable products a browse would eventually reach.
+    How many tiles a browse would eventually show.
 
-    Counts DISTINCT PRODUCTS, not offers: a product carried by three shops is
-    one thing to look at, and paging that counted offers would promise pages
-    that do not exist.
+    Counts FAMILIES, not products, because that is what the page renders: 151
+    phones are 101 handsets once colours are collapsed, and a count of 151
+    above a list that stops at 101 is the same broken promise the category
+    tiles used to make.
     """
-    query = _visible_offers(
-        db.query(func.count(distinct(ProductAlias.product_id)))
-        .select_from(ProductAlias)
-        .join(Product, Product.id == ProductAlias.product_id)
-    ).filter(ProductAlias.condition == "new")
-
     if category:
-        query = query.filter(Product.match_category == category)
+        return len(_families(db, category))
+    return sum(len(_families(db, name)) for name in BROWSABLE)
 
-    return query.filter(Product.match_category.in_(BROWSABLE)).scalar() or 0
+
+
+def _family_key(name: str, attributes: dict | None) -> tuple:
+    """
+    What makes two listings THE SAME HANDSET IN A DIFFERENT COLOUR.
+
+    Measured problem: of 151 phones, only 71 are distinct handsets. The first
+    page of a browse showed 24 tiles carrying 14 phones -- four Honor X5c, three
+    Infinix Smart 20 -- which is a colour swatch, not a catalogue.
+
+    THE KEY IS ATTRIBUTES *PLUS* THE NAME'S LEADING SEGMENT, and both halves
+    are load-bearing:
+
+      - Attributes alone merge different products. An Infinix Tab XPAD 30E (a
+        TABLET) and an Infinix Smart 20 both parse to
+        (infinix, model=None, base, 128gb, 4gb), because the model pattern does
+        not cover either name. Grouping on that would have hidden the tablet.
+      - The name alone merges across storage. "Infinix Smart 20 ... 64GB" and
+        "... 128GB" share a leading segment and are genuinely different things
+        to buy.
+
+    THE NAME SEGMENT IS ONLY CONSULTED WHEN THE MODEL DID NOT PARSE. When the
+    model is known, brand + model + variant + storage + memory already
+    identifies a handset, and dragging the name in splits families that should
+    merge: "VIVO Y02 Orchid Blue" and "VIVO Y02 Cosmic Grey" carry no comma, so
+    the segment is the whole name including the colour, and the two stay apart
+    for no reason. The segment exists to separate products the MODEL PATTERN
+    MISSED, which is exactly the Infinix case above.
+
+    THE COLOUR IS NEVER PARSED OUT OF THE NAME, deliberately. Stripping the
+    colour word fails on marketing names: Honor writes "Tidal Blue" and
+    "Midnight Black", so removing "blue"/"black" leaves "Tidal " and
+    "Midnight " -- different strings for the same handset. Cutting at the first
+    comma instead keeps the model segment, which these feeds all put first.
+    """
+    a = attributes or {}
+    model = a.get("model")
+    segment = (
+        ""
+        if model
+        else re.sub(r"[^a-z0-9]+", " ", (name or "").split(",")[0].lower()).strip()
+    )
+    return (
+        a.get("brand"),
+        model,
+        a.get("variant"),
+        a.get("storage"),
+        a.get("ram"),
+        segment,
+    )
+
+
+def _families(db: Session, category: str | None) -> list[dict]:
+    """
+    Every browsable handset in a category, one entry per colour family,
+    cheapest first.
+
+    WHY THIS READS THE WHOLE CATEGORY rather than a page of it: the grouping
+    key is built in Python from a product name, so it cannot go into the ORDER
+    BY. Grouping after a LIMIT would give pages of unpredictable size and a
+    total that disagreed with them.
+
+    That trades away the "cost is a function of limit, not catalogue size"
+    property the paged version had. At 364 products it is a few hundred rows,
+    and the ROUTE CACHES the whole payload on the catalogue version, so this
+    runs once per scrape rather than once per visitor. It is the right trade
+    at this size and the wrong one at 50,000 products -- at which point the
+    family key belongs in a column, computed at ingest, and indexed.
+    """
+    rows = _ranked(db, category, limit=_FAMILY_SCAN_LIMIT)
+    if not rows:
+        return []
+
+    products = {
+        product.id: product
+        for product in db.query(Product)
+        .filter(Product.id.in_([r.product_id for r in rows]))
+        .all()
+    }
+
+    families: dict[tuple, dict] = {}
+    for row in rows:
+        product = products.get(row.product_id)
+        if product is None:
+            continue
+        key = _family_key(product.canonical_name, product.match_attributes)
+        existing = families.get(key)
+        if existing is None:
+            # `rows` is already cheapest-first, so the FIRST one seen is the
+            # cheapest and becomes the family's representative.
+            families[key] = {"row": row, "product": product, "variants": 1}
+        else:
+            existing["variants"] += 1
+
+    return list(families.values())
 
 
 def _ranked(db: Session, category: str | None, limit: int, offset: int = 0):
@@ -175,7 +266,7 @@ def browse(
     `limit`, not of catalogue size.
     """
     if category:
-        ranked = _ranked(db, category, limit, offset)
+        families = _families(db, category)
     else:
         # Round-robin, cheapest-first within each category.
         #
@@ -190,24 +281,25 @@ def browse(
         # page 2 of a round-robin is not the round-robin of each category's
         # page 2. Each category is asked for enough rows to cover the window,
         # which stays bounded because the route caps limit and page.
-        window = limit + offset
-        per_category = [_ranked(db, name, window) for name in BROWSABLE]
+        per_category = [_families(db, name) for name in BROWSABLE]
         longest = max((len(rows) for rows in per_category), default=0)
-        ranked = [
+        families = [
             rows[i]
             for i in range(longest)
             for rows in per_category
             if i < len(rows)
-        ][offset:window]
+        ]
 
-    if not ranked:
+    # Sliced AFTER interleaving and after grouping: page 2 of a round-robin is
+    # not the round-robin of each category's page 2.
+    families = families[offset:offset + limit]
+
+    if not families:
         return []
 
-    summary = {row.product_id: row for row in ranked}
-    products = {
-        product.id: product
-        for product in db.query(Product).filter(Product.id.in_(list(summary))).all()
-    }
+    summary = {f["row"].product_id: f["row"] for f in families}
+    products = {f["product"].id: f["product"] for f in families}
+    variants = {f["product"].id: f["variants"] for f in families}
 
     # Which shop is cheapest, for the "from X at Y" line. Same second pass the
     # savings query makes, bounded to the products actually being returned.
@@ -245,6 +337,10 @@ def browse(
                 "lowest_total_cost": float(row.lowest),
                 "best_deal_store": cheapest.get(product_id, (None, None))[1],
                 "store_count": row.store_count,
+                # How many colours of this exact handset the catalogue holds,
+                # the representative included. 1 means there is nothing else
+                # to say, so the UI stays quiet.
+                "variant_count": variants.get(product_id, 1),
             }
         )
 

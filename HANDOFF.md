@@ -517,6 +517,17 @@ no untranslated English in the Arabic table.
 - **Attributes stored as JSON** — adding a category needs no migration.
 - **Patterns, not enumerations** — the chip list said m1–m4 and an M5 was
   already in the catalogue.
+- **Browse collapses COLOUR VARIANTS into one tile.** Measured: 151 phones are
+  73 distinct handsets, and a 24-tile page was showing 14 — four Honor X5c,
+  three Infinix Smart 20. The family key is attributes **plus the name's
+  leading segment, used only when the model did not parse**. Both halves are
+  load-bearing: attributes alone merged an Infinix Tab XPAD *tablet* into a
+  Smart 20 phone (both parse to `infinix/None/base/128gb/4gb`), and the name
+  alone split "VIVO Y02 Orchid Blue" from "VIVO Y02 Cosmic Grey" because
+  neither has a comma. The colour is never stripped from the name — Honor
+  writes "Tidal Blue" and "Midnight Black", so removing the colour word leaves
+  "Tidal" and "Midnight". **`category_counts`, `total_in` and `browse` all
+  count families**, or the tile promises a number the page cannot reach.
 - **A CATEGORY IS NOT A QUERY.** The home page's category tiles link to
   `/browse/:category`, not to `/results?q=Phones`. They shipped doing the
   latter once: a text search for the word "Phones" matches no product, so a

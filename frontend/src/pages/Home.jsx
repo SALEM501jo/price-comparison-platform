@@ -31,6 +31,12 @@ export default function Home() {
   const [dealsLoading, setDealsLoading] = useState(true);
   const [catalogue, setCatalogue] = useState({ categories: [], products: [] });
   const [browseLoading, setBrowseLoading] = useState(true);
+  // The browse strip pages in place rather than sending someone away: a
+  // visitor who is still deciding what they want has not chosen a category
+  // yet, so "show me more of everything" is the useful next step.
+  const [browsePage, setBrowsePage] = useState(1);
+  const [browseMore, setBrowseMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -49,11 +55,12 @@ export default function Home() {
       // Both sections are decoration in the strict sense: a failure here must
       // never stop someone searching.
       setDeals(dealsResult.status === 'fulfilled' ? dealsResult.value : []);
-      setCatalogue(
+      const browsed =
         browseResult.status === 'fulfilled'
           ? browseResult.value
-          : { categories: [], products: [] },
-      );
+          : { categories: [], products: [] };
+      setCatalogue(browsed);
+      setBrowseMore(Boolean(browsed.has_more));
       setDealsLoading(false);
       setBrowseLoading(false);
     };
@@ -61,6 +68,27 @@ export default function Home() {
     load();
     return () => controller.abort();
   }, []);
+
+  const showMore = async () => {
+    const next = browsePage + 1;
+    setLoadingMore(true);
+    try {
+      const more = await browseCatalogue({ limit: 12, page: next });
+      setCatalogue((current) => ({
+        ...current,
+        products: [...current.products, ...more.products],
+      }));
+      setBrowseMore(Boolean(more.has_more));
+      setBrowsePage(next);
+    } catch {
+      // Same rule as the initial load: this section is decoration, and a
+      // failure here must never break the page somebody came here to search
+      // from. The button simply stops offering more.
+      setBrowseMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const hasDeals = dealsLoading || deals.length > 0;
 
@@ -112,6 +140,19 @@ export default function Home() {
             products={catalogue.products}
             loading={browseLoading}
           />
+
+          {browseMore && (
+            <div className="mt-8 flex justify-center">
+              <button
+                type="button"
+                onClick={showMore}
+                disabled={loadingMore}
+                className="min-h-11 rounded-lg border border-gray-300 px-5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+              >
+                {loadingMore ? t('common.loading') : t('browse.showMore')}
+              </button>
+            </div>
+          )}
         </section>
       )}
     </div>

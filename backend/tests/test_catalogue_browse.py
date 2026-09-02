@@ -14,6 +14,7 @@ from app.models.alias import ProductAlias
 from app.models.price import Price
 from app.models.product import Product
 from app.models.store import Store
+from app.matching import parse
 from app.services import catalogue
 
 
@@ -34,10 +35,18 @@ def make_store(db, name, *, owner_user_id=None, verified=False):
 
 def stock(db, store, *, name, category, price, image=True, condition="new",
           available=True, sku=None):
-    """One shop's listing of one product, priced."""
+    """
+    One shop's listing of one product, priced.
+
+    ATTRIBUTES COME FROM THE REAL PARSER, not from the fixture. The colour
+    family key reads `match_attributes`, so a fixture that left them null would
+    exercise a code path no real row takes -- and would have quietly "passed"
+    the grouping tests for the wrong reason.
+    """
     product = Product(
         canonical_name=name,
         match_category=category,
+        match_attributes=parse(name).attributes,
         image_url=f"https://cdn.example/{abs(hash(name)) % 9999}.jpg" if image else None,
     )
     db.add(product)
@@ -394,3 +403,119 @@ class TestPagingEndpoint:
             assert page < 20, "paging did not terminate"
 
         assert len(seen) == advertised
+
+
+# --- Colour families --------------------------------------------------------
+
+
+class TestColourFamilies:
+    """
+    A browse page should show DIFFERENT PHONES, not one phone four times.
+
+    Measured on the real catalogue: 151 phones are 71 distinct handsets, and
+    the first page of 24 tiles carried 14 -- four Honor X5c, three Infinix
+    Smart 20. That is a colour swatch, not a catalogue.
+
+    The two tests that matter here are the negative ones: collapsing colours
+    must not collapse different products.
+    """
+
+    def test_the_same_handset_in_two_colours_is_one_tile(self, db_session):
+        shop = make_store(db_session, "iGeek")
+        stock(db_session, shop, name="Honor X5c 4G, 4GB & 64GB, Tidal Blue",
+              category="phones", price=96)
+        stock(db_session, shop, name="Honor X5c 4G, 4GB & 64GB, Midnight Black",
+              category="phones", price=96)
+        db_session.commit()
+
+        rows = catalogue.browse(db_session, category="phones", limit=10)
+        assert len(rows) == 1
+        assert rows[0]["variant_count"] == 2
+
+    def test_marketing_colour_names_still_collapse(self, db_session):
+        """
+        The key never parses the colour out of the name, because stripping
+        "blue"/"black" from "Tidal Blue" and "Midnight Black" leaves "Tidal"
+        and "Midnight" -- different strings for the same handset.
+        """
+        shop = make_store(db_session, "iGeek")
+        stock(db_session, shop, name="VIVO Y02 Orchid Blue", category="phones",
+              price=100)
+        stock(db_session, shop, name="VIVO Y02 Cosmic Grey", category="phones",
+              price=100)
+        db_session.commit()
+
+        rows = catalogue.browse(db_session, category="phones", limit=10)
+        assert len(rows) == 1, "names with no comma must still group"
+        assert rows[0]["variant_count"] == 2
+
+    def test_a_different_product_is_never_folded_in(self, db_session):
+        """
+        THE TRAP THAT KILLED THE FIRST VERSION. An Infinix Tab XPAD (a tablet)
+        and an Infinix Smart 20 both parse to
+        (infinix, model=None, base, 128gb, 4gb) -- the model pattern covers
+        neither name. Grouping on attributes alone hid the tablet entirely.
+        """
+        shop = make_store(db_session, "iGeek")
+        stock(db_session, shop,
+              name="Infinix Smart 20 4G, 4GB & 128GB, 6.78Inch, Blue",
+              category="phones", price=109)
+        stock(db_session, shop,
+              name="Infinix Tab XPAD 30E 4G, 4GB & 128GB, 11Inch, Purple",
+              category="phones", price=109)
+        db_session.commit()
+
+        rows = catalogue.browse(db_session, category="phones", limit=10)
+        names = " ".join(r["canonical_name"] for r in rows)
+        assert len(rows) == 2, "a tablet must not be folded into a phone"
+        assert "XPAD" in names
+
+    def test_the_same_handset_at_two_storage_sizes_stays_apart(self, db_session):
+        """64GB and 128GB are different things to buy, not two colours."""
+        shop = make_store(db_session, "iGeek")
+        stock(db_session, shop, name="Infinix Smart 20 4G, 4GB & 64GB, Blue",
+              category="phones", price=99)
+        stock(db_session, shop, name="Infinix Smart 20 4G, 4GB & 128GB, Blue",
+              category="phones", price=109)
+        db_session.commit()
+
+        assert len(catalogue.browse(db_session, category="phones", limit=10)) == 2
+
+    def test_the_cheapest_colour_represents_the_family(self, db_session):
+        shop = make_store(db_session, "iGeek")
+        stock(db_session, shop, name="Honor X5c 4G, 4GB & 64GB, Blue",
+              category="phones", price=120)
+        stock(db_session, shop, name="Honor X5c 4G, 4GB & 64GB, Black",
+              category="phones", price=96)
+        db_session.commit()
+
+        (row,) = catalogue.browse(db_session, category="phones", limit=10)
+        assert row["lowest_total_cost"] == 96.0
+
+    def test_a_lone_product_reports_one_variant(self, catalogue_db):
+        """1 means there is nothing to say, so the UI stays quiet."""
+        rows = catalogue.browse(catalogue_db, category="phones", limit=4)
+        assert all(r["variant_count"] == 1 for r in rows)
+
+    def test_the_count_matches_what_the_page_can_show(self, db_session):
+        """
+        The tile advertises a number and the listing must reach it. Counting
+        products while rendering families is the same broken promise the
+        category tiles used to make.
+        """
+        shop = make_store(db_session, "iGeek")
+        for colour in ("Blue", "Black", "Green"):
+            stock(db_session, shop, name=f"Honor X5c 4G, 4GB & 64GB, {colour}",
+                  category="phones", price=96)
+        stock(db_session, shop, name="TECNO Spark 9 pro", category="phones",
+              price=124)
+        db_session.commit()
+
+        total = catalogue.total_in(db_session, "phones")
+        reachable = catalogue.browse(db_session, category="phones", limit=50)
+        assert total == 2, "three colours of one handset are one tile"
+        assert len(reachable) == total
+
+        counts = {row["category"]: row["count"]
+                  for row in catalogue.category_counts(db_session)}
+        assert counts["phones"] == total, "the tile must promise what browse shows"

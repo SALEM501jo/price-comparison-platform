@@ -60,6 +60,8 @@ const translations = {
     'browse.showingOf': 'عرض {shown} من {total}',
     'browse.empty': 'لا توجد منتجات في هذا القسم بعد.',
     'browse.loadError': 'تعذّر تحميل المنتجات.',
+    'browse.moreColours': 'متوفر بـ{count} ألوان أخرى',
+    'browse.moreColoursOne': 'متوفر بلون آخر',
 
     // --- Search
     'search.placeholder': 'ابحث — اكتب سعة التخزين واللون',
@@ -538,6 +540,8 @@ const translations = {
     'browse.showingOf': 'Showing {shown} of {total}',
     'browse.empty': 'Nothing in this category yet.',
     'browse.loadError': 'Could not load the products.',
+    'browse.moreColours': 'in {count} more colours',
+    'browse.moreColoursOne': 'in one more colour',
 
     'search.placeholder': 'Search — try including storage and colour',
     'search.button': 'Search',

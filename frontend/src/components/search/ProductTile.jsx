@@ -69,6 +69,17 @@ export default function ProductTile({ product, saving = null }) {
             : t('common.inclDelivery')}
         </p>
 
+        {/* This tile stands for a family of colours. Saying so is what keeps
+            the collapse honest: the other colours are still in the catalogue,
+            they are just not worth four identical-looking tiles in a row. */}
+        {product.variant_count > 1 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            {product.variant_count === 2
+              ? t('browse.moreColoursOne')
+              : t('browse.moreColours', { count: product.variant_count - 1 })}
+          </p>
+        )}
+
         {/* The dearest price is CONTEXT, not a struck-through "was". It is a
             real price at a real shop, and striking it through would be the
             invented-RRP pattern a comparison site exists to see past. */}
