@@ -25,6 +25,7 @@ from app.schemas.search import SearchSuggestion, TieredSearchResponse
 from app.matching import arabic, normalize
 from app.matching import spelling
 from app.services import photos
+from app.services import catalogue
 from app.services.deals import best_savings
 from app.services.search import escape_like, search_products
 from app.config import get_settings
@@ -117,6 +118,44 @@ async def deals(
     results = best_savings(db, limit=limit)
     await store_json(cache_key, results)
     return results
+
+
+@router.get("/browse")
+async def browse(
+    category: Optional[str] = Query(None, max_length=50),
+    limit: int = Query(12, ge=1, le=48),
+    db: Session = Depends(get_db),
+    _: None = Depends(get_rate_limited),
+):
+    """
+    A slice of the catalogue for someone who has not searched yet.
+
+    WHY THIS EXISTS: the home page was built entirely on /deals, which can
+    only show a product carried by two or more shops -- exactly ONE product in
+    the real catalogue. A landing page with 423 products behind it rendered a
+    single card. Savings answer "where is shopping around worth it"; this
+    answers "what do you have", and they are different questions.
+
+    Declared BEFORE /{product_id} for the same reason /deals and /suggest are:
+    FastAPI matches in order, so the dynamic route would swallow "browse" and
+    fail to validate it as an integer.
+
+    Cached on the catalogue version like the deals query, so a scrape or a
+    merchant edit invalidates it and nothing else has to.
+    """
+    version = await catalogue_version()
+    cache_key = f"browse:v1:{version}:{category or 'all'}:{limit}"
+
+    cached = await cached_json(cache_key)
+    if cached is not None:
+        return cached
+
+    payload = {
+        "categories": catalogue.category_counts(db),
+        "products": catalogue.browse(db, category=category, limit=limit),
+    }
+    await store_json(cache_key, payload)
+    return payload
 
 
 @router.get("/suggest", response_model=List[SearchSuggestion])

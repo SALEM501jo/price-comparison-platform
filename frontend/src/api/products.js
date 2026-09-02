@@ -58,6 +58,28 @@ export const getDeals = async (limit = 8, config = {}) => {
 };
 
 /**
+ * A slice of the catalogue, for a visitor who has not searched yet.
+ *
+ * Returns { categories, products }. Separate from getDeals because the two
+ * answer different questions: deals say where shopping around is worth it and
+ * can only cover products carried by two or more shops, which is one product
+ * today. This says what the catalogue holds.
+ *
+ * With no category the products come back INTERLEAVED across phones, laptops
+ * and monitors -- a single global sort by price returns nothing but monitors.
+ */
+export const browseCatalogue = async (
+  { category, limit = 12 } = {},
+  config = {},
+) => {
+  const { data } = await api.get('/products/browse', {
+    ...config,
+    params: { ...(category ? { category } : {}), limit },
+  });
+  return data;
+};
+
+/**
  * Type-ahead suggestions, drawn from the catalogue itself.
  *
  * Every suggestion is a real product, so clicking one is guaranteed to lead

@@ -49,6 +49,14 @@ const translations = {
     'home.elsewhere': 'في متاجر أخرى',
     'home.comparedAcross': 'مقارنة بين {count} متاجر',
 
+    // --- Browsing the catalogue (home page, under the savings)
+    'browse.title': 'تصفّح المتاجر',
+    'browse.hint': 'أسعار حقيقية من متاجر أردنية',
+    'browse.count': '{count} منتج',
+    'category.phones': 'هواتف',
+    'category.laptops': 'لابتوبات',
+    'category.monitors': 'شاشات',
+
     // --- Search
     'search.placeholder': 'ابحث — اكتب سعة التخزين واللون',
     'search.button': 'بحث',
@@ -514,6 +522,14 @@ const translations = {
     'home.upTo': 'up to',
     'home.elsewhere': 'elsewhere',
     'home.comparedAcross': 'compared across {count} shops',
+
+    // --- Browsing the catalogue (home page, under the savings)
+    'browse.title': 'Browse the shops',
+    'browse.hint': 'Real prices from Jordanian shops',
+    'browse.count': '{count} products',
+    'category.phones': 'Phones',
+    'category.laptops': 'Laptops',
+    'category.monitors': 'Monitors',
 
     'search.placeholder': 'Search — try including storage and colour',
     'search.button': 'Search',

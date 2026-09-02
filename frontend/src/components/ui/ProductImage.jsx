@@ -27,6 +27,10 @@ const SIZES = {
   card: 'h-20 w-20 rounded-lg sm:h-24 sm:w-24',
   // The product page.
   hero: 'aspect-square w-full rounded-xl',
+  // A grid tile. Square and full-bleed: the card rounds its own corners and
+  // clips this, so the image must not round them again or the two radii
+  // disagree by a pixel along every edge.
+  tile: 'aspect-square w-full',
 };
 
 function Placeholder({ className, label }) {
