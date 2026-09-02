@@ -517,6 +517,16 @@ no untranslated English in the Arabic table.
 - **Attributes stored as JSON** — adding a category needs no migration.
 - **Patterns, not enumerations** — the chip list said m1–m4 and an M5 was
   already in the catalogue.
+- **A CATEGORY IS NOT A QUERY.** The home page's category tiles link to
+  `/browse/:category`, not to `/results?q=Phones`. They shipped doing the
+  latter once: a text search for the word "Phones" matches no product, so a
+  tile advertising 151 products led to "Nothing matched that search", and the
+  Laptops tile returned a single monitor whose title contains "for Laptops".
+  Search answers "which products match these words"; browse answers "show me
+  what you filed under this" — no query, no scoring, no tiers. `Browse.jsx` is
+  its own page for that reason. A test asserts the tiles never route through
+  `/results` or carry a `q=`, because the broken version rendered perfectly
+  and only failed when clicked.
 - **Pagination is per tier** — paging a flattened list would push the exact
   match to page two.
 - **Password reset is a LINK, never a mailed password.** Resetting revokes

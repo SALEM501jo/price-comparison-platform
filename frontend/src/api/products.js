@@ -69,12 +69,16 @@ export const getDeals = async (limit = 8, config = {}) => {
  * and monitors -- a single global sort by price returns nothing but monitors.
  */
 export const browseCatalogue = async (
-  { category, limit = 12 } = {},
+  { category, limit = 12, page } = {},
   config = {},
 ) => {
   const { data } = await api.get('/products/browse', {
     ...config,
-    params: { ...(category ? { category } : {}), limit },
+    params: {
+      ...(category ? { category } : {}),
+      ...(page && page > 1 ? { page } : {}),
+      limit,
+    },
   });
   return data;
 };

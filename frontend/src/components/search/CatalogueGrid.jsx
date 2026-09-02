@@ -34,10 +34,12 @@ export function CategoryTiles({ categories }) {
       {categories.map(({ category, count }) => (
         <Link
           key={category}
-          // Straight to the results page with the category filter applied.
-          // The query is the category word itself so the results page has
-          // something to echo back as "showing results for".
-          to={`/results?q=${encodeURIComponent(t(CATEGORY_LABEL[category] ?? category))}&category=${category}`}
+          // A CATEGORY IS NOT A QUERY. This used to link to
+          // /results?q=Phones, which runs a text search for the word
+          // "Phones" -- no product is called that, so a tile advertising 151
+          // products led to "Nothing matched that search", and the Laptops
+          // tile returned one monitor whose title contains "for Laptops".
+          to={`/browse/${category}`}
           className="flex min-h-11 flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-4 text-center transition hover:border-brand-400 hover:shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:hover:border-brand-600"
         >
           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">

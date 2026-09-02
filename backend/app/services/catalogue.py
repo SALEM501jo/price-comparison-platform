@@ -87,7 +87,27 @@ def category_counts(db: Session) -> list[dict]:
     ]
 
 
-def _ranked(db: Session, category: str | None, limit: int):
+def total_in(db: Session, category: str | None = None) -> int:
+    """
+    How many buyable products a browse would eventually reach.
+
+    Counts DISTINCT PRODUCTS, not offers: a product carried by three shops is
+    one thing to look at, and paging that counted offers would promise pages
+    that do not exist.
+    """
+    query = _visible_offers(
+        db.query(func.count(distinct(ProductAlias.product_id)))
+        .select_from(ProductAlias)
+        .join(Product, Product.id == ProductAlias.product_id)
+    ).filter(ProductAlias.condition == "new")
+
+    if category:
+        query = query.filter(Product.match_category == category)
+
+    return query.filter(Product.match_category.in_(BROWSABLE)).scalar() or 0
+
+
+def _ranked(db: Session, category: str | None, limit: int, offset: int = 0):
     """
     The cheapest `limit` buyable products, optionally within one category.
 
@@ -123,12 +143,19 @@ def _ranked(db: Session, category: str | None, limit: int):
             func.min(total).asc(),
             ProductAlias.product_id.asc(),
         )
+        .offset(offset)
         .limit(limit)
         .all()
     )
 
 
-def browse(db: Session, *, category: str | None = None, limit: int = 12) -> list[dict]:
+def browse(
+    db: Session,
+    *,
+    category: str | None = None,
+    limit: int = 12,
+    offset: int = 0,
+) -> list[dict]:
     """
     A sample of the catalogue: real products, with prices and pictures.
 
@@ -148,7 +175,7 @@ def browse(db: Session, *, category: str | None = None, limit: int = 12) -> list
     `limit`, not of catalogue size.
     """
     if category:
-        ranked = _ranked(db, category, limit)
+        ranked = _ranked(db, category, limit, offset)
     else:
         # Round-robin, cheapest-first within each category.
         #
@@ -158,14 +185,20 @@ def browse(db: Session, *, category: str | None = None, limit: int = 12) -> list
         # five and the page comes back half empty. Over-fetching and trimming
         # is what lets a deep category cover for a thin one. Still bounded:
         # three queries, each carrying the same LIMIT.
-        per_category = [_ranked(db, name, limit) for name in BROWSABLE]
+        #
+        # Offset is applied AFTER interleaving, not pushed into each query:
+        # page 2 of a round-robin is not the round-robin of each category's
+        # page 2. Each category is asked for enough rows to cover the window,
+        # which stays bounded because the route caps limit and page.
+        window = limit + offset
+        per_category = [_ranked(db, name, window) for name in BROWSABLE]
         longest = max((len(rows) for rows in per_category), default=0)
         ranked = [
             rows[i]
             for i in range(longest)
             for rows in per_category
             if i < len(rows)
-        ][:limit]
+        ][offset:window]
 
     if not ranked:
         return []

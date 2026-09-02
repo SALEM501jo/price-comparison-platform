@@ -8,6 +8,7 @@ import VerifyBanner from './components/auth/VerifyBanner';
 import NotFound from './pages/NotFound';
 import Home from './pages/Home';
 import Results from './pages/Results';
+import Browse from './pages/Browse';
 import ProductDetail from './pages/ProductDetail';
 import Wishlist from './pages/Wishlist';
 import Alerts from './pages/Alerts';
@@ -34,6 +35,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/results" element={<Results />} />
+                <Route path="/browse/:category" element={<Browse />} />
                 <Route path="/product/:productId" element={<ProductDetail />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />

@@ -124,6 +124,7 @@ async def deals(
 async def browse(
     category: Optional[str] = Query(None, max_length=50),
     limit: int = Query(12, ge=1, le=48),
+    page: int = Query(1, ge=1, le=100),
     db: Session = Depends(get_db),
     _: None = Depends(get_rate_limited),
 ):
@@ -144,15 +145,25 @@ async def browse(
     merchant edit invalidates it and nothing else has to.
     """
     version = await catalogue_version()
-    cache_key = f"browse:v1:{version}:{category or 'all'}:{limit}"
+    cache_key = f"browse:v2:{version}:{category or 'all'}:{limit}:{page}"
 
     cached = await cached_json(cache_key)
     if cached is not None:
         return cached
 
+    offset = (page - 1) * limit
+    total = catalogue.total_in(db, category)
+    products = catalogue.browse(db, category=category, limit=limit, offset=offset)
+
     payload = {
         "categories": catalogue.category_counts(db),
-        "products": catalogue.browse(db, category=category, limit=limit),
+        "products": products,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        # Computed from the total rather than from len(products): a short
+        # final page is not the same fact as "there is nothing after this".
+        "has_more": offset + len(products) < total,
     }
     await store_json(cache_key, payload)
     return payload

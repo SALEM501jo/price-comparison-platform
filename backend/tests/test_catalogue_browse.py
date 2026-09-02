@@ -274,3 +274,123 @@ class TestBrowseEndpoint:
         browsed = client.get("/products/browse", params={"limit": 12}).json()
         assert browsed["products"], "single-shop stock must be browsable"
         assert client.get("/products/deals").json() == []
+
+
+# --- Paging -----------------------------------------------------------------
+
+
+class TestPaging:
+    """
+    A category tile advertises a number -- "151 products" -- so the page behind
+    it has to be able to reach all 151. Everything here exists because that
+    promise is on the home page.
+    """
+
+    def test_the_total_counts_products_not_offers(self, catalogue_db):
+        """
+        A product carried by three shops is ONE thing to look at. Counting
+        offers would promise pages that do not exist.
+        """
+        shop_a = catalogue_db.query(Store).first()
+        shop_b = make_store(catalogue_db, "Second Shop")
+
+        # Same product name in a second shop: dedup gives it its own alias and
+        # price but it must not add to the count.
+        product = stock(catalogue_db, shop_a, name="Shared Phone",
+                        category="phones", price=500)
+        alias = ProductAlias(
+            product_id=product.id, store_id=shop_b.id,
+            store_product_name="Shared Phone", store_product_id="sku-b",
+            condition="new",
+        )
+        catalogue_db.add(alias)
+        catalogue_db.flush()
+        catalogue_db.add(Price(alias_id=alias.id, price=490, delivery_cost=0,
+                               availability=True))
+        catalogue_db.commit()
+
+        assert catalogue.total_in(catalogue_db, "phones") == 5
+
+    def test_the_total_respects_the_same_filters_as_the_listing(self, catalogue_db):
+        pending = make_store(catalogue_db, "Pending", owner_user_id=1, verified=False)
+        stock(catalogue_db, pending, name="Hidden Phone", category="phones", price=1)
+        stock(catalogue_db, catalogue_db.query(Store).first(),
+              name="Used Phone", category="phones", price=1, condition="used")
+        catalogue_db.commit()
+
+        assert catalogue.total_in(catalogue_db, "phones") == 4
+
+    def test_a_second_page_does_not_repeat_the_first(self, catalogue_db):
+        first = catalogue.browse(catalogue_db, category="phones", limit=2, offset=0)
+        second = catalogue.browse(catalogue_db, category="phones", limit=2, offset=2)
+        assert len(first) == len(second) == 2
+        assert not {r["id"] for r in first} & {r["id"] for r in second}
+
+    def test_paging_the_mixed_view_keeps_interleaving(self, catalogue_db):
+        """
+        Page 2 of a round-robin is NOT the round-robin of each category's page
+        2, which is why the offset is applied after interleaving rather than
+        pushed into each query.
+        """
+        first = catalogue.browse(catalogue_db, limit=3, offset=0)
+        second = catalogue.browse(catalogue_db, limit=3, offset=3)
+        assert {r["category"] for r in second} == {"phones", "laptops", "monitors"}
+        assert not {r["id"] for r in first} & {r["id"] for r in second}
+
+    def test_paging_past_the_end_is_empty_rather_than_an_error(self, catalogue_db):
+        assert catalogue.browse(catalogue_db, category="phones",
+                                limit=10, offset=500) == []
+
+
+class TestPagingEndpoint:
+    def test_it_reports_the_total_and_whether_more_remain(self, client, catalogue_db):
+        body = client.get("/products/browse",
+                          params={"category": "phones", "limit": 2}).json()
+        assert body["total"] == 4
+        assert body["page"] == 1
+        assert len(body["products"]) == 2
+        assert body["has_more"] is True
+
+    def test_the_last_page_says_there_is_no_more(self, client, catalogue_db):
+        """
+        has_more is computed from the TOTAL, not from a short page: a full
+        final page would otherwise claim there is another one after it.
+        """
+        body = client.get("/products/browse",
+                          params={"category": "phones", "limit": 2, "page": 2}).json()
+        assert len(body["products"]) == 2
+        assert body["has_more"] is False
+
+    def test_pages_do_not_overlap_over_http(self, client, catalogue_db):
+        one = client.get("/products/browse",
+                         params={"category": "phones", "limit": 2, "page": 1}).json()
+        two = client.get("/products/browse",
+                         params={"category": "phones", "limit": 2, "page": 2}).json()
+        assert not ({p["id"] for p in one["products"]}
+                    & {p["id"] for p in two["products"]})
+
+    def test_the_advertised_count_is_reachable(self, client, catalogue_db):
+        """
+        THE REGRESSION THIS MODULE EXISTS FOR. The home page tile says
+        "N products"; walking the pages must actually yield N. The tiles used
+        to link to a text SEARCH for the category word instead, which returned
+        nothing for phones and one unrelated monitor for laptops.
+        """
+        advertised = next(
+            row["count"]
+            for row in client.get("/products/browse").json()["categories"]
+            if row["category"] == "phones"
+        )
+
+        seen, page = set(), 1
+        while True:
+            body = client.get("/products/browse",
+                              params={"category": "phones", "limit": 2,
+                                      "page": page}).json()
+            seen.update(p["id"] for p in body["products"])
+            if not body["has_more"]:
+                break
+            page += 1
+            assert page < 20, "paging did not terminate"
+
+        assert len(seen) == advertised

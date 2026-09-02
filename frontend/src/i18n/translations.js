@@ -56,6 +56,10 @@ const translations = {
     'category.phones': 'هواتف',
     'category.laptops': 'لابتوبات',
     'category.monitors': 'شاشات',
+    'browse.showMore': 'عرض المزيد',
+    'browse.showingOf': 'عرض {shown} من {total}',
+    'browse.empty': 'لا توجد منتجات في هذا القسم بعد.',
+    'browse.loadError': 'تعذّر تحميل المنتجات.',
 
     // --- Search
     'search.placeholder': 'ابحث — اكتب سعة التخزين واللون',
@@ -530,6 +534,10 @@ const translations = {
     'category.phones': 'Phones',
     'category.laptops': 'Laptops',
     'category.monitors': 'Monitors',
+    'browse.showMore': 'Show more',
+    'browse.showingOf': 'Showing {shown} of {total}',
+    'browse.empty': 'Nothing in this category yet.',
+    'browse.loadError': 'Could not load the products.',
 
     'search.placeholder': 'Search — try including storage and colour',
     'search.button': 'Search',
