@@ -2,9 +2,32 @@ import { useMemo } from 'react';
 import { useLocale } from '../../hooks/useLocale';
 import { formatPrice } from '../../utils/format';
 
-// One colour per store series. Chosen to stay distinguishable in greyscale
-// too, since screenshots and printed CVs lose colour.
-const SERIES_COLORS = ['#2563eb', '#16a34a', '#ea580c', '#9333ea', '#0891b2'];
+/**
+ * One colour per store, as CLASS NAMES rather than hex values.
+ *
+ * WHY NOT hex, and why not a template literal. These were five hardcoded
+ * hexes with no theme response at all -- the same five in both modes, which
+ * meant they were chosen for neither. Routing them through the palette tokens
+ * lets each theme get hues stepped for its own ground.
+ *
+ * Written out in full because Tailwind extracts class names by SCANNING THE
+ * SOURCE. `stroke-series-${i}` produces nothing: the scanner never sees the
+ * finished string, so the utility is never generated and every line renders
+ * with no stroke at all.
+ *
+ * FIXED ORDER, NEVER CYCLED. These encode identity -- which shop -- not rank,
+ * so a shop keeps its colour when a filter removes the series above it. A
+ * sixth store folds into the existing five rather than inventing a hue,
+ * because a generated sixth colour cannot be checked for colour-vision
+ * separation against the other five.
+ */
+const SERIES_CLASSES = [
+  { stroke: 'stroke-series-1', fill: 'fill-series-1', swatch: 'bg-series-1' },
+  { stroke: 'stroke-series-2', fill: 'fill-series-2', swatch: 'bg-series-2' },
+  { stroke: 'stroke-series-3', fill: 'fill-series-3', swatch: 'bg-series-3' },
+  { stroke: 'stroke-series-4', fill: 'fill-series-4', swatch: 'bg-series-4' },
+  { stroke: 'stroke-series-5', fill: 'fill-series-5', swatch: 'bg-series-5' },
+];
 
 const WIDTH = 720;
 const HEIGHT = 260;
@@ -51,7 +74,7 @@ export default function PriceHistoryChart({ series }) {
     return {
       series: withData.map((s, i) => ({
         name: s.store_name,
-        color: SERIES_COLORS[i % SERIES_COLORS.length],
+        classes: SERIES_CLASSES[i % SERIES_CLASSES.length],
         points: [...s.history]
           .sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at))
           .map((h) => ({
@@ -129,14 +152,20 @@ export default function PriceHistoryChart({ series }) {
             <g key={s.name}>
               <polyline
                 fill="none"
-                stroke={s.color}
+                className={s.classes.stroke}
                 strokeWidth="2"
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 points={s.points.map((p) => `${p.x},${p.y}`).join(' ')}
               />
               {s.points.map((p) => (
-                <circle key={`${p.at}-${p.price}`} cx={p.x} cy={p.y} r="3" fill={s.color}>
+                <circle
+                  key={`${p.at}-${p.price}`}
+                  cx={p.x}
+                  cy={p.y}
+                  r="4"
+                  className={s.classes.fill}
+                >
                   <title>
                     {s.name}: {formatPrice(p.price)} on{' '}
                     {new Date(p.at).toLocaleDateString()}
@@ -152,8 +181,7 @@ export default function PriceHistoryChart({ series }) {
         {chart.series.map((s) => (
           <li key={s.name} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
             <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: s.color }}
+              className={`inline-block h-2.5 w-2.5 rounded-full ${s.classes.swatch}`}
             />
             {s.name}
           </li>

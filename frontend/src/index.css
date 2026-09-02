@@ -71,6 +71,14 @@
     --c-amber-50: 250 242 223;  /* #FAF2DF */
     --c-amber-100: 245 231 196; /* #F5E7C4 */
     --c-amber-700: 154 91 18;   /* #9A5B12 */
+
+    /* Chart series, light ground. Blue / orange / aqua / yellow / magenta,
+       every slot >= 3:1 against the card. */
+    --c-series-1: 42 120 214;   /* #2A78D6  4.22:1 */
+    --c-series-2: 235 104 52;   /* #EB6834  3.06:1 */
+    --c-series-3: 25 163 114;   /* #19A372  3.08:1 */
+    --c-series-4: 193 131 0;    /* #C18300  3.08:1 */
+    --c-series-5: 212 112 150;  /* #D47096  3.06:1 */
   }
 
   /* ------------------------------------------------------------------
@@ -121,6 +129,13 @@
     --c-amber-50: 255 251 235;
     --c-amber-100: 254 243 199;
     --c-amber-700: 180 83 9;
+
+    /* Same five hues, re-stepped for the dark card rather than flipped. */
+    --c-series-1: 57 135 229;   /* #3987E5 */
+    --c-series-2: 217 89 38;    /* #D95926 */
+    --c-series-3: 25 158 112;   /* #199E70 */
+    --c-series-4: 201 133 0;    /* #C98500 */
+    --c-series-5: 213 81 129;   /* #D55181 */
   }
 
   html {

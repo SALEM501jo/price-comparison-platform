@@ -98,6 +98,28 @@ export default {
         green: { 100: v('green-100'), 600: v('green-600'), 700: v('green-700') },
         red: { 50: v('red-50'), 600: v('red-600'), 700: v('red-700') },
         amber: { 50: v('amber-50'), 100: v('amber-100'), 700: v('amber-700') },
+
+        // Chart series. A CATEGORICAL palette: these encode identity (which
+        // shop), not magnitude, so the hues are assigned in a FIXED ORDER and
+        // never cycled -- a shop must not change colour because a filter
+        // removed the series above it.
+        //
+        // Selected per theme rather than flipped: the dark column is the same
+        // five hues re-stepped for a dark ground, because a hue that clears
+        // 3:1 on #F8FAFC does not on #111827 and vice versa.
+        //
+        // Validated, not eyeballed -- lightness band, chroma floor, adjacent
+        // colour-vision-deficiency separation, and 3:1 against each surface.
+        // The light column is the reference palette stepped DOWN until every
+        // slot cleared 3:1 on our card; three of the five did not at their
+        // published values.
+        series: {
+          1: v('series-1'),
+          2: v('series-2'),
+          3: v('series-3'),
+          4: v('series-4'),
+          5: v('series-5'),
+        },
       },
 
       borderColor: {

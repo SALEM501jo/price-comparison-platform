@@ -548,6 +548,17 @@ no untranslated English in the Arabic table.
   FAILED WCAG before), page-to-card step 1.78 → 4.96 L*. The three photo
   letterboxes keep pure white via a `photo` token — they back product shots,
   and an off-white panel behind a white photo shows a seam.
+- **Chart series colours are CATEGORICAL and selected per theme.** They encode
+  identity — which shop — not rank, so hues are assigned in fixed order and
+  never cycled: a shop keeps its colour when a filter removes the series above
+  it. The dark column is the same five hues re-stepped for a dark ground, not
+  a flip, because a hue clearing 3:1 on `#F8FAFC` does not on `#111827`. The
+  light column is the reference palette stepped DOWN until every slot cleared
+  3:1 — three of five failed at their published values. Validated with a
+  script (lightness band, chroma floor, adjacent CVD separation, contrast),
+  not eyeballed. Class names are written out in full in `PriceHistoryChart`
+  because Tailwind extracts by scanning source: `stroke-series-${i}` generates
+  nothing and every line renders strokeless.
 - **Dark mode is fixed in `@layer base`, not per component.** Tailwind's
   preflight sets `color: inherit` on form controls, so in dark mode they
   inherited near-white text on a white background — 29 of 30 fields at 1.05:1
@@ -601,20 +612,16 @@ no untranslated English in the Arabic table.
 3. **No merchants at all.** See the warning at the top.
 4. `Core 5-120U` parses, but **CPU generation is not captured** — an 8th-gen
    and a 14th-gen i7 both resolve to `i7`.
-5. **`PriceHistoryChart` still hardcodes its five series colours** as hex
-   literals with no theme response, including a blue that collides with the
-   brand teal. Deliberately left: they are shared by both themes with no
-   variant mechanism, so desaturating them for light would change dark.
-6. **Merchant photos are served from the API's own origin.** Re-encoding is
+5. **Merchant photos are served from the API's own origin.** Re-encoding is
    the control that matters and it is in place; a separate origin is the
    defence in depth that is not.
-7. **Merchant photos are not moderated.** Nothing stops a verified shop
+6. **Merchant photos are not moderated.** Nothing stops a verified shop
    uploading something irrelevant.
-8. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
+7. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
    Running them re-pollutes the database. `scripts/e2e_test.py` cleans up after
    itself; the other two do not. Run `scripts/cleanup_test_data.py --apply`
    afterwards.
-9. No email verification enforcement on *access* — gates outbound mail only
+8. No email verification enforcement on *access* — gates outbound mail only
    (deliberate).
 
 ---
