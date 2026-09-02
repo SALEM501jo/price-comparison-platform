@@ -204,8 +204,13 @@ def main() -> int:
         demoted = tiers.get("close", []) + tiers.get("similar", [])
         check("wrong storage is demoted, not dropped", len(demoted) > 0)
         if demoted:
-            check("demotion is explained in words",
-                  any("storage" in d for d in demoted[0]["differences"]),
+            # `differences` is STRUCTURED -- [{attribute, label, query_value,
+            # candidate_value}] -- not prose. This read `"storage" in d` when
+            # the entries were sentences; against dicts that silently tests
+            # for a KEY called "storage" and is always false.
+            check("demotion names the attribute that differs",
+                  any(d.get("attribute") == "storage"
+                      for d in demoted[0]["differences"]),
                   str(demoted[0]["differences"]))
 
     # The home page's example searches. Kept in step with EXAMPLES in

@@ -42,8 +42,8 @@ there is no checkout anywhere.
 
 | | |
 |---|---|
-| Backend tests | **625** — `cd backend && pytest -q` |
-| Frontend tests | **88** — `cd frontend && npm test` |
+| Backend tests | **660** — `cd backend && pytest -q` |
+| Frontend tests | **96** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
 | Smoke checks | **57/57** — `python scripts/smoke_test.py` |
