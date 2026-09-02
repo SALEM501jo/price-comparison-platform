@@ -97,7 +97,7 @@ export default function PriceHistoryChart({ series }) {
                 x2={WIDTH - PADDING.right}
                 y1={tick.y}
                 y2={tick.y}
-                stroke="#e5e7eb"
+                className="stroke-gray-200"
                 strokeWidth="1"
               />
               <text

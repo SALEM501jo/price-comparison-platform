@@ -90,7 +90,7 @@ export default function PhotoPicker({
             <img
               src={shown}
               alt=""
-              className="h-full w-full bg-white object-contain dark:bg-gray-900"
+              className="h-full w-full bg-photo object-contain dark:bg-gray-900"
             />
           ) : (
             <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-gray-400 dark:text-gray-500">

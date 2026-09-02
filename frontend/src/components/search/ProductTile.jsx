@@ -30,12 +30,12 @@ export default function ProductTile({ product, saving = null }) {
       {/* The image sits on its own light panel in BOTH themes. Product shots
           are photographed on white, so a dark tile behind a transparent PNG
           renders the handset as a black rectangle on black. */}
-      <div className="relative bg-white dark:bg-gray-100">
+      <div className="relative bg-photo dark:bg-gray-100">
         <ProductImage
           src={product.image_url}
           alt={product.canonical_name}
           size="tile"
-          className="!border-0 bg-white p-3 dark:bg-gray-100"
+          className="!border-0 bg-photo p-3 dark:bg-gray-100"
         />
 
         {hasSaving && (

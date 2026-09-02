@@ -88,7 +88,7 @@ export default function ProductImage({ src, alt, size = 'card', className = '' }
       // counts.
       referrerPolicy="no-referrer"
       onError={() => setFailedSrc(resolved)}
-      className={`${box} shrink-0 border border-gray-200 bg-white object-contain dark:border-gray-800 dark:bg-gray-900`}
+      className={`${box} shrink-0 border border-gray-200 bg-photo object-contain dark:border-gray-800 dark:bg-gray-900`}
     />
   );
 }

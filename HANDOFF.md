@@ -529,6 +529,25 @@ no untranslated English in the Arabic table.
   out-of-scope category — a closed set, not a growing blocklist.
 - **Cache invalidation is global** (one version counter). Correct and cheap at
   three shops.
+- **Light mode is a TOKEN SYSTEM, not literal hexes.** Every colour that
+  differs between themes is served through a CSS custom property; `:root`
+  holds the light values and `html.dark` restores today's byte-identical dark
+  ones. This is not decoration: almost every gray rung is used by both modes
+  (gray-900 is 56 light text uses against 38 `dark:bg-` uses), so a literal
+  override of the scale would have repainted dark mode. Two rules:
+  **channel triplets, never hex** — `<alpha-value>` needs three numbers, and a
+  hex makes every `/60`, `/30`, `/20` utility render transparent without
+  erroring — and **`html.dark`, never `.dark`**, because `:root` is also
+  specificity (0,1,0), so with `.dark` the firewall would depend on source
+  order. Every colour added to `:root` needs an entry in both blocks.
+- **Nothing in light mode is pure white.** The old palette put the page at
+  #F9FAFB and cards at #FFFFFF — 1.05:1, below the threshold at which the eye
+  accepts two regions as separate surfaces — so the screen was one flat field
+  at maximum luminance with 17.74:1 near-black text on it. Measured, then
+  fixed at both ends: ceiling 17.74 → 10.6:1, muted floor 2.54 → 5.5:1 (it
+  FAILED WCAG before), page-to-card step 1.78 → 4.96 L*. The three photo
+  letterboxes keep pure white via a `photo` token — they back product shots,
+  and an off-white panel behind a white photo shows a seam.
 - **Dark mode is fixed in `@layer base`, not per component.** Tailwind's
   preflight sets `color: inherit` on form controls, so in dark mode they
   inherited near-white text on a white background — 29 of 30 fields at 1.05:1
@@ -582,16 +601,20 @@ no untranslated English in the Arabic table.
 3. **No merchants at all.** See the warning at the top.
 4. `Core 5-120U` parses, but **CPU generation is not captured** — an 8th-gen
    and a 14th-gen i7 both resolve to `i7`.
-5. **Merchant photos are served from the API's own origin.** Re-encoding is
+5. **`PriceHistoryChart` still hardcodes its five series colours** as hex
+   literals with no theme response, including a blue that collides with the
+   brand teal. Deliberately left: they are shared by both themes with no
+   variant mechanism, so desaturating them for light would change dark.
+6. **Merchant photos are served from the API's own origin.** Re-encoding is
    the control that matters and it is in place; a separate origin is the
    defence in depth that is not.
-6. **Merchant photos are not moderated.** Nothing stops a verified shop
+7. **Merchant photos are not moderated.** Nothing stops a verified shop
    uploading something irrelevant.
-7. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
+8. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
    Running them re-pollutes the database. `scripts/e2e_test.py` cleans up after
    itself; the other two do not. Run `scripts/cleanup_test_data.py --apply`
    afterwards.
-8. No email verification enforcement on *access* — gates outbound mail only
+9. No email verification enforcement on *access* — gates outbound mail only
    (deliberate).
 
 ---

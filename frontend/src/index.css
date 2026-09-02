@@ -3,6 +3,126 @@
 @tailwind utilities;
 
 @layer base {
+  /* ------------------------------------------------------------------
+     THE LIGHT PALETTE.
+
+     Measured problem, not a taste one. Light mode put the page at #F9FAFB
+     and every card at #FFFFFF -- 1.05:1 apart, below the threshold at which
+     the eye accepts two abutting regions as separate surfaces -- so the whole
+     screen read as ONE uninterrupted field at the top of the luminance range,
+     with near-black text on it at 17.74:1. Bright field plus maximum stroke
+     contrast is what produces halation, and it is why this hurt to look at.
+
+     Three things changed, in order of how much they matter:
+
+       1. NOTHING IS PURE WHITE ANY MORE. The reading plane comes off
+          #FFFFFF (Y=1.000) to #F8FAFC (Y=0.954). There is no headroom above
+          white, so every other value had to be built by going darker; taking
+          the ceiling down is what gives the rest of the ramp room.
+       2. A REAL ELEVATION LADDER. page 93.2 L* < sunken 95.3 < card 98.2.
+          The page-to-card step goes from 1.78 L* to 4.96, so a card is now
+          an object rather than a hint.
+       3. THE TEXT BAND IS PULLED IN AT BOTH ENDS. Body text drops from
+          17.74:1 to 11.37:1 -- still far above AAA, just no longer glaring --
+          and the muted floor rises from 2.43:1, which FAILED WCAG outright,
+          to 4.83:1. The old palette was simultaneously too harsh to rest on
+          and too faint to read, pushing the eye in both directions at once.
+
+     Every value below was computed, not picked: see the contrast table in
+     the commit message. Channel triplets, never hex -- Tailwind's
+     <alpha-value> needs three numbers to build rgb(r g b / a), and a hex
+     here makes every `/60`, `/30`, `/20` utility in the app render
+     transparent without erroring.
+     ------------------------------------------------------------------ */
+  :root {
+    color-scheme: light;
+
+    --c-surface: 231 236 243;   /* #E7ECF3  the page plane        */
+    --c-white: 248 250 252;     /* #F8FAFC  cards, nav, tables    */
+    --c-gray-50: 238 242 247;   /* #EEF2F7  sunken inside a card  */
+    --c-gray-100: 227 233 241;  /* #E3E9F1  chips, skeletons      */
+
+    --c-gray-200: 172 179 191;  /* #ACB3BF  container borders     */
+    --c-gray-300: 126 136 150;  /* #7E8896  field borders, 3.02:1 */
+
+    --c-gray-400: 94 103 115;   /* #5E6773  muted floor, 4.83:1   */
+    --c-gray-500: 83 90 100;    /* #535A64  muted                 */
+    --c-gray-600: 73 81 90;     /* #49515A  secondary             */
+    --c-gray-700: 63 71 80;     /* #3F4750  body                  */
+    --c-gray-800: 55 63 73;     /* #373F49                        */
+    --c-gray-900: 47 56 66;     /* #2F3842  headings, prices      */
+
+    --c-brand-400: 8 198 139;   /* #08C68B  card hover edge       */
+    --c-brand-500: 7 154 108;   /* #079A6C  focus ring, 3.03:1    */
+    --c-brand-600: 5 120 84;    /* #057854  buttons, links        */
+    --c-brand-700: 4 100 69;    /* #046445  button hover          */
+    --c-brand-800: 3 81 56;     /* #035138  text on brand chips   */
+
+    --c-green-100: 211 239 221; /* #D3EFDD */
+    --c-green-600: 22 134 63;   /* #16863F  WhatsApp button    */
+    --c-green-700: 16 114 52;   /* #107234 */
+    --c-red-50: 251 238 238;    /* #FBEEEE */
+    /* red-600 measured 4.07:1 on the page and 4.27:1 on its own
+       banner -- an AA failure that predates this palette and that no
+       surface change could fix. Darkened here rather than hand-edited
+       at 18 call sites. */
+    --c-red-600: 180 35 43;     /* #B4232B  5.50:1 worst case */
+    --c-red-700: 150 24 31;     /* #96181F  hover            */
+    --c-amber-50: 250 242 223;  /* #FAF2DF */
+    --c-amber-100: 245 231 196; /* #F5E7C4 */
+    --c-amber-700: 154 91 18;   /* #9A5B12 */
+  }
+
+  /* ------------------------------------------------------------------
+     THE DARK-MODE FIREWALL.
+
+     Every value here is the byte-identical Tailwind or brand default this
+     app uses today, so under `html.dark` every `dark:` utility computes
+     exactly the colour it computed before this change. Dark mode was not
+     the complaint and must not move.
+
+     WRITTEN AS `html.dark`, NOT `.dark`, AND THAT MATTERS. `:root` is a
+     pseudo-class: specificity (0,1,0) -- the SAME as `.dark`. Equal
+     specificity means source order decides, which makes the whole firewall
+     depend on where this block happens to sit in the file. `html.dark` is
+     (0,1,1) and wins outright, whatever an editor or a bundler does to the
+     ordering later.
+
+     THE INVARIANT: every colour added to :root above needs an entry here.
+     ------------------------------------------------------------------ */
+  html.dark {
+    color-scheme: dark;
+
+    --c-surface: 3 7 18;        /* unused in dark; body uses gray-950 */
+    --c-white: 255 255 255;
+    --c-gray-50: 249 250 251;
+    --c-gray-100: 243 244 246;
+    --c-gray-200: 229 231 235;
+    --c-gray-300: 209 213 219;
+    --c-gray-400: 156 163 175;
+    --c-gray-500: 107 114 128;
+    --c-gray-600: 75 85 99;
+    --c-gray-700: 55 65 81;
+    --c-gray-800: 31 41 55;
+    --c-gray-900: 17 24 39;
+
+    --c-brand-400: 52 211 158;
+    --c-brand-500: 16 183 127;
+    --c-brand-600: 7 150 105;
+    --c-brand-700: 4 120 87;
+    --c-brand-800: 6 95 70;
+
+    --c-green-100: 220 252 231;
+    --c-green-600: 22 163 74;
+    --c-green-700: 21 128 61;
+    --c-red-50: 254 242 242;
+    --c-red-600: 220 38 38;
+    --c-red-700: 185 28 28;
+    --c-amber-50: 255 251 235;
+    --c-amber-100: 254 243 199;
+    --c-amber-700: 180 83 9;
+  }
+
   html {
     /* Arabic sits lower and taller than Latin in the same point size, so a
        line-height tuned for English crowds it. */
@@ -11,7 +131,11 @@
 
   body {
     margin: 0;
-    @apply bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
+    /* `surface`, not `gray-50`. Splitting the page plane off is what frees
+       gray-50 to mean "one step below whatever surface you are on" for the
+       29 bg-gray-50 / hover:bg-gray-50 usages inside cards -- one token
+       cannot be both the floor of the page and a dent in a card. */
+    @apply bg-surface text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
     font-family: 'Cairo', system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
 
@@ -35,9 +159,6 @@
      Chrome's autofill highlight follow the theme. None of those are reachable
      from CSS, so without this line a dark page still gets a bright yellow
      autofill block over the login fields. */
-  .dark {
-    color-scheme: dark;
-  }
 
   /* Form controls in dark mode.
 
@@ -56,6 +177,32 @@
 
      Radios and checkboxes are excluded: they are not text-bearing, and giving
      them a fill and a text colour makes them render as small grey boxes. */
+  /* Form controls in LIGHT mode.
+
+     THE SAME BUG THE RULE BELOW FIXES, IN THE OTHER THEME, AND IT WAS LEFT
+     BEHIND. That rule is scoped to `.dark`, so in light mode Tailwind's
+     preflight leaves 35 fields at the browser default: a WHITE fill on a
+     white card, outlined by a 1.47:1 hairline. An input is recognised as
+     interactive by being a WELL -- a step down from its surroundings -- and
+     at 1.00:1 fill difference there is no well at all, so the eye has to
+     find the typing target from the label rather than reading it off the
+     shape.
+
+     It also reintroduces exactly what this palette removes: without it, 35
+     controls would sit at Y=1.000 on a 0.954 card, putting peak luminance
+     back on the screen in the places people stare at longest.
+
+     Base layer, not 35 class strings, for the reason the dark rule already
+     gives. Specificity keeps both safe: `.dark input` is (0,2,1) against
+     this rule's (0,1,1), so dark still wins, and @layer base loses to
+     utilities so a per-component `border-red-500` error state still wins
+     over both. */
+  input:not([type='radio']):not([type='checkbox']):not([type='range']),
+  textarea,
+  select {
+    @apply border-gray-300 bg-white text-gray-900;
+  }
+
   .dark input:not([type='radio']):not([type='checkbox']):not([type='range']),
   .dark textarea,
   .dark select {
