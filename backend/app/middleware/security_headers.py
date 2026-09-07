@@ -14,9 +14,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net "
+                "https://fonts.googleapis.com; "
                 "img-src 'self' data: https:; "
-                "font-src 'self'; "
+                "font-src 'self' https://fonts.gstatic.com; "
                 "connect-src 'self'; "
                 "frame-ancestors 'none'; "
                 "form-action 'self'; "
@@ -26,9 +27,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self'; "
-                "style-src 'self' 'unsafe-inline'; "
+                # fonts.googleapis.com serves the Cairo STYLESHEET and
+                # fonts.gstatic.com serves the font FILES it points at -- two
+                # hosts, two directives, and missing either one silently drops
+                # the site to a fallback face. That matters more here than on
+                # a Latin-only site: Cairo is what makes the Arabic and the
+                # English read as one product.
+                #
+                # WORTH REVISITING: self-hosting the four Cairo weights would
+                # let both of these go back to 'self', remove a render-
+                # blocking third-party request, and stop Google seeing every
+                # visitor -- which is the same instinct that already put
+                # referrerPolicy="no-referrer" on the product images.
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "img-src 'self' data: https:; "
-                "font-src 'self'; "
+                "font-src 'self' https://fonts.gstatic.com; "
                 "connect-src 'self'; "
                 "frame-ancestors 'none'; "
                 "form-action 'self'; "

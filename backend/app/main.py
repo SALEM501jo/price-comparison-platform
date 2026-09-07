@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import get_settings
+from app.frontend import mount_frontend
 from app.database import Base, engine
 from app.exceptions import setup_exception_handlers
 from app.logging_config import setup_logging
@@ -154,3 +155,11 @@ app.include_router(admin.router, prefix="/admin", tags=["admin"])
 async def health_check():
     """Health check endpoint for monitoring."""
     return {"status": "ok", "version": "1.0.0", "environment": settings.environment}
+
+
+# --- The built frontend, LAST ---
+#
+# Registered after every router because it ends in a catch-all that matches any
+# path; mounted earlier it would shadow the whole API. Does nothing unless
+# frontend/dist exists, so a checkout without a build is unaffected.
+mount_frontend(app)

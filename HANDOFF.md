@@ -42,7 +42,7 @@ there is no checkout anywhere.
 
 | | |
 |---|---|
-| Backend tests | **660** — `cd backend && pytest -q` |
+| Backend tests | **683** — `cd backend && pytest -q` |
 | Frontend tests | **96** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
@@ -675,10 +675,32 @@ front of Fly: 2. Directly exposed: 0. Wrong, and every visitor shares one
 rate-limit bucket — the 101st request in a minute returns 429 to everybody,
 which looks exactly like an outage.
 
-**Same-origin matters.** If the API and app sit on different registrable
-domains the refresh cookie becomes third-party and **Safari blocks it by
-default** — sessions die on every page refresh for iPhone users. Buy a domain
-and use `api.yourdomain` + `yourdomain`, or serve `dist/` from the API's origin.
+**Same-origin is now BUILT IN.** `app/frontend.py` serves `frontend/dist` from
+the API itself, so there is one origin, no CORS, and the refresh cookie is
+never third-party — which is what stops **Safari killing every iPhone session
+on page refresh**. It mounts only when a build exists, so `npm run dev` on
+:5173 is untouched.
+
+Two things it had to get right, both tested: an unknown path under an API
+prefix answers as the API (never `index.html`, which would hand an axios call
+a page of HTML), and the catch-all resolves paths before serving them, so
+`../../etc/passwd` cannot walk out of `dist`. Hashed assets are cached for a
+year; `index.html` is `no-cache`, because it is the one filename that never
+changes.
+
+**The CSP had to be widened for it.** Serving the app same-origin puts it under
+the API's own Content-Security-Policy, which was `style-src 'self'` /
+`font-src 'self'` — that silently drops the whole site to a fallback face,
+Arabic included. `fonts.googleapis.com` (the stylesheet) and
+`fonts.gstatic.com` (the files) are now allowed. **Self-hosting the four Cairo
+weights would take both back to `'self'`**, remove a render-blocking
+third-party request and stop Google seeing every visitor — the same instinct
+that put `referrerPolicy="no-referrer"` on the product images. Worth doing.
+
+**Still to write for a deploy:** a production `docker-compose.yml` (the one in
+the repo is dev-only — Postgres and Redis for a laptop) and a Caddyfile for
+TLS. The cheapest shape is one small VPS running API + Postgres + Redis +
+worker + the static build.
 
 **Cost:** ~$2–4/month (Fly machine + Neon free Postgres + Upstash free Redis),
 plus ~$12/year for a domain. Fly has **no free tier** any more, and **Render's
