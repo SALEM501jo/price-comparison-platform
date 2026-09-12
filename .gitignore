@@ -6,6 +6,14 @@
 # whole Apple integration, and *.pem / *.key do not cover that extension.
 *.p8
 secrets/
+# Real environment files, anywhere in the tree. backend/.gitignore covered
+# backend/.env only, so deploy/.env.production -- which holds the database
+# password, the JWT signing key and the Apple private key -- was committable.
+# The .example files are the ones meant to be tracked.
+.env
+.env.*
+!.env.example
+!.env.*.example
 # Database dumps taken before destructive cleanups. Local only -- they
 # contain every account and price in the database.
 backups/

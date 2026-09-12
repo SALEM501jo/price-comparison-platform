@@ -1,0 +1,46 @@
+# TLS and nothing else.
+#
+# Caddy requests and renews a Let's Encrypt certificate on its own, redirects
+# http to https, and hands everything to the API. It deliberately does NOT
+# serve the SPA itself: app/frontend.py already does that from the API's own
+# origin, and duplicating the routing here would mean two files disagreeing
+# about which paths are the API and which fall back to index.html -- the kind
+# of split that shows up as a 404 on one route months later.
+
+{
+	email {$ACME_EMAIL}
+
+	# Caddy's own Server header. The app strips uvicorn's for the same reason:
+	# free version reconnaissance for anyone scanning.
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy api:8000 {
+		# THE APP RESOLVES THE CLIENT IP ITSELF from TRUSTED_PROXY_COUNT,
+		# counting from the RIGHT of X-Forwarded-For, because the header is a
+		# client-supplied list that each proxy appends to. Caddy appends the
+		# real peer address here; TRUSTED_PROXY_COUNT=1 in .env.production is
+		# what tells the app that exactly one entry -- the last -- was written
+		# by infrastructure. Add a CDN in front and that number becomes 2, or
+		# the rate limiter buckets on a forgeable value and stops limiting.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up Host {host}
+	}
+
+	# NO SECURITY HEADERS HERE. The app sets CSP, HSTS, X-Frame-Options,
+	# X-Content-Type-Options and Referrer-Policy in
+	# app/middleware/security_headers.py, where they are tested. Setting them
+	# in both places means the day someone tightens the CSP, the copy here
+	# silently wins and the test that guards it still passes.
+
+	log {
+		output stdout
+		format console
+	}
+}
