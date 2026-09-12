@@ -1,0 +1,5 @@
+# woff2 files are binary. Git detects this by heuristic today and gets it
+# right, but core.autocrlf=true is on and a misdetected font would be silently
+# corrupted by line-ending translation. State it rather than rely on the guess.
+*.woff2 binary
+*.woff binary

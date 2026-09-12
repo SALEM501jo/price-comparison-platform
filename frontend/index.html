@@ -6,13 +6,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Cairo carries Arabic and Latin, so the brand reads as one product in
-         either language. Preconnect because the wordmark is the first thing
-         painted and a font swap on the logo is very visible. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+         either language. It is served from our own origin (see the @font-face
+         block in src/index.css); nothing here reaches a third party.
+
+         ONLY THE ARABIC SUBSET IS PRELOADED. Without a hint the browser
+         cannot ask for a font until it has fetched and parsed the CSS
+         bundle, so the wordmark -- the first thing painted, and the place a
+         swap is most visible -- waits a whole extra round trip. Arabic is
+         the default locale and every glyph of the default UI is in that
+         subset, so it is the one file almost every first paint needs. The
+         Latin subsets are not hinted: they are only wanted once the visitor
+         has switched to English, by which point the CSS has long since
+         parsed and unicode-range fetches them on demand.
+
+         `crossorigin` is REQUIRED even though this is same-origin. Fonts are
+         always fetched in CORS mode, and a preload whose mode does not match
+         the real request is discarded -- the file is then downloaded twice
+         and the hint makes things slower, not faster. -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/cairo-arabic.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
 
     <title>احسن سعر — قارن الأسعار في الأردن</title>

@@ -25,6 +25,8 @@ def built_site(tmp_path, monkeypatch):
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("<!doctype html><div id=root></div>")
     (dist / "assets" / "index-ABC123.js").write_text("console.log(1)")
+    (dist / "fonts").mkdir()
+    (dist / "fonts" / "cairo-arabic.woff2").write_bytes(b"wOF2fake")
     (dist / "favicon.svg").write_text("<svg/>")
 
     # A file OUTSIDE dist, for the traversal test to try to reach.
@@ -73,6 +75,27 @@ class TestServing:
         assert response.status_code == 200
         assert "immutable" in response.headers["cache-control"]
         assert "max-age=31536000" in response.headers["cache-control"]
+
+    def test_fonts_are_cached_but_not_immutable(self, built_site):
+        """
+        Font filenames are hand-written, so they do NOT change when the bytes
+        do. A long max-age keeps repeat visits off the network; `immutable`
+        would pin every visitor to the first subset they ever loaded, with no
+        way to push a correction.
+        """
+        response = built_site.get("/fonts/cairo-arabic.woff2")
+        assert response.status_code == 200
+        cache_control = response.headers["cache-control"]
+        assert "max-age=604800" in cache_control
+        assert "immutable" not in cache_control
+
+    def test_a_cached_font_revalidates_to_304(self, built_site):
+        """The bound on staleness is only real if the conditional GET works."""
+        etag = built_site.get("/fonts/cairo-arabic.woff2").headers["etag"]
+        again = built_site.get(
+            "/fonts/cairo-arabic.woff2", headers={"If-None-Match": etag}
+        )
+        assert again.status_code == 304
 
     def test_the_shell_itself_must_revalidate(self, built_site):
         """

@@ -66,6 +66,32 @@ class ImmutableStatic(StaticFiles):
         return response
 
 
+class RevalidatedStatic(StaticFiles):
+    """
+    Static files cached for a week, then revalidated.
+
+    Mounted at /fonts, whose filenames are HAND-WRITTEN (cairo-arabic.woff2)
+    and referenced by that name from index.css. Unlike /assets, the name does
+    NOT change when the bytes do, so `immutable` would be the index.html bug
+    with a longer fuse: re-subset a font under the same name and every visitor
+    who ever loaded it keeps the old glyphs for a year, with no way to push a
+    correction. Content-hashing these names instead would mean importing the
+    fonts through the bundler, which breaks the `<link rel=preload>` in
+    index.html that keeps Arabic text from flashing unstyled.
+
+    A week of max-age means a repeat visitor spends no request on 81 KB of
+    fonts, and the conditional GET afterwards is a 304 against the ETag
+    StaticFiles already sends -- cheap, and it bounds staleness at seven days.
+    """
+
+    FONT_MAX_AGE = 604800  # one week
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = f"public, max-age={self.FONT_MAX_AGE}"
+        return response
+
+
 def mount_frontend(app: FastAPI) -> bool:
     """
     Serve `frontend/dist` from this app. Returns whether anything was mounted.
@@ -82,6 +108,14 @@ def mount_frontend(app: FastAPI) -> bool:
         return False
 
     app.mount("/assets", ImmutableStatic(directory=DIST / "assets"), name="assets")
+
+    # Without its own mount, /fonts/*.woff2 falls through to the SPA catch-all
+    # below, which serves the bytes with no Cache-Control at all -- so every
+    # cold navigation re-fetches 81 KB of self-hosted Cairo that used to be
+    # cached for a year when it came from Google.
+    fonts = DIST / "fonts"
+    if fonts.is_dir():
+        app.mount("/fonts", RevalidatedStatic(directory=fonts), name="fonts")
 
     @app.api_route("/{full_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     async def spa(full_path: str):
