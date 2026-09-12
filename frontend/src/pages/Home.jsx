@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import SearchBar from '../components/search/SearchBar';
 import DealsGrid from '../components/search/DealsGrid';
 import CatalogueGrid, { CategoryTiles } from '../components/search/CatalogueGrid';
@@ -27,6 +28,11 @@ import { useLocale } from '../hooks/useLocale';
  */
 export default function Home() {
   const { t } = useLocale();
+  // Set by the account page on its way out. The confirmation cannot be shown
+  // where the deletion happened: that page is behind RequireAuth and unmounts
+  // with the session it just ended, and a user who is silently signed out
+  // cannot tell a success from a crash.
+  const { state } = useLocation();
   const [deals, setDeals] = useState([]);
   const [dealsLoading, setDealsLoading] = useState(true);
   const [catalogue, setCatalogue] = useState({ categories: [], products: [] });
@@ -94,6 +100,20 @@ export default function Home() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
+      {state?.accountDeleted && (
+        <div
+          role="status"
+          className="mt-6 rounded-lg bg-brand-50 px-4 py-3 dark:bg-brand-900/30"
+        >
+          <p className="text-sm font-semibold text-brand-900 dark:text-brand-200">
+            {t('account.deleted.title')}
+          </p>
+          <p className="mt-1 text-sm text-brand-900 dark:text-brand-200">
+            {t('account.deleted.blurb')}
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-col items-center pt-14 pb-10">
         <h1 className="mb-3 text-center text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
           {t('home.title')}

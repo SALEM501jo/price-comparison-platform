@@ -20,7 +20,14 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
-    password_hash = Column(String(255), nullable=False)
+    # NULL for an account that signs in only through Google or Apple, and for
+    # one whose password was cleared because it was set by somebody who had
+    # not proved they own the mailbox. Nullable is therefore a security state,
+    # not an absence of data -- and it is why the login handler must still run
+    # bcrypt against a dummy hash for these accounts: a fast "no password
+    # here" reply would tell an attacker which addresses sign in with Google,
+    # naming the provider to phish.
+    password_hash = Column(String(255), nullable=True)
     role = Column(Enum(UserRole), default=UserRole.user, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -30,6 +37,9 @@ class User(Base):
 
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     email_tokens = relationship("EmailToken", back_populates="user", cascade="all, delete-orphan")
+    oauth_identities = relationship(
+        "OAuthIdentity", back_populates="user", cascade="all, delete-orphan"
+    )
     wishlist_items = relationship("WishlistItem", back_populates="user", cascade="all, delete-orphan")
     price_alerts = relationship("PriceAlert", back_populates="user", cascade="all, delete-orphan")
 

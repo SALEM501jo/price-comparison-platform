@@ -33,6 +33,7 @@ GOOD = {
     "email_backend": "smtp",
     "support_email": "you@example.com",
     "trusted_proxy_count": 1,
+    "redis_url": "redis://cache.internal:6379/0",
 }
 
 
@@ -86,6 +87,21 @@ class TestTheDangerousDefaultsAreRefused:
         """Browsers reject the combination, so sessions would simply not work."""
         assert any("COOKIE_SAMESITE" in e for e in errors_for(
             cookie_samesite="none", cookie_secure_override=False))
+
+    def test_localhost_redis_url(self):
+        """
+        THE REASON THIS IS AN ERROR AND NOT A WARNING: the two things that
+        depend on Redis fail in OPPOSITE directions, so the deployment looks
+        healthy while being half-broken. The rate limiter fails OPEN -- login
+        brute-force protection is simply off, and nothing says so -- while the
+        OAuth state store fails CLOSED, so every "Continue with Google" is
+        refused. Neither shows up in a health check.
+        """
+        found = errors_for(redis_url="redis://localhost:6379/0")
+        assert any("REDIS_URL" in e for e in found), found
+
+    def test_a_real_redis_url_is_accepted(self):
+        assert errors_for(redis_url="redis://cache.internal:6379/0") == []
 
     def test_every_problem_is_reported_at_once(self):
         """

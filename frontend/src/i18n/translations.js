@@ -31,6 +31,7 @@ const translations = {
     'nav.alerts': 'التنبيهات',
     'nav.myShop': 'متجري',
     'nav.admin': 'الإدارة',
+    'nav.account': 'حسابي',
     'nav.login': 'تسجيل الدخول',
     'nav.logout': 'خروج',
     'nav.toggleLanguage': 'English',
@@ -281,6 +282,91 @@ const translations = {
     'auth.verifyBanner': 'أكّد بريدك الإلكتروني لتصلك تنبيهات الأسعار.',
     'auth.resendLink': 'إعادة إرسال الرابط',
 
+    // --- Signing in with Google or Apple.
+    // The failure keys carry the API's own error codes -- 'state_invalid',
+    // not 'stateInvalid' -- because the callback looks the code up directly.
+    // A code this table has not caught up with then surfaces as a visible
+    // missing key rather than as a wrong but plausible sentence. And
+    // email_unverified is the one failure a reader can actually fix, so it
+    // names the fix instead of apologising.
+    'auth.continueWithGoogle': 'المتابعة باستخدام Google',
+    'auth.continueWithApple': 'تسجيل الدخول باستخدام Apple',
+    'auth.or': 'أو',
+    'auth.oauth.signingIn': 'جارٍ إتمام تسجيل الدخول…',
+    'auth.oauth.problemTitle': 'تعذّر إتمام تسجيل الدخول',
+    'auth.oauth.cancelledTitle': 'لم يكتمل تسجيل الدخول',
+    'auth.oauth.state_invalid':
+      'انتهت صلاحية محاولة الدخول أو استُخدمت من قبل. ابدأ من جديد.',
+    'auth.oauth.unavailable':
+      'تسجيل الدخول عبر Google أو Apple غير متاح الآن. يمكنك الدخول ببريدك الإلكتروني وكلمة المرور.',
+    'auth.oauth.provider_error':
+      'لم تكتمل الموافقة لدى المزوّد. إن كنت قد ألغيت العملية فهذا كل ما حدث — جرّب مرة أخرى أو ادخل ببريدك وكلمة المرور.',
+    'auth.oauth.email_unverified':
+      'لم يؤكّد المزوّد أن هذا البريد الإلكتروني لك. أكّد بريدك في إعدادات حسابك لدى Google أو Apple ثم أعد المحاولة، أو أنشئ حساباً ببريد وكلمة مرور هنا.',
+    'auth.oauth.unknown':
+      'لم يكتمل تسجيل الدخول. حاول مرة أخرى، أو ادخل ببريدك وكلمة المرور.',
+
+    // --- The account page, and deleting an account.
+    // The consequences are spelled out item by item rather than summarised as
+    // "this cannot be undone", because the summary is the part everybody
+    // already assumes and the items are the part nobody guesses: that a
+    // support message keeps its text, that a shop is retired rather than
+    // deleted, that its photographs go but its prices stay. A destructive
+    // action behind a vague warning is a dark pattern, so the vague version
+    // is not offered.
+    'account.title': 'حسابك',
+    'account.blurb': 'تفاصيل حسابك، وحذفه إن أردت.',
+    'account.emailStatus': 'حالة البريد',
+    'account.verified': 'مؤكَّد',
+    'account.unverified': 'غير مؤكَّد',
+    'account.unverifiedHint':
+      'لا تُرسل تنبيهات الأسعار إلا إلى بريد مؤكَّد. استعمل الشريط في أعلى الصفحة لإرسال رابط جديد.',
+    'account.role': 'نوع الحساب',
+    'account.role.buyer': 'متسوّق',
+    'account.role.merchant': 'تاجر',
+    'account.role.admin': 'مشرف',
+    'account.created': 'تاريخ الإنشاء',
+    'account.limits':
+      'لا توجد بعد صفحة لتغيير بريد الحساب أو لتنزيل نسخة من بياناتك. راسلنا وينفّذها شخص يدوياً.',
+    'account.limitsLink': 'راسلنا',
+    'account.delete.title': 'حذف الحساب',
+    'account.delete.blurb':
+      'الحذف نهائي: لا تراجع فيه، ولا نسخة محفوظة، ولا نستطيع إعادة حساب بعد حذفه.',
+    'account.delete.start': 'أريد حذف حسابي',
+    'account.delete.whatTitle': 'ماذا يحدث عند الحذف',
+    'account.delete.goneTitle': 'يُحذف فوراً وبلا رجعة',
+    'account.delete.gone.account':
+      'حسابك وعنوان بريدك. ويصبح العنوان متاحاً للتسجيل من جديد في الحال.',
+    'account.delete.gone.saved': 'كل ما حفظته: مفضّلتك وكل تنبيهات الأسعار.',
+    'account.delete.gone.sessions':
+      'كل جلسات الدخول على كل الأجهزة، بما فيها هذه الجلسة.',
+    'account.delete.gone.social': 'أي ربط بحساب Google أو Apple.',
+    'account.delete.keptTitle': 'يبقى بعد محو ما يدلّ عليك',
+    'account.delete.kept.support':
+      'رسائل الدعم التي أرسلتها يبقى نصّها ليبقى لدينا سجلّ المحادثة، لكن عنوان الردّ يُمحى فلا تعود الرسالة تدلّ عليك.',
+    'account.delete.untouchedTitle': 'لا يتغيّر',
+    'account.delete.untouched.taps':
+      'عدّادات النقرات التي تُظهر لكل متجر كم متسوّقاً طلب رقمه. وهي مجهولة بالتصميم ولا تشير إلى أي شخص.',
+    'account.delete.merchantTitle': 'إن كان لديك متجر',
+    'account.delete.merchant.retired':
+      'متجرك لا يُحذف مع الحساب بل يُعتزل: يُرفع عن الموقع فوراً، وتُمحى أرقام الهاتف والواتساب وروابط التواصل، ويُغيَّر اسمه — فأسماء المتاجر فريدة، ومتجر معتزل يحتفظ بالاسم يحجزه إلى الأبد ويمنع صاحب العمل من التسجيل به مرة أخرى.',
+    'account.delete.merchant.photos':
+      'كل صورة منتج رفعتها تُحذف. فهي من إنتاجك، وقد تُظهرك أو تُظهر محلّك، ولا يصحّ عرضها بعد اليوم.',
+    'account.delete.merchant.listings':
+      'أما العروض والأسعار وسجلّها فتبقى، لأنها جزء من كتالوج المنتجات الذي يقارنه المتسوّقون، لا جزء من حسابك.',
+    'account.delete.merchantLink': 'راجع متجرك قبل الحذف',
+    'account.delete.confirmTitle': 'اكتب بريدك الإلكتروني للتأكيد',
+    'account.delete.confirmWhy':
+      'بريدك لا كلمة المرور: الحساب المُنشأ عبر Google ليس له كلمة مرور أصلاً، والتأكيد لا بدّ أن يعمل له كذلك. ولا يهمّ حرف كبير ولا مسافة زائدة.',
+    'account.delete.confirmLabel': 'بريدك الإلكتروني',
+    'account.delete.confirm': 'احذف حسابي نهائياً',
+    'account.delete.deleting': 'جارٍ الحذف…',
+    'account.delete.mismatch': 'هذا ليس بريد هذا الحساب.',
+    'account.delete.error': 'تعذّر حذف الحساب. حاول مرة أخرى.',
+    'account.deleted.title': 'تم حذف حسابك.',
+    'account.deleted.blurb':
+      'زال كل ما ذُكر في صفحة الحساب. وعنوان بريدك متاح للتسجيل من جديد إن أردت العودة يوماً.',
+
     // --- Merchant
     'merchant.listYourShop': 'اعرض متجرك',
     'merchant.listYourShopBlurb':
@@ -503,6 +589,286 @@ const translations = {
     'wishlist.from': 'ابتداءً من',
     'common.previous': 'السابق',
     'common.next': 'التالي',
+
+    // --- Footer
+    'footer.nav': 'روابط الموقع',
+    'footer.notAShop':
+      'نحن نقارن الأسعار فقط. لا نبيع شيئاً، ولا يتم أي شراء أو دفع على هذا الموقع.',
+    'footer.privacy': 'الخصوصية',
+    'footer.terms': 'الشروط',
+    'footer.copyright': '© {year} احسن سعر',
+
+    // --- Legal pages: the furniture both of them share
+    // The two blanks are deliberately loud. A privacy policy that ships with
+    // "[company name]" inside a paragraph is worse than no policy at all --
+    // it reads as boilerplate nobody checked -- so the unfilled fields get a
+    // panel at the top of the page rather than a marker buried in a sentence.
+    'legal.updated': 'آخر تحديث: أيلول 2026',
+    'legal.contents': 'في هذه الصفحة',
+    'legal.todo.title': 'هذه الصفحة لم تُستكمل بعد',
+    'legal.todo.blurb': 'على مشغّل الموقع تعبئة ما يلي قبل النشر:',
+    'legal.todo.blank': '⟨ يُملأ ⟩',
+    'legal.field.entity': 'الاسم القانوني للجهة التي تشغّل هذا الموقع',
+    'legal.field.dataContact':
+      'عنوان البريد الإلكتروني لطلبات البيانات: الاطّلاع والتصحيح والحذف',
+    'legal.field.law': 'الدولة التي تحكم قوانينها هذه الشروط',
+
+    // --- Privacy policy
+    // Every sentence here is a claim about what this code does, and the ones
+    // the code did not back were cut rather than softened. There is no
+    // scheduled purge anywhere in the backend, so the page promises no
+    // retention period; product images really are fetched by the shopper's
+    // browser from the retailers' own servers, so the page says so instead
+    // of claiming nothing leaves the site.
+    'privacy.title': 'سياسة الخصوصية',
+    'privacy.blurb': 'ما الذي نحفظه عنك، ولماذا، ومن يراه غيرنا.',
+
+    'privacy.who.title': 'من يشغّل هذا الموقع',
+    'privacy.who.p1':
+      '«احسن سعر» موقع لمقارنة أسعار الأجهزة في المتاجر الأردنية. الجهة المشغّلة مذكورة في أعلى هذه الصفحة، وهي المسؤولة عن كل ما يرد هنا.',
+    'privacy.who.p2':
+      'نتعامل مع بياناتك وفق قانون حماية البيانات الشخصية الأردني رقم 24 لسنة 2023.',
+    'privacy.who.p3':
+      'كتبنا هذه الصفحة بلغة واضحة قدر ما استطعنا. إن بقي فيها ما هو غامض، راسلنا وسنشرحه.',
+
+    'privacy.collect.title': 'ما الذي نجمعه',
+    'privacy.collect.intro': 'لا نجمع إلا ما تحتاجه الخدمة فعلاً:',
+    'privacy.collect.account':
+      'الحساب: بريدك الإلكتروني، وكلمة المرور محفوظة كبصمة مشفّرة لا يمكن الرجوع منها إلى الكلمة نفسها، ونوع الحساب، وتاريخ إنشائه، وما إذا كنت قد أكّدت بريدك.',
+    'privacy.collect.noProfile':
+      'لا نطلب اسمك ولا رقمك ولا عنوانك ولا تاريخ ميلادك. ولا توجد وسيلة دفع على الموقع، فلا نملك أي بيانات بطاقة.',
+    'privacy.collect.shop':
+      'إن كان لديك متجر: اسم المتجر وموقعه وشعاره، وبيانات التواصل التي تختار نشرها — الهاتف وواتساب وفيسبوك وانستغرام. هذه تظهر لكل زائر على صفحة المنتج.',
+    'privacy.collect.listing':
+      'تفاصيل العروض التي يكتبها التاجر: الحالة، ونسبة البطارية، ووصف أي ضرر، ومدة الكفالة، والملاحظات. تُنشر كما كُتبت.',
+    'privacy.collect.photos':
+      'صور العروض التي يرفعها التاجر. تُحفظ كصورة فقط: نعيد ترميزها بالكامل، فلا يبقى فيها موقع التقاط ولا رقم جهاز ولا وقت تصوير.',
+    'privacy.collect.wishlist':
+      'المفضلة وتنبيهات السعر: أي منتج حفظته، وعند أي سعر تريد أن نخبرك.',
+    'privacy.collect.support':
+      'رسائل الدعم: البريد الذي تكتبه في النموذج، والموضوع، ونص الرسالة.',
+    'privacy.collect.sessions':
+      'سجلّ الدخول: متى بدأت كل جلسة ومتى انتهت. ويكتب الخادم في سجلّاته عنوان الـ IP ورقم الحساب عند تسجيل الدخول وإنشاء الحساب وإعادة تعيين كلمة المرور.',
+    'privacy.collect.provider':
+      'إذا دخلت عبر جوجل أو آبل: نخزّن معرّفاً دائماً يعطينا إيّاه المزوّد، وعنوان بريدك. لا نطلب اسمك ولا صورتك ولا نستلمهما — الصلاحية التي نطلبها هي البريد وحده.',
+    'privacy.collect.linkPassword':
+      'وإن كان على البريد نفسه حساب بكلمة مرور لم يُؤكَّد بريده بعد، فإن الدخول عبر المزوّد يربط الاثنين ويُلغي كلمة المرور القديمة وينهي جلساتها. السبب أن تلك الكلمة وضعها شخص لم يُثبت يوماً أنه يملك هذا البريد. تستطيع وضع كلمة مرور جديدة من «نسيت كلمة المرور».',
+
+    'privacy.why.title': 'لماذا نحتفظ بها',
+    'privacy.why.signin': 'لتسجيل دخولك وإبقائك داخل حسابك بعد تحديث الصفحة.',
+    'privacy.why.alerts':
+      'لإرسال تنبيه حين ينزل سعر منتج تتابعه، ولإرسال روابط تأكيد البريد وإعادة تعيين كلمة المرور.',
+    'privacy.why.shop': 'لعرض بيانات المتجر للمتسوّق كي يستطيع التواصل معه.',
+    'privacy.why.support': 'للرد على رسائلك.',
+    'privacy.why.abuse':
+      'لحماية الموقع: نعدّ المحاولات القادمة من كل عنوان كي لا تُخمّن كلمات المرور بالتكرار.',
+    'privacy.why.noSale':
+      'لا نبيع بياناتك ولا نؤجّرها ولا نستخدمها لإعلانات، ولا يوجد على الموقع أي شبكة إعلانات.',
+
+    'privacy.not.title': 'ما لا نجمعه، عن قصد',
+    'privacy.not.intro': 'هذه قرارات في بناء الموقع، لا أشياء نسيناها:',
+    'privacy.not.analytics':
+      'لا يوجد أي نظام تحليلات أو تتبّع خارجي، ولا بكسل إعلاني، ولا تسجيل لجلسات التصفّح. لا يُحمَّل على هذا الموقع شيء من شركة تحليلات.',
+    'privacy.not.search':
+      'لا نحتفظ بسجلّ لما بحثت عنه. نص البحث يصل إلى الذاكرة المؤقتة على شكل بصمة غير قابلة للقراءة، وتُمحى بعد خمس دقائق.',
+    'privacy.not.taps':
+      'حين تضغط «اتصال» أو «واتساب» نسجّل أربعة أشياء فقط: أي متجر، وأي منتج، وأي قناة، ومتى. بلا عنوان IP، وبلا رقم حساب، وبلا معرّف جلسة.',
+    'privacy.not.exif':
+      'لا نحتفظ بالبيانات المخفيّة داخل الصور. كل صورة مرفوعة تُفكّ وتُكتب من جديد، فيختفي معها موقع الالتقاط ونوع الجهاز ووقت التصوير.',
+    'privacy.not.sensors':
+      'لا نطلب موقعك ولا الكاميرا ولا الميكروفون، والموقع يخبر متصفّحك صراحةً أن يرفض هذه الطلبات.',
+    'privacy.not.tapsWhy':
+      'نعدّ النقرات لأن التاجر يحتاج أن يعرف إن كان الموقع يفيده. والثمن الذي قبلناه مقابل ألّا نسجّل هويّتك أننا لا نميّز بين شخصين: من يضغط مرتين يُحسب نقرتين. لذلك نقول «نقرات» ولا نقول «اتصالات» ولا «مبيعات» — نحن لا نعرفها.',
+
+    'privacy.cookies.title': 'الكوكيز والتخزين في متصفّحك',
+    'privacy.cookies.one':
+      'نضع كوكي واحداً فقط، اسمه refresh_token، ولا يوضع إلا بعد تسجيل دخولك. وظيفته الوحيدة أن تبقى داخل حسابك بعد تحديث الصفحة. لا يستطيع أي كود في الصفحة قراءته، ولا يُرسل إلا إلى مسار الدخول، ومدّته سبعة أيام، ويُحذف عند الخروج.',
+    'privacy.cookies.local':
+      'ويحفظ متصفّحك شيئين اخترتهما أنت بالضغط: اللغة، والوضع الليلي أو النهاري. يبقيان على جهازك ولا يصلان إلى خادمنا أبداً.',
+    'privacy.cookies.oauth':
+      'وكوكي ثانٍ قصير العمر يُنشأ فقط عند بدء الدخول عبر جوجل أو آبل ويُحذف فور انتهائه. مهمّته أن يُثبت أن الجلسة العائدة هي التي بدأها متصفّحك أنت لا متصفّح شخص آخر، وعمره عشر دقائق.',
+    'privacy.cookies.noBanner1': 'ولهذا لا ترى هنا نافذة موافقة على الكوكيز.',
+    'privacy.cookies.noBanner2':
+      'الكوكي الوحيد ضروري لتسجيل الدخول، والموافقة لا تُطلب على ما هو ضروري لأداء الخدمة. أما اللغة والوضع فاختيارك أنت، ولا يحملان أي معرّف، ولا يغادران جهازك. ولا يوجد شيء ثالث نتتبّعك به.',
+    'privacy.cookies.noBanner3':
+      'نافذة موافقة هنا ستوحي بتتبّع لا يحدث، وستدرّبك على الضغط «موافق» دون قراءة. إن أضفنا يوماً ما يتتبّعك فعلاً، سنسألك قبله.',
+
+    'privacy.others.title': 'من يرى شيئاً غيرنا',
+    'privacy.others.intro': 'نحاول أن تكون هذه القائمة أقصر ما يمكن، لكنها ليست فارغة:',
+    'privacy.others.images':
+      'صور المنتجات تأتي من خوادم المتاجر نفسها، ومتصفّحك يجلبها منهم مباشرة. أي أن المتجر — وشركة الاستضافة التي يستعملها — يرى عنوان الـ IP الخاص بك ونوع متصفّحك. هذه أهم نقطة في هذه الصفحة.',
+    'privacy.others.referrer':
+      'نطلب من متصفّحك ألّا يخبرهم بالصفحة التي كنت فيها، فلا يعرفون أي منتج كنت تنظر إليه. لكن عنوان الـ IP لا يمكن إخفاؤه ما دمنا نعرض صورهم.',
+    'privacy.others.meta':
+      'أزرار واتساب وفيسبوك وانستغرام تنقلك إلى شركة ميتا. ما يحدث بعد الضغط تحكمه سياساتها لا سياستنا.',
+    'privacy.others.email':
+      'بريدنا — التأكيد وإعادة تعيين كلمة المرور وتنبيهات السعر والرد على الدعم — يمرّ عبر مزوّد بريد يرى عنوانك ونص الرسالة.',
+    'privacy.others.hosting':
+      'قاعدة البيانات والذاكرة المؤقتة وسجلّات الخادم تعمل عند مزوّدي استضافة، وهم قادرون تقنياً على الوصول إليها بحكم تشغيلهم لها.',
+    'privacy.others.providers':
+      'زر «المتابعة بجوجل» أو «الدخول بآبل» ينقل متصفّحك إلى جوجل أو آبل، ثم يتبادل خادمنا معهم رمزاً للتحقق من هويتك. هذا لا يحدث إلا لمن يضغط الزر: الزائر الذي يقارن الأسعار فقط لا يصل منه إليهما شيء.',
+    'privacy.others.fonts':
+      'الخطوط وبقية ملفات الموقع كلها من خادمنا، فلا يُحمَّل أي خط من خطوط جوجل ولا من أي شبكة توزيع خارجية. وهذا يخص الملفات وحدها: إن اخترت الدخول بجوجل فجوجل طرف في ذلك، كما هو مذكور أعلاه.',
+    'privacy.others.retailers':
+      'أسعار المتاجر التي نقرأها آلياً يجلبها خادمنا على فترات، لا متصفّحك. زيارتك أنت لا تصل إليهم منّا.',
+
+    'privacy.keep.title': 'كم من الوقت نحتفظ بها',
+    'privacy.keep.honest':
+      'بصراحة: لا يوجد حتى الآن حذف تلقائي. أغلب السجلات تبقى إلى أن تحذفها أنت أو نحذفها نحن يدوياً عند طلبك. لا نعدك بمدّة لا ينفّذها الكود.',
+    'privacy.keep.wishlist': 'المفضلة وتنبيهات السعر: تبقى إلى أن تحذفها أو يُحذف حسابك.',
+    'privacy.keep.links':
+      'روابط التأكيد وإعادة تعيين كلمة المرور: تنتهي خلال أربع وعشرين ساعة وتعمل مرة واحدة. ويبقى سجلّ بأن رابطاً قد أُرسل.',
+    'privacy.keep.sessions':
+      'جلسات الدخول: تنتهي صلاحيتها بعد سبعة أيام، ويبقى سجلّ بأن جلسة بدأت وانتهت.',
+    'privacy.keep.support':
+      'رسائل الدعم: يبقى نصّها حتى بعد حذف الحساب، لأن الرسالة هي ما يفسّر لماذا فعلنا شيئاً. أما عنوان بريدك فيها فيُستبدل عند الحذف.',
+    'privacy.keep.prices': 'سجلّ الأسعار يبقى بلا حدّ، لكنه عن المنتجات لا عن الأشخاص.',
+    'privacy.keep.logs':
+      'سجلّات الخادم تحتفظ بها جهة الاستضافة حسب إعداداتها، ولا يوجد في الكود ما يحذفها بعد مدة معيّنة.',
+
+    'privacy.rights.title': 'حقوقك، وكيف تستعملها',
+    'privacy.rights.intro':
+      'بموجب قانون حماية البيانات الشخصية رقم 24 لسنة 2023، يحقّ لك أن تعرف ما نحفظه عنك، وأن تصحّحه، وأن تطلب حذفه، وأن تعترض على استخدامه.',
+    'privacy.rights.delete':
+      'حذف الحساب: من صفحة حسابك، وهو نهائي ولا رجعة فيه. يزيل الحذف حسابك وجلسات دخولك وروابطك المؤقتة ومفضّلتك وتنبيهاتك. وإن كنت تاجراً، يُرفع متجرك عن الموقع ويُمحى اسمه وبيانات تواصله، وتُحذف صور عروضك.',
+    'privacy.rights.providerLink':
+      'ارتباطك بجوجل أو آبل: حذف حسابك يزيله من عندنا. لكن الإذن الذي أعطيته يبقى في حسابك عندهم، فاحذف هذا الموقع من إعدادات حسابك في جوجل أو آبل إن أردت قطع الصلة تماماً.',
+    'privacy.rights.survives':
+      'ما يبقى بعد الحذف: نصّ رسائل الدعم التي أرسلتها، بعد استبدال عنوان بريدك فيها برمز لا يُقرأ منه العنوان. ويبقى سجلّ الأسعار وأعداد النقرات، وهي بيانات عن المنتجات والمتاجر لا عنك.',
+    'privacy.rights.export':
+      'لا توجد بعد صفحة لتنزيل نسخة من بياناتك ولا لتغيير بريد الحساب. راسلنا وينفّذها شخص يدوياً.',
+    'privacy.rights.accountLink': 'افتح صفحة حسابك لحذف حسابك',
+    'privacy.rights.how':
+      'لأي طلب من هذه، استعمل صفحة «اتصل بنا» أو العنوان المذكور في أعلى الصفحة.',
+
+    'privacy.security.title': 'كيف نحمي حسابك',
+    'privacy.security.password':
+      'كلمة المرور لا تُحفظ كما كتبتها، بل كبصمة مشفّرة بطيئة الحساب عمداً. ولا نرسل كلمة مرور في بريد أبداً: رابط إعادة التعيين ينتهي ويعمل مرة واحدة.',
+    'privacy.security.cookie':
+      'كوكي الجلسة لا يستطيع أي كود في الصفحة قراءته، ولا يُخزَّن رمز الدخول في متصفّحك.',
+    'privacy.security.uploads':
+      'كل صورة مرفوعة تُكتب من جديد قبل حفظها، فلا يمرّ ملف ضار متخفّياً في هيئة صورة.',
+    'privacy.security.rate': 'نحدّ عدد محاولات الدخول وإنشاء الحساب من العنوان الواحد.',
+    'privacy.security.https': 'نطلب من المتصفّح ألّا يتصل بالموقع إلا عبر اتصال مشفّر.',
+    'privacy.security.honest':
+      'لا نستطيع أن نعدك بأن شيئاً لن ينكسر أبداً. لكن إن وقع خرق يمسّ بياناتك، نُبلغ المتضرّرين والجهة المختصة.',
+
+    'privacy.changes.title': 'إن تغيّرت هذه الصفحة',
+    'privacy.changes.p1':
+      'إن غيّرنا شيئاً غيّرنا معه تاريخ التحديث في الأعلى. وإن كان التغيير جوهرياً — كأن نبدأ بجمع شيء جديد — نقوله بوضوح على الموقع، لا في سطر مدفون هنا.',
+
+    'privacy.contact.title': 'كيف تتواصل معنا',
+    'privacy.contact.p1':
+      'أي سؤال عن هذه الصفحة، أو أي طلب يخصّ بياناتك، أرسله من صفحة «اتصل بنا» أو إلى العنوان المذكور في الأعلى. نرد على البريد الذي تكتبه.',
+    'privacy.contact.link': 'افتح صفحة «اتصل بنا»',
+
+    // --- Terms of use
+    // Written for two audiences at once: a shopper who needs to know the
+    // price here is not a promise, and a shop owner about to be asked for an
+    // account. The merchant section is the one that has to be exact, because
+    // it is what someone agrees to when they upload a photo of a phone.
+    'terms.title': 'شروط الاستخدام',
+    'terms.blurb': 'ما الذي تقدّمه هذه الخدمة وما لا تقدّمه — للمتسوّقين وللمتاجر.',
+
+    'terms.what.title': 'ما هذه الخدمة',
+    'terms.what.p1':
+      '«احسن سعر» يقارن أسعار أجهزة معروضة في متاجر أردنية، ويدلّك على أين تجدها بأقل سعر.',
+    'terms.what.p2':
+      'نحن لسنا متجراً. لا نبيع شيئاً، ولا يتم أي شراء ولا أي دفع على هذا الموقع. حين تقرّر الشراء تتعامل مع المتجر مباشرة: البيع والسعر والفاتورة والكفالة والاستبدال كلها بينك وبينه، ولسنا طرفاً فيها.',
+    'terms.what.p3':
+      'باستخدامك للموقع أنت توافق على ما في هذه الصفحة. وإن لم توافق، فلا تستخدمه.',
+
+    'terms.prices.title': 'عن الأسعار المعروضة',
+    'terms.prices.sources':
+      'للأسعار هنا مصدران: أسعار نقرأها آلياً من صفحات المتاجر المنشورة للعموم، وأسعار يدخلها التاجر بنفسه.',
+    'terms.prices.stale':
+      'السعر هنا قد يكون قديماً أو خاطئاً. المتاجر تغيّر أسعارها في أي لحظة، وقد يخطئ التاجر في الإدخال، وقد نخطئ نحن في القراءة.',
+    'terms.prices.governs':
+      'السعر المعتمد هو سعر المتجر نفسه وقت الشراء. ما تراه عندنا دليل، لا وعد.',
+    'terms.prices.age':
+      'نعرض متى تحقّقنا آخر مرة من كل سعر، فانظر إلى هذا التاريخ قبل أن تبني عليه.',
+    'terms.prices.matching':
+      'نحاول أن نطابق عروض المتاجر على المنتج نفسه، ونبيّن درجة قرب المطابقة. المطابقة القريبة ليست بالضرورة المنتج ذاته: تأكّد من السعة واللون والحالة قبل الشراء.',
+    'terms.prices.report':
+      'إن وجدت سعراً خاطئاً فأخبرنا وسنصحّحه، لكننا لا نستطيع إلزام أي متجر ببيعك بسعر ظهر عندنا.',
+
+    'terms.account.title': 'حسابك',
+    'terms.account.email':
+      'تحتاج بريداً إلكترونياً حقيقياً تصل إليه الرسائل، لأن التأكيد وإعادة تعيين كلمة المرور والتنبيهات كلها تصل عليه.',
+    'terms.account.password':
+      'كلمة المرور مسؤوليتك. لا تشاركها مع أحد، وما يجري من حسابك يُحسب عليك.',
+    'terms.account.breach':
+      'إن ظننت أن أحداً دخل إلى حسابك، غيّر كلمة المرور وراسلنا فوراً.',
+    'terms.account.one':
+      'حساب واحد لكل شخص أو متجر. لا تُنشئ حسابات إضافية لتجاوز حدّ أو إيقاف.',
+
+    'terms.merchant.title': 'إن كنت تاجراً',
+    'terms.merchant.intro': 'حين تنشر عرضاً على «احسن سعر» فأنت توافق على ما يلي:',
+    'terms.merchant.accurate':
+      'أن يكون العرض صحيحاً: جهاز تملكه فعلاً، بسعر تبيع به فعلاً، وأن تحدّثه إن تغيّر أو نفد.',
+    'terms.merchant.condition':
+      'أن تصف الحالة بصدق: جديد أو مستعمل أو مجدّد، ونسبة البطارية، وأي ضرر — حتى ما لا يظهر في الصورة.',
+    'terms.merchant.public':
+      'أن تعرف أن بيانات تواصلك — الهاتف وواتساب وحساباتك — تُنشر على صفحة المنتج لكل زائر، لا لمن يطلبها وحده.',
+    'terms.merchant.freeText':
+      'أن ما تكتبه بحرّية — اسم المتجر وملاحظات الضرر وملاحظات العرض — يُنشر كما هو. لا تكتب فيه ما لا تريد نشره.',
+    'terms.merchant.photos':
+      'أن تكون الصورة التي ترفعها لك: صوّرتها أنت أو تملك حق استخدامها، وهي للجهاز المعروض نفسه. لا ترفع صورة من موقع متجر آخر ولا من موقع الشركة المصنّعة إلا إن كان يحقّ لك ذلك.',
+    'terms.merchant.licence':
+      'أن تأذن لنا بعرض صور عروضك على الموقع ما دام العرض قائماً. الصورة تبقى ملكك، واحذفها متى شئت فتُحذف عندنا.',
+    'terms.merchant.remove':
+      'أنه يحقّ لك أن تطلب إزالة متجرك أو أي عرض فيه في أي وقت، وننفّذ ذلك.',
+    'terms.merchant.review':
+      'نراجع كل متجر قبل أن تظهر أسعاره للمتسوّقين. ويحقّ لنا إخفاء أو إزالة أي عرض مضلّل أو خاطئ أو مخالف للقانون، ونوضّح لك السبب.',
+    'terms.merchant.taps':
+      'نُظهر لك كم مرة ضغط أحدهم «اتصال» أو «واتساب» على عروضك. هذا عدد نقرات فقط: لا نعرف إن رنّ الهاتف، ولا إن تمّ بيع، ومن يضغط مرتين يُحسب مرتين. فلا تُقرأ هذه الأرقام على أنها زبائن أو مبيعات.',
+
+    'terms.retailers.title': 'للمتاجر التي نقرأ أسعارها',
+    'terms.retailers.p1':
+      'نقرأ صفحات منشورة للعموم فقط، على مهل، ونعرّف عن أنفسنا في كل طلب، ونحترم ملف robots.txt.',
+    'terms.retailers.p2':
+      'هذا أدب تعامل، لا ادّعاء بأن أحداً أذن لنا. لا توجد بيننا وبين هذه المتاجر شراكة ولا اتفاق.',
+    'terms.retailers.p3':
+      'إن كنت تدير أحد هذه المتاجر ولا تريد أن تظهر أسعارك هنا، راسلنا ونزيلها.',
+
+    'terms.use.title': 'ما لا يجوز على الموقع',
+    'terms.use.harvest':
+      'جمع أرقام التجّار أو بياناتهم من الموقع لاستعمالها في تسويق أو رسائل غير مطلوبة.',
+    'terms.use.copy': 'نسخ محتوى الموقع آلياً أو إعادة نشره كخدمة مشابهة.',
+    'terms.use.attack':
+      'محاولة تعطيل الموقع، أو الدخول إلى حساب غيرك، أو الالتفاف على حدود الاستخدام.',
+    'terms.use.illegal': 'نشر ما يخالف القانون، أو ما يخصّ شخصاً آخر بغير إذنه.',
+
+    'terms.termination.title': 'إغلاق الحساب',
+    'terms.termination.you':
+      'تستطيع حذف حسابك بنفسك في أي وقت من صفحة حسابك. وحذف حساب تاجر يُخفي أسعاره عن الموقع.',
+    'terms.termination.link': 'افتح صفحة حسابك',
+    'terms.termination.us':
+      'ويحقّ لنا إيقاف أو إغلاق حساب يخالف هذه الشروط، ونذكر السبب حيثما أمكن. وما يبقى بعد الحذف مشروح في صفحة الخصوصية.',
+    'terms.termination.privacyLink': 'اقرأ سياسة الخصوصية',
+
+    'terms.warranty.title': 'لا يوجد ضمان',
+    'terms.warranty.p1':
+      'الموقع يُقدَّم كما هو. لا نعد بأنه سيعمل دائماً، ولا بأن كل معلومة فيه صحيحة أو كاملة أو محدّثة.',
+    'terms.warranty.p2':
+      'ولسنا مسؤولين عن صفقة عقدتها مع متجر، ولا عن سعر دفعته، ولا عن جهاز اشتريته، ولا عن طريقة تعامل متجر معك. لا شيء في هذه الصفحة ولا في الموقع يُعدّ ضماناً من أي نوع.',
+    'terms.warranty.p3':
+      'وفي حدود ما يسمح به القانون، لا نتحمّل أي خسارة غير مباشرة نتجت عن استعمال الموقع.',
+
+    'terms.changes.title': 'تعديل الشروط',
+    'terms.changes.p1':
+      'قد نعدّل هذه الشروط. تاريخ آخر تعديل مذكور في الأعلى، واستمرارك في استعمال الموقع بعده يعني قبولك به. وإن كان التعديل جوهرياً على التجّار، نخبرهم.',
+
+    'terms.law.title': 'القانون والاختصاص',
+    'terms.law.p1':
+      'تخضع هذه الشروط لقانون الدولة المذكورة في أعلى هذه الصفحة، وتُنظر أي منازعة أمام محاكمها.',
+    'terms.law.p2':
+      'أما البيانات الشخصية فيحكمها قانون حماية البيانات الشخصية الأردني رقم 24 لسنة 2023.',
+
+    'terms.contact.title': 'أسئلة',
+    'terms.contact.p1':
+      'أي سؤال عن هذه الشروط، أو طلب إزالة عرض أو متجر، أرسله من صفحة «اتصل بنا».',
+    'terms.contact.link': 'افتح صفحة «اتصل بنا»',
   },
 
   en: {
@@ -512,6 +878,7 @@ const translations = {
     'nav.alerts': 'Alerts',
     'nav.myShop': 'My shop',
     'nav.admin': 'Admin',
+    'nav.account': 'Account',
     'nav.login': 'Login',
     'nav.logout': 'Logout',
     'nav.toggleLanguage': 'العربية',
@@ -738,6 +1105,80 @@ const translations = {
     'auth.verifyBanner': 'Confirm your email to receive price alerts.',
     'auth.resendLink': 'Resend the link',
 
+    // --- Signing in with Google or Apple. The failure keys carry the API's
+    // own error codes; see the Arabic table for why.
+    'auth.continueWithGoogle': 'Continue with Google',
+    'auth.continueWithApple': 'Sign in with Apple',
+    'auth.or': 'or',
+    'auth.oauth.signingIn': 'Finishing your sign-in…',
+    'auth.oauth.problemTitle': 'We could not finish signing you in',
+    'auth.oauth.cancelledTitle': 'Sign-in not completed',
+    'auth.oauth.state_invalid':
+      'That sign-in attempt expired or was already used. Start again.',
+    'auth.oauth.unavailable':
+      'Signing in with Google or Apple is unavailable right now. You can sign in with your email and password instead.',
+    'auth.oauth.provider_error':
+      'The provider did not complete the sign-in. If you cancelled, that is all that happened — try again, or sign in with your email and password.',
+    'auth.oauth.email_unverified':
+      'Google or Apple would not confirm that this email address is yours. Verify the address in your account settings there and try again, or sign in here with an email and password instead.',
+    'auth.oauth.unknown':
+      'The sign-in did not complete. Try again, or sign in with your email and password.',
+
+    // --- The account page. The consequences of a deletion are listed one by
+    // one rather than summarised; see the Arabic table for why.
+    'account.title': 'Your account',
+    'account.blurb': 'Your details, and how to delete the account if you want to.',
+    'account.emailStatus': 'Email status',
+    'account.verified': 'Confirmed',
+    'account.unverified': 'Not confirmed',
+    'account.unverifiedHint':
+      'Price alerts are only sent to a confirmed address. Use the banner at the top of the page to send yourself a new link.',
+    'account.role': 'Account type',
+    'account.role.buyer': 'Shopper',
+    'account.role.merchant': 'Merchant',
+    'account.role.admin': 'Administrator',
+    'account.created': 'Opened',
+    'account.limits':
+      'There is not yet a page to change the address on an account, or to download a copy of your data. Write to us and a person will do it by hand.',
+    'account.limitsLink': 'Write to us',
+    'account.delete.title': 'Delete your account',
+    'account.delete.blurb':
+      'Deleting is final: there is no undo, nothing kept aside, and no way for us to bring an account back afterwards.',
+    'account.delete.start': 'Delete my account',
+    'account.delete.whatTitle': 'What deleting actually does',
+    'account.delete.goneTitle': 'Gone immediately, and for good',
+    'account.delete.gone.account':
+      'Your account and your email address. The address is free to register again straight away.',
+    'account.delete.gone.saved': 'Everything you saved: your wishlist and every price alert.',
+    'account.delete.gone.sessions':
+      'Every sign-in session on every device, this one included.',
+    'account.delete.gone.social': 'Any Google or Apple sign-in linked to the account.',
+    'account.delete.keptTitle': 'Kept, with what named you removed',
+    'account.delete.kept.support':
+      'Support messages you sent keep their text, so we still have the history of the conversation, but the reply-to address is scrubbed and the message no longer names you.',
+    'account.delete.untouchedTitle': 'Untouched',
+    'account.delete.untouched.taps':
+      'The tap counters that tell a shop how many shoppers asked for its number. They are anonymous by design and refer to no person.',
+    'account.delete.merchantTitle': 'If you own a shop',
+    'account.delete.merchant.retired':
+      'Your shop is not deleted with the account, it is retired: taken off the site at once, its phone, WhatsApp and social links erased, and its name changed — shop names are unique, and a retired shop holding on to yours would reserve it forever and block that business from ever registering again.',
+    'account.delete.merchant.photos':
+      'Every product photo you uploaded is deleted. It is your own work, it may show you or your premises, and it can never be displayed again.',
+    'account.delete.merchant.listings':
+      'Your listings, their prices and the price history stay. They belong to the catalogue shoppers are comparing, not to your account.',
+    'account.delete.merchantLink': 'Look at your shop first',
+    'account.delete.confirmTitle': 'Type your email address to confirm',
+    'account.delete.confirmWhy':
+      'Your address, not your password: an account created through Google has no password at all, and this has to work for those accounts too. Capitals and stray spaces do not matter.',
+    'account.delete.confirmLabel': 'Your email address',
+    'account.delete.confirm': 'Delete my account permanently',
+    'account.delete.deleting': 'Deleting…',
+    'account.delete.mismatch': 'That is not the email address on this account.',
+    'account.delete.error': 'We could not delete the account. Try again.',
+    'account.deleted.title': 'Your account has been deleted.',
+    'account.deleted.blurb':
+      'Everything listed on the account page is gone. Your email address is free to use again if you ever want to come back.',
+
     'merchant.listYourShop': 'List your shop',
     'merchant.listYourShopBlurb':
       'Add your prices and shoppers comparing phones in Jordan will see them, with your phone number to call. Free, and you do not need a website.',
@@ -956,6 +1397,281 @@ const translations = {
     'wishlist.from': 'from',
     'common.previous': 'Previous',
     'common.next': 'Next',
+
+    // --- Footer
+    'footer.nav': 'Site links',
+    'footer.notAShop':
+      'We only compare prices. We sell nothing, and no purchase or payment happens on this site.',
+    'footer.privacy': 'Privacy',
+    'footer.terms': 'Terms',
+    'footer.copyright': '© {year} Ahsan Se3r',
+
+    // --- Legal pages: the furniture both of them share. The two blanks get a
+    // panel of their own rather than a marker inside a sentence; see the
+    // Arabic table for why.
+    'legal.updated': 'Last updated: September 2026',
+    'legal.contents': 'On this page',
+    'legal.todo.title': 'This page is not finished',
+    'legal.todo.blurb': 'Whoever operates this site must fill these in before publishing:',
+    'legal.todo.blank': '⟨ to fill in ⟩',
+    'legal.field.entity': 'Legal name of the entity that operates this site',
+    'legal.field.dataContact':
+      'Email address for data requests: access, correction, deletion',
+    'legal.field.law': 'The country whose law governs these terms',
+
+    // --- Privacy policy. Every sentence is a claim about what this code
+    // does; see the Arabic table for the ones that were cut.
+    'privacy.title': 'Privacy policy',
+    'privacy.blurb': 'What we keep about you, why, and who else sees it.',
+
+    'privacy.who.title': 'Who runs this site',
+    'privacy.who.p1':
+      'Ahsan Se3r compares the price of devices across Jordanian shops. The operator is named at the top of this page and is responsible for everything on it.',
+    'privacy.who.p2':
+      'We handle your data under Jordan’s Personal Data Protection Law No. 24 of 2023.',
+    'privacy.who.p3':
+      'This page is written as plainly as we could manage. If anything here is unclear, write to us and we will explain it.',
+
+    'privacy.collect.title': 'What we collect',
+    'privacy.collect.intro': 'Only what the service actually needs:',
+    'privacy.collect.account':
+      'Your account: your email address, your password stored as a one-way hash that cannot be turned back into the password, the kind of account, when it was created, and whether you have confirmed your address.',
+    'privacy.collect.noProfile':
+      'We do not ask for your name, your phone number, your address or your date of birth. There is no way to pay on this site, so we hold no card details.',
+    'privacy.collect.shop':
+      'If you have a shop: its name, website and logo, and the contact details you choose to publish — phone, WhatsApp, Facebook and Instagram. These are shown to every visitor on the product page.',
+    'privacy.collect.listing':
+      'The listing details a merchant writes: condition, battery health, any damage, warranty length and notes. They are published as written.',
+    'privacy.collect.photos':
+      'Listing photos a merchant uploads. We keep the picture and nothing else: every upload is re-encoded, so no capture location, device serial or timestamp survives.',
+    'privacy.collect.wishlist':
+      'Your wishlist and price alerts: which product you saved, and the price at which you want to hear from us.',
+    'privacy.collect.support':
+      'Support messages: the address you type into the form, the subject, and the message itself.',
+    'privacy.collect.sessions':
+      'Sign-in records: when each session started and ended. The server also writes your IP address and your account number to its logs when you sign in, register, or reset your password.',
+    'privacy.collect.provider':
+      'If you sign in with Google or Apple: a permanent identifier the provider gives us, and your email address. We never ask for or receive your name or your picture — the only scope we request is your email.',
+    'privacy.collect.linkPassword':
+      'And if an account with a password already exists on the same address but that address was never confirmed, signing in with a provider links the two, clears that old password and ends its sessions. The reason: it was set by someone who never proved they own the mailbox. You can set a new one through “Forgot password”.',
+
+    'privacy.why.title': 'Why we keep it',
+    'privacy.why.signin': 'To sign you in and keep you signed in across page loads.',
+    'privacy.why.alerts':
+      'To tell you when a product you follow drops in price, and to send confirmation and password-reset links.',
+    'privacy.why.shop': 'To show a shop’s details to shoppers so they can reach it.',
+    'privacy.why.support': 'To answer your messages.',
+    'privacy.why.abuse':
+      'To protect the site: we count attempts from each address so passwords cannot be guessed by repetition.',
+    'privacy.why.noSale':
+      'We do not sell or rent your data, we do not use it for advertising, and there is no ad network on this site.',
+
+    'privacy.not.title': 'What we deliberately do not collect',
+    'privacy.not.intro': 'These are decisions in how the site was built, not oversights:',
+    'privacy.not.analytics':
+      'There is no analytics or tracking service, no advertising pixel, and no session recording. Nothing on this site is loaded from an analytics company.',
+    'privacy.not.search':
+      'We keep no record of what you searched for. The text of a search reaches our cache only as an unreadable fingerprint, and is erased after five minutes.',
+    'privacy.not.taps':
+      'When you press Call or WhatsApp we record four things: which shop, which product, which channel, and when. No IP address, no account number, no session identifier.',
+    'privacy.not.exif':
+      'We do not keep the hidden data inside photos. Every upload is decoded and written afresh, which destroys the capture location, the device and the time it was taken.',
+    'privacy.not.sensors':
+      'We never ask for your location, your camera or your microphone, and the site explicitly instructs your browser to refuse those requests.',
+    'privacy.not.tapsWhy':
+      'We count taps because a merchant needs to know whether the site is doing anything for them. The price we accepted for not recording who you are is that we cannot tell two people apart: press twice and it counts twice. That is why we say taps, and never calls or sales — we do not know those.',
+
+    'privacy.cookies.title': 'Cookies and browser storage',
+    'privacy.cookies.one':
+      'We set exactly one cookie, refresh_token, and only once you sign in. Its only job is to keep you signed in across page loads. No code on the page can read it, it is sent only to the sign-in path, it lasts seven days, and logging out deletes it.',
+    'privacy.cookies.local':
+      'Your browser also remembers two things you chose by clicking: your language, and light or dark mode. Both stay on your device and never reach our server.',
+    'privacy.cookies.oauth':
+      'And a second, short-lived cookie, created only when you begin a Google or Apple sign-in and deleted the moment it finishes. Its job is to prove the sign-in that came back is the one your browser started rather than someone else’s. It lasts ten minutes.',
+    'privacy.cookies.noBanner1': 'That is why there is no cookie consent banner here.',
+    'privacy.cookies.noBanner2':
+      'The one cookie is necessary to sign you in, and consent is not asked for what a service needs to work. Your language and theme are your own choices, carry no identifier, and never leave your device. There is no third thing tracking you.',
+    'privacy.cookies.noBanner3':
+      'A banner here would imply tracking that does not happen, and would train you to press Accept without reading. If we ever add something that does track you, we will ask first.',
+
+    'privacy.others.title': 'Who else sees anything',
+    'privacy.others.intro': 'We keep this list as short as we can, but it is not empty:',
+    'privacy.others.images':
+      'Product photos come from the shops’ own servers, and your browser fetches them directly. So the shop — and whichever hosting company it uses — sees your IP address and which browser you are on. This is the most important line on this page.',
+    'privacy.others.referrer':
+      'We ask your browser not to tell them which page you were on, so they cannot see which product you were looking at. The IP address cannot be hidden while we are showing you their picture.',
+    'privacy.others.meta':
+      'The WhatsApp, Facebook and Instagram buttons hand you to Meta. What happens after the tap is governed by their policies, not ours.',
+    'privacy.others.email':
+      'Our email — confirmation, password resets, price alerts and support replies — goes through a mail provider that sees your address and the message.',
+    'privacy.others.hosting':
+      'The database, the cache and the server logs run at hosting providers, who can technically reach them by virtue of running them.',
+    'privacy.others.providers':
+      'The “Continue with Google” or “Sign in with Apple” button sends your browser to Google or Apple, and our server then exchanges a code with them to confirm who you are. This happens only for someone who presses that button: a visitor who is just comparing prices sends them nothing.',
+    'privacy.others.fonts':
+      'The fonts and every other file of this site come from our own server. None of it is loaded from Google Fonts or any other external network. That is about the files alone: if you choose to sign in with Google, Google is a party to that, as described above.',
+    'privacy.others.retailers':
+      'The shop prices we read automatically are fetched by our server on a schedule, not by your browser. Your visit is never reported to them by us.',
+
+    'privacy.keep.title': 'How long we keep it',
+    'privacy.keep.honest':
+      'Honestly: there is no automatic deletion yet. Most records stay until you delete them, or until we delete them by hand when you ask. We are not going to promise you a retention period the code does not keep.',
+    'privacy.keep.wishlist':
+      'Wishlist and price alerts: until you remove them or your account is deleted.',
+    'privacy.keep.links':
+      'Confirmation and password-reset links: they expire within twenty-four hours and work once. A record that a link was sent remains.',
+    'privacy.keep.sessions':
+      'Sign-in sessions: they expire after seven days, and a record that a session began and ended remains.',
+    'privacy.keep.support':
+      'Support messages: the text is kept even after an account is deleted, because the message is what explains why we did something. The address in it is replaced when you delete your account.',
+    'privacy.keep.prices':
+      'Price history is kept indefinitely, but it is about products, not about people.',
+    'privacy.keep.logs':
+      'Server logs are held by the hosting provider under its own settings, and nothing in our code deletes them after a set period.',
+
+    'privacy.rights.title': 'Your rights, and how to use them',
+    'privacy.rights.intro':
+      'Under Personal Data Protection Law No. 24 of 2023 you have the right to know what we hold about you, to correct it, to ask us to delete it, and to object to how it is used.',
+    'privacy.rights.delete':
+      'Deleting your account: from your account page, and it is final. It removes your account, your sign-in sessions, your pending links, your wishlist and your alerts. If you are a merchant, your shop comes off the site with its name and contact details erased, and your listing photos are deleted.',
+    'privacy.rights.providerLink':
+      'Your Google or Apple link: deleting your account removes it on our side. The permission you granted stays in your account with them, so remove this site from your Google or Apple account settings if you want the connection gone entirely.',
+    'privacy.rights.survives':
+      'What survives deletion: the text of support messages you sent, with the address in them replaced by a code the address cannot be read back out of. Price history and tap counts stay too — those are about products and shops, not about you.',
+    'privacy.rights.export':
+      'There is not yet a page to download a copy of your data, or to change the address on an account. Write to us and a person will do it by hand.',
+    'privacy.rights.accountLink': 'Open your account page to delete your account',
+    'privacy.rights.how':
+      'For any of these, use the contact page or the address given at the top of this page.',
+
+    'privacy.security.title': 'How we protect your account',
+    'privacy.security.password':
+      'Your password is never stored as you typed it, but as a hash that is deliberately slow to compute. We never send a password by email: a reset link expires and works once.',
+    'privacy.security.cookie':
+      'No code on the page can read the session cookie, and the sign-in token is never stored in your browser.',
+    'privacy.security.uploads':
+      'Every uploaded photo is written afresh before it is stored, so a harmful file cannot travel disguised as a picture.',
+    'privacy.security.rate':
+      'We limit how many sign-in and registration attempts one address can make.',
+    'privacy.security.https':
+      'We instruct your browser to reach this site only over an encrypted connection.',
+    'privacy.security.honest':
+      'We cannot promise you that nothing will ever break. But if a breach touches your data, we will tell the people affected and the authority.',
+
+    'privacy.changes.title': 'If this page changes',
+    'privacy.changes.p1':
+      'If we change something, we change the date at the top with it. And if the change is material — if we start collecting something new — we will say so plainly on the site, not in a line buried here.',
+
+    'privacy.contact.title': 'How to reach us',
+    'privacy.contact.p1':
+      'Any question about this page, or any request about your data, can go through the contact page or to the address given at the top. We reply to whatever address you write from.',
+    'privacy.contact.link': 'Open the contact page',
+
+    // --- Terms of use. Two audiences at once; see the Arabic table.
+    'terms.title': 'Terms of use',
+    'terms.blurb': 'What this service does and does not do — for shoppers and for shops.',
+
+    'terms.what.title': 'What this service is',
+    'terms.what.p1':
+      'Ahsan Se3r compares the price of devices sold by Jordanian shops, and points you at where to find them cheapest.',
+    'terms.what.p2':
+      'We are not a shop. We sell nothing, and no purchase and no payment happens on this site. When you decide to buy, you deal with the shop directly: the sale, the price, the receipt, the warranty and the return are between you and them, and we are not a party to any of it.',
+    'terms.what.p3':
+      'Using the site means you accept what is on this page. If you do not accept it, do not use the site.',
+
+    'terms.prices.title': 'About the prices you see',
+    'terms.prices.sources':
+      'Prices here come from two places: prices we read automatically from shops’ public pages, and prices a merchant enters themselves.',
+    'terms.prices.stale':
+      'A price here may be old or wrong. Shops change prices at any moment, a merchant can mistype, and we can misread a page.',
+    'terms.prices.governs':
+      'The price that counts is the shop’s own price at the time you buy. What you see here is a guide, not a promise.',
+    'terms.prices.age':
+      'We show when each price was last checked, so look at that date before relying on it.',
+    'terms.prices.matching':
+      'We try to match a shop’s listing to the same product, and we show how close the match is. A close match is not necessarily the same item: check the storage, the colour and the condition before you buy.',
+    'terms.prices.report':
+      'If you find a wrong price, tell us and we will correct it — but we cannot make a shop honour a price that appeared here.',
+
+    'terms.account.title': 'Your account',
+    'terms.account.email':
+      'You need a real email address that you can receive mail on, because confirmation, password resets and alerts all go there.',
+    'terms.account.password':
+      'Your password is your responsibility. Do not share it, and what happens from your account counts as yours.',
+    'terms.account.breach':
+      'If you think someone else has got into your account, change your password and write to us immediately.',
+    'terms.account.one':
+      'One account per person or shop. Do not open extra accounts to get around a limit or a suspension.',
+
+    'terms.merchant.title': 'If you are a merchant',
+    'terms.merchant.intro': 'When you list something on Ahsan Se3r, you agree to this:',
+    'terms.merchant.accurate':
+      'That the listing is real: a device you actually have, at a price you will actually sell at, and that you will update it when it changes or sells.',
+    'terms.merchant.condition':
+      'That you describe the condition honestly: new, used or refurbished, the battery health, and any damage — including damage the photo does not show.',
+    'terms.merchant.public':
+      'That your contact details — phone, WhatsApp and your social accounts — are published on the product page for every visitor, not only for whoever asks.',
+    'terms.merchant.freeText':
+      'That your free text — the shop name, the damage notes and the listing notes — is published exactly as written. Do not type anything into it that you do not want published.',
+    'terms.merchant.photos':
+      'That a photo you upload is yours: you took it, or you have the right to use it, and it is of the actual unit you are selling. Do not upload a photo taken from another shop or from the manufacturer’s site unless you are entitled to.',
+    'terms.merchant.licence':
+      'That you let us show your listing photos on the site for as long as the listing stands. The photo stays yours, and deleting it here deletes it from us.',
+    'terms.merchant.remove':
+      'That you may ask for your shop, or any listing in it, to be removed at any time, and we will do it.',
+    'terms.merchant.review':
+      'We review every shop before its prices become visible to shoppers. We may hide or remove any listing that is misleading, wrong, or against the law, and we will tell you why.',
+    'terms.merchant.taps':
+      'We show you how many times someone pressed Call or WhatsApp on your listings. That is a count of taps and nothing more: we do not know whether the phone rang, or whether anything was sold, and one person pressing twice counts twice. Do not read those numbers as customers or as sales.',
+
+    'terms.retailers.title': 'For the shops whose prices we read',
+    'terms.retailers.p1':
+      'We read only publicly published pages, slowly, identifying ourselves on every request, and we honour robots.txt.',
+    'terms.retailers.p2':
+      'That is courtesy, not a claim that anyone gave us permission. There is no partnership and no agreement between us and these shops.',
+    'terms.retailers.p3':
+      'If you run one of them and do not want your prices shown here, write to us and we will take them down.',
+
+    'terms.use.title': 'What you may not do here',
+    'terms.use.harvest':
+      'Harvest merchants’ numbers or details from the site to use for marketing or unwanted messages.',
+    'terms.use.copy':
+      'Copy the site’s content automatically, or republish it as a competing service.',
+    'terms.use.attack':
+      'Try to break the site, get into someone else’s account, or work around the usage limits.',
+    'terms.use.illegal':
+      'Publish anything unlawful, or anything belonging to another person without their permission.',
+
+    'terms.termination.title': 'Closing an account',
+    'terms.termination.you':
+      'You can delete your account yourself at any time from your account page. Deleting a merchant account hides its prices from the site.',
+    'terms.termination.link': 'Open your account page',
+    'terms.termination.us':
+      'We may suspend or close an account that breaks these terms, and we will say why wherever we can. What survives deletion is set out in the privacy policy.',
+    'terms.termination.privacyLink': 'Read the privacy policy',
+
+    'terms.warranty.title': 'No warranty',
+    'terms.warranty.p1':
+      'The site is provided as it is. We do not promise that it will always work, or that everything on it is correct, complete or up to date.',
+    'terms.warranty.p2':
+      'We are not responsible for a deal you made with a shop, a price you paid, a device you bought, or how a shop treated you. Nothing on this page or on this site is a warranty of any kind.',
+    'terms.warranty.p3':
+      'To the extent the law allows, we are not liable for indirect loss arising from your use of the site.',
+
+    'terms.changes.title': 'Changes to these terms',
+    'terms.changes.p1':
+      'We may change these terms. The date of the last change is at the top, and continuing to use the site after it means you accept it. If a change matters to merchants, we will tell them.',
+
+    'terms.law.title': 'Governing law',
+    'terms.law.p1':
+      'These terms are governed by the law of the country named at the top of this page, and any dispute goes to its courts.',
+    'terms.law.p2':
+      'Personal data is governed by Jordan’s Personal Data Protection Law No. 24 of 2023.',
+
+    'terms.contact.title': 'Questions',
+    'terms.contact.p1':
+      'Any question about these terms, or a request to remove a listing or a shop, can go through the contact page.',
+    'terms.contact.link': 'Open the contact page',
   },
 };
 

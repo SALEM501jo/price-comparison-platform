@@ -1,6 +1,10 @@
 # Root ignores
 *.pem
 *.key
+# Apple hands you the Sign in with Apple signing key as a .p8, and
+# backend/.env.example tells the operator to open one. It authenticates the
+# whole Apple integration, and *.pem / *.key do not cover that extension.
+*.p8
 secrets/
 # Database dumps taken before destructive cleanups. Local only -- they
 # contain every account and price in the database.

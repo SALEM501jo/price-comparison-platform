@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.exceptions import AuthenticationError, ConflictError
+from app.exceptions import AppException, AuthenticationError, ConflictError
 from app.logging_config import get_security_logger, pseudonymize
 from app.models.user import User, UserRole
 from app.schemas.auth import (
+    DeleteAccountRequest,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
@@ -35,7 +36,7 @@ from app.security.cookies import (
 from app.security.password import get_dummy_hash, hash_password, verify_password
 from app.security.rate_limiter import rate_limit, strict_rate_limit
 from app.services import tokens as token_service
-from app.services import password_reset, verification
+from app.services import account, password_reset, verification
 
 router = APIRouter()
 logger = get_security_logger("app.auth")
@@ -140,14 +141,25 @@ async def login(
     When the account does not exist we still run verify_password against a
     dummy hash. Without it, "no such user" returns in ~1ms and "wrong password"
     in ~250ms, and that gap alone reveals which addresses are registered.
+
+    THE SAME APPLIES TO AN ACCOUNT WITH NO PASSWORD -- one that signs in with
+    Google or Apple, or one whose password was cleared when a provider was
+    linked to it. Skipping bcrypt for those is the obvious shortcut and it is
+    a worse leak than plain account enumeration: a reply in ~0ms against
+    ~240ms says "this address exists AND uses a provider", which tells an
+    attacker exactly which login page to imitate. Measured before this
+    existed, it was not even a timing gap -- password_hash=None reached
+    bcrypt, raised AttributeError, and returned HTTP 500 instantly.
+    So the hash comparison still RUNS against the dummy, its result is
+    discarded, and there is one uniform failure branch below.
     """
     await strict_rate_limit(request)
 
     user = db.query(User).filter(User.email == body.email).first()
-    password_hash = user.password_hash if user else get_dummy_hash()
-    password_valid = verify_password(body.password, password_hash)
+    stored_hash = user.password_hash if user else None
+    password_valid = verify_password(body.password, stored_hash or get_dummy_hash())
 
-    if not user or not password_valid:
+    if not user or stored_hash is None or not password_valid:
         logger.warning(
             "Login failed",
             extra={
@@ -450,3 +462,72 @@ async def reset_password(
         raise AuthenticationError("This link is invalid or has expired.")
 
     return user
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_me(
+    request: Request,
+    response: Response,
+    body: DeleteAccountRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete the signed-in account. Permanent, and not appealable.
+
+    THE ERASURE ITSELF is in app/services/account.py, table by table --
+    including why a merchant's shop is retired rather than deleted, and why a
+    support ticket keeps its text but loses the address that would still name
+    the person who wrote it.
+
+    EVERY SESSION DIES HERE. The refresh tokens are revoked and then removed
+    with the account, and the cookie is cleared exactly as logout clears it: a
+    deleted account whose refresh cookie still works is a live account. The
+    access token that authorised this request dies with the row as well --
+    get_current_user re-reads the user on every request -- so unlike logout
+    there is no 15-minute window where a token outlives what it names.
+    """
+    # The ordinary limit, not the strict one. The strict limit exists to slow
+    # credential guessing, and there is no credential to guess here: the
+    # confirmation is the account's own address, which anyone holding this
+    # token can read straight off GET /auth/me. This only keeps a destructive
+    # endpoint from being hammered.
+    await rate_limit(request)
+
+    # Compared case-insensitively and with surrounding space ignored, because
+    # a mobile keyboard capitalises the first letter and a paste brings a
+    # trailing space -- neither is a different address, and refusing them
+    # would teach people to retype until something works.
+    if body.email.strip().lower() != current_user.email.strip().lower():
+        logger.warning(
+            "Account deletion refused: confirmation did not match",
+            extra={
+                "user_id": current_user.id,
+                "ip": _client_ip(request),
+                "action": "delete_account",
+                "success": False,
+            },
+        )
+        raise AppException(
+            status.HTTP_400_BAD_REQUEST,
+            "That is not the email address on this account.",
+        )
+
+    # Read before the row goes: once the account is deleted the instance is
+    # detached and expired, and reading .id then raises rather than logging.
+    user_id = current_user.id
+
+    summary = account.delete_account(db, current_user)
+    clear_refresh_cookie(response)
+
+    logger.warning(
+        "Account deleted",
+        extra={
+            "user_id": user_id,
+            "ip": _client_ip(request),
+            "action": "delete_account",
+            "target": "store_retired" if summary.store_retired else "no_store",
+            "success": True,
+        },
+    )
+    return None

@@ -92,6 +92,33 @@ class Settings(BaseSettings):
     # Secure is forced on in production regardless; see cookie_is_secure.
     cookie_secure_override: bool | None = None
 
+    # --- Social sign-in (Continue with Google / Sign in with Apple) ---
+    #
+    # Each provider is enabled only when ITS OWN credentials are present, and
+    # /auth/providers reports which. That is load-bearing rather than tidy:
+    # Sign in with Apple needs a paid Apple Developer account, so the site has
+    # to deploy and work with Google alone, and a button for a provider whose
+    # credentials are missing is a button that leads to a 404.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
+    # Apple's "client_id" is the SERVICES ID (com.example.web), not the app id.
+    # There is no static client secret: it is an ES256 JWT signed with the .p8
+    # below, which is why three more values are needed. See
+    # app/services/oauth/providers.py.
+    apple_client_id: str = ""
+    apple_team_id: str = ""
+    apple_key_id: str = ""
+    apple_private_key: str = ""
+
+    # Where the provider sends the browser back -- the API's OWN public
+    # address, which is NOT app_base_url in development (Vite serves the app
+    # on :5173 while the callback route lives here on :8000). It must match
+    # the redirect URI registered with the provider byte for byte, so it is
+    # configuration rather than something inferred from the request Host
+    # header, which is client-supplied and therefore forgeable.
+    api_base_url: str = "http://localhost:8000"
+
     # Kept as a plain string on purpose. pydantic-settings JSON-decodes any
     # complex field type (list/dict) straight from the env var, which made
     # the documented comma-separated form in .env.example crash on startup.
@@ -193,6 +220,18 @@ class Settings(BaseSettings):
                 "public address."
             )
 
+        if self._is_local(self.redis_url):
+            errors.append(
+                f"REDIS_URL is still {self.redis_url!r}. Two controls depend "
+                "on it and they fail in OPPOSITE directions, which is what "
+                "makes this worth refusing the boot over: the rate limiter "
+                "fails OPEN, so brute-force protection is simply off and "
+                "nothing says so, while social sign-in fails CLOSED, so every "
+                "Continue-with-Google attempt is refused. A deployment that "
+                "forgets this comes up looking healthy with its login "
+                "protection disabled."
+            )
+
         origins = self.cors_origins
         if not origins:
             errors.append(
@@ -233,6 +272,45 @@ class Settings(BaseSettings):
                 "will be sent to anyone. Deliberate, but worth knowing."
             )
 
+        # A HALF-CONFIGURED PROVIDER IS THE WORST OF THE THREE STATES. Absent
+        # credentials are honest -- /auth/providers omits the provider and the
+        # frontend renders no button. Complete credentials work. But a client
+        # id with an empty secret boots healthy, passes its health check,
+        # renders the button, and then fails at the token exchange, which is a
+        # provider round trip away from anything a deploy log would show.
+        google_parts = (self.google_client_id, self.google_client_secret)
+        if any(google_parts) and not all(google_parts):
+            errors.append(
+                "Google sign-in is half configured: GOOGLE_CLIENT_ID and "
+                "GOOGLE_CLIENT_SECRET must both be set, or both be empty. As "
+                "it stands the button would render and the token exchange "
+                "would fail."
+            )
+
+        apple_parts = (
+            self.apple_client_id,
+            self.apple_team_id,
+            self.apple_key_id,
+            self.apple_private_key_pem,
+        )
+        if any(apple_parts) and not all(apple_parts):
+            errors.append(
+                "Apple sign-in is half configured: APPLE_CLIENT_ID, "
+                "APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY are all "
+                "required together -- Apple's client secret is a JWT signed "
+                "with the .p8 key, so none of them is optional."
+            )
+
+        if (self.google_oauth_enabled or self.apple_oauth_enabled) and self._is_local(
+            self.api_base_url
+        ):
+            errors.append(
+                f"API_BASE_URL is {self.api_base_url!r} while social sign-in "
+                "is enabled. It is sent to the provider as redirect_uri and "
+                "must be this API's public address, or every sign-in ends at "
+                "'redirect_uri_mismatch'."
+            )
+
         if self.cookie_samesite.lower() == "none" and not self.cookie_is_secure:
             errors.append(
                 "COOKIE_SAMESITE=none requires a Secure cookie; browsers "
@@ -240,6 +318,31 @@ class Settings(BaseSettings):
             )
 
         return errors, warnings
+
+    @property
+    def apple_private_key_pem(self) -> str:
+        """
+        The .p8 contents as a real PEM.
+
+        Env vars are single-line in most deploy platforms, so the key is
+        pasted with literal backslash-n between the armour lines. Left as-is
+        it is not a PEM, and the only symptom is every Apple sign-in failing
+        at signing time with "Could not deserialize key data".
+        """
+        return (self.apple_private_key or "").replace("\\n", "\n").strip()
+
+    @property
+    def google_oauth_enabled(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
+
+    @property
+    def apple_oauth_enabled(self) -> bool:
+        return bool(
+            self.apple_client_id
+            and self.apple_team_id
+            and self.apple_key_id
+            and self.apple_private_key_pem
+        )
 
     @property
     def cookie_is_secure(self) -> bool:

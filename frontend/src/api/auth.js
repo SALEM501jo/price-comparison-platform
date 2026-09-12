@@ -54,6 +54,28 @@ export const getMe = async () => {
   return data;
 };
 
+/**
+ * Delete the signed-in account. Permanent: there is no soft delete and no
+ * tombstone, and the address is free to register again immediately.
+ *
+ * The confirmation is the account's own address rather than its password,
+ * because an account created through Google has no password to type --
+ * password_hash is nullable for exactly those users, so a password prompt
+ * would be unusable by the people most likely to be removing a social login
+ * they never meant to create. The body goes under `data` because that is the
+ * only way axios sends one on a DELETE.
+ *
+ * THE TOKEN IS DROPPED ONLY ON SUCCESS. Clearing it in a `finally` would sign
+ * out a user whose deletion was REFUSED for a mistyped address -- the one
+ * outcome where they still have an account to be signed in to.
+ */
+export const deleteAccount = async (email) => {
+  await api.delete('/auth/me', { data: { email } });
+  // The server has revoked every refresh token and cleared the cookie; this
+  // is the in-memory half of the same thing.
+  clearAccessToken();
+};
+
 /** Redeem a verification link. Unauthenticated: the link is opened from an
  *  email client, often in a different browser from the one that signed up. */
 export const verifyEmail = async (token) => {
@@ -77,4 +99,20 @@ export const forgotPassword = async (email) => {
 export const resetPassword = async (token, password) => {
   const { data } = await api.post('/auth/reset-password', { token, password });
   return data;
+};
+
+/**
+ * Which social sign-ins this deployment can actually complete.
+ *
+ * Asked rather than hard-coded because a provider with no credentials does not
+ * exist as far as the API is concerned: /auth/oauth/apple/start answers 404,
+ * with nothing on screen to explain it. Sign in with Apple needs a paid Apple
+ * Developer account, so "Google alone" is the shipping configuration and
+ * "Google and Apple" has to become true without a frontend change.
+ *
+ * Returns [{ id, start_url }]. start_url is a path on the API, not on the app.
+ */
+export const getAuthProviders = async (config = {}) => {
+  const { data } = await api.get('/auth/providers', config);
+  return data.providers ?? [];
 };

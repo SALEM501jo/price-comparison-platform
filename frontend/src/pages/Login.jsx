@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import SocialSignIn from '../components/auth/SocialSignIn';
 import { extractApiError } from '../utils/errors';
 
 export default function Login() {
@@ -42,6 +43,8 @@ export default function Login() {
           </div>
         )}
 
+        <SocialSignIn />
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -74,20 +77,10 @@ export default function Login() {
           </div>
 
           <Link
-
-
             to="/forgot-password"
-
-
             className="inline-flex min-h-11 items-center text-sm text-brand-600 hover:underline dark:text-brand-400"
-
-
           >
-
-
             {t('auth.forgotPassword')}
-
-
           </Link>
 
           <button

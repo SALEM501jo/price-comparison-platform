@@ -73,6 +73,12 @@ export default function Navbar() {
                   {t('nav.admin')}
                 </NavLink>
               )}
+              {/* Last, because it is the settings drawer of this app rather
+                  than somewhere to browse -- and it is the only route to
+                  deleting an account, which the privacy policy promises. */}
+              <NavLink to="/account" className={linkClass}>
+                {t('nav.account')}
+              </NavLink>
             </div>
           )}
         </div>

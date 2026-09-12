@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLocale } from '../hooks/useLocale';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import SocialSignIn from '../components/auth/SocialSignIn';
 import { extractApiError, PASSWORD_RULES, passwordProblems } from '../utils/errors';
 
 export default function Register() {
@@ -62,6 +63,8 @@ export default function Register() {
           </div>
         )}
 
+        <SocialSignIn />
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <fieldset>
             <legend className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -109,7 +112,7 @@ export default function Register() {
 
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Email
+              {t('auth.email')}
             </label>
             <input
               id="email"
@@ -124,7 +127,7 @@ export default function Register() {
 
           <div>
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Password
+              {t('auth.password')}
             </label>
             <input
               id="password"
@@ -160,7 +163,7 @@ export default function Register() {
               htmlFor="confirmPassword"
               className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
             >
-              Confirm Password
+              {t('auth.confirmPassword')}
             </label>
             <input
               id="confirmPassword"
@@ -186,9 +189,9 @@ export default function Register() {
         </form>
 
         <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-400">
-          Already have an account?{' '}
+          {t('auth.haveAccount')}{' '}
           <Link to="/login" className="text-brand-600 dark:text-brand-400 hover:underline">
-            Login
+            {t('auth.login')}
           </Link>
         </p>
       </div>

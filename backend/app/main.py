@@ -20,6 +20,7 @@ from app.routers import (
     admin,
     auth,
     merchant,
+    oauth,
     prices,
     products,
     support,
@@ -144,6 +145,11 @@ if settings.is_production:
 
 # --- Routers ---
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
+# Social sign-in shares the /auth prefix rather than claiming one of its own:
+# a new top-level prefix would also have to be added to API_PREFIXES in
+# app/frontend.py, and forgetting that gives a route whose POST works while
+# its GET silently returns the app shell.
+app.include_router(oauth.router, prefix="/auth", tags=["auth"])
 app.include_router(products.router, prefix="/products", tags=["products"])
 app.include_router(prices.router, prefix="/prices", tags=["prices"])
 app.include_router(support.router, prefix="/support", tags=["support"])

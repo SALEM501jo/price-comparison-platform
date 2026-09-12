@@ -28,6 +28,7 @@ from datetime import timedelta
 from fastapi import Request, Response
 
 from app.config import get_settings
+from app.services import oauth_state
 
 settings = get_settings()
 
@@ -65,6 +66,75 @@ def clear_refresh_cookie(response: Response) -> None:
         secure=settings.cookie_is_secure,
         samesite=settings.cookie_samesite,
     )
+
+
+# --- The social sign-in browser binding ------------------------------------
+#
+# Scoped to the OAuth endpoints alone. It exists for one redirect and is spent
+# at the callback, so sending it anywhere else is surface for nothing.
+OAUTH_STATE_COOKIE = "oauth_binding"
+OAUTH_STATE_COOKIE_PATH = "/auth/oauth"
+
+
+def _oauth_cookie_policy() -> tuple[bool, str]:
+    """
+    Secure and SameSite for the binding cookie, which are not free choices.
+
+    APPLE IS WHY THIS IS NOT `lax` LIKE THE REFRESH COOKIE. Apple mandates
+    response_mode=form_post, so its callback arrives as a CROSS-SITE POST, and
+    a Lax cookie is not sent on one. The binding would be missing on every
+    Apple sign-in and every Apple sign-in would be refused -- a Lax cookie here
+    does not weaken the control, it breaks the provider outright.
+
+    SameSite=None is only honoured on a Secure cookie, so the two move
+    together. When the deployment cannot be Secure -- plain-http local
+    development -- this falls back to Lax, which still carries Google's
+    top-level GET redirect back to us. Apple is unreachable in that
+    configuration anyway: it refuses to register an http redirect URI at all,
+    so the fallback never degrades a working Apple setup.
+    """
+    secure = settings.cookie_is_secure
+    return secure, "none" if secure else "lax"
+
+
+def set_oauth_state_cookie(response: Response, binding: str) -> None:
+    """Remember, in this browser, that it is the one that began the sign-in."""
+    secure, samesite = _oauth_cookie_policy()
+    response.set_cookie(
+        key=OAUTH_STATE_COOKIE,
+        value=binding,
+        httponly=True,  # script has no use for it; XSS should not reach it
+        secure=secure,
+        samesite=samesite,
+        path=OAUTH_STATE_COOKIE_PATH,
+        # The state it is paired with expires on the same clock. A binding
+        # that outlived its state would be a value with nothing to match.
+        max_age=oauth_state.DEFAULT_TTL_SECONDS,
+    )
+
+
+def clear_oauth_state_cookie(response: Response) -> None:
+    """
+    Spend the binding, whatever the outcome.
+
+    Cleared on FAILURE as well as success. A binding left behind after a
+    refused callback is matched against the next sign-in's state, which it
+    cannot satisfy -- so the user's retry fails too, and they are locked out by
+    the debris of their own last attempt rather than by anything real.
+    """
+    secure, samesite = _oauth_cookie_policy()
+    response.delete_cookie(
+        key=OAUTH_STATE_COOKIE,
+        path=OAUTH_STATE_COOKIE_PATH,
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+    )
+
+
+def read_oauth_state_cookie(request: Request) -> str | None:
+    """The binding this browser is carrying, if it is carrying one."""
+    return request.cookies.get(OAUTH_STATE_COOKIE)
 
 
 def read_refresh_token(request: Request, body_token: str | None = None) -> str | None:

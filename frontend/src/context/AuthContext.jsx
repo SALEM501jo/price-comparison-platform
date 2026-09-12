@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { startTransition, useCallback, useEffect, useState } from 'react';
 import { AuthContext } from './auth-context';
 import { clearAccessToken, refreshAccessToken } from '../api/axios';
 import {
   login as loginApi,
   logout as logoutApi,
   register as registerApi,
+  deleteAccount as deleteAccountApi,
   getMe,
 } from '../api/auth';
 
@@ -61,6 +62,36 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  /**
+   * Delete the account, then forget it here.
+   *
+   * It lives beside logout rather than being called straight from the page,
+   * because ending a session is this provider's job: a page that deleted the
+   * account through the API layer alone would leave `user` populated, and the
+   * navbar would go on offering the wishlist of an account that no longer
+   * exists until the next reload.
+   *
+   * WHY THERE IS A CALLBACK, AND WHY IT IS A TRANSITION. Dropping the user
+   * makes RequireAuth render <Navigate to="/login">, and the only page that
+   * calls this sits behind RequireAuth. React Router puts its own location
+   * change in a transition, so an ordinary setUser here is the higher-priority
+   * update and commits first -- with the app still standing on the protected
+   * route, which redirects somebody who has just deleted their account to a
+   * login form. Scheduling both as transitions in the same tick puts them in
+   * one render pass, so the app leaves the route and forgets the session
+   * together. (Measured: without this the successful-deletion test lands on
+   * the login page every run, not intermittently.)
+   *
+   * No POST /auth/logout afterwards. The row is gone, so that request would
+   * 401, and the 401 interceptor would spend a refresh round trip finding out
+   * that the cookie it needs was cleared by the deletion itself.
+   */
+  const deleteAccount = useCallback(async (email, onDeleted) => {
+    await deleteAccountApi(email);
+    onDeleted?.();
+    startTransition(() => setUser(null));
+  }, []);
+
   const value = {
     user,
     isAuthenticated: Boolean(user),
@@ -71,6 +102,7 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    deleteAccount,
     loading,
   };
 
