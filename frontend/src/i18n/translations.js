@@ -613,6 +613,15 @@ const translations = {
       'عنوان البريد الإلكتروني لطلبات البيانات: الاطّلاع والتصحيح والحذف',
     'legal.field.law': 'الدولة التي تحكم قوانينها هذه الشروط',
 
+    // The operator's own details. Paired with the legal.field.* labels above:
+    // LegalPage renders the value where the blank was, and the amber "this
+    // page is not finished" panel goes quiet once all three are filled. Both
+    // pages point here -- "الجهة المشغّلة مذكورة في أعلى هذه الصفحة" -- so
+    // emptying one of these makes those sentences false again.
+    'legal.value.entity': 'سالم أسعد محمود مصطفى',
+    'legal.value.dataContact': 'altamarysalem@gmail.com',
+    'legal.value.law': 'الأردن',
+
     // --- Privacy policy
     // Every sentence here is a claim about what this code does, and the ones
     // the code did not back were cut rather than softened. There is no
@@ -1418,6 +1427,12 @@ const translations = {
     'legal.field.dataContact':
       'Email address for data requests: access, correction, deletion',
     'legal.field.law': 'The country whose law governs these terms',
+
+    // The operator's own details. The email is the address the policy promises
+    // will answer a data request, so it has to be one that is actually read.
+    'legal.value.entity': "Salem Ass'ad Mahmoud Mustafa",
+    'legal.value.dataContact': 'altamarysalem@gmail.com',
+    'legal.value.law': 'Jordan',
 
     // --- Privacy policy. Every sentence is a claim about what this code
     // does; see the Arabic table for the ones that were cut.

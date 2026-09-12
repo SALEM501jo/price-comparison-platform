@@ -68,10 +68,20 @@ describe('translations', () => {
       // status display, and people do not press it.
       'nav.toggleLanguage',
     ]);
+    // AN ADDRESS IS NOT PROSE. A contact email or a URL is the same string in
+    // both tables because it HAS to be -- it is a literal address, and
+    // "translating" it would break it. Matched by shape rather than added to
+    // the allow-list above, so the operator can change their contact address
+    // without this test needing to know the key.
+    const isAddress = (value) =>
+      !/\s/.test(value) &&
+      (/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(value) || /^https?:\/\/\S+$/i.test(value));
+
     const suspicious = Object.entries(translations.ar)
       .filter(([key]) => !allowLatin.has(key))
       .filter(([, value]) => /^[\x20-\x7E]+$/.test(value))
       .filter(([, value]) => /[a-zA-Z]{4,}/.test(value))
+      .filter(([, value]) => !isAddress(value))
       .map(([key]) => key);
 
     expect(suspicious, 'these Arabic entries look like untranslated English').toEqual([]);
