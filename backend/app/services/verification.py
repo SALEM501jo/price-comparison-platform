@@ -19,6 +19,7 @@ import hashlib
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
+from html import escape
 
 from sqlalchemy.orm import Session
 
@@ -91,12 +92,20 @@ def send_verification(db: Session, user: User) -> bool:
     link = build_link(token)
     hours = settings.email_token_ttl_hours
 
+    # THE BRAND IN THIS EMAIL IS THE FIRST THING A NEW ACCOUNT EVER RECEIVES.
+    # It said "PriceCompare" -- the project's working name -- while the site,
+    # the sender address and every other email say Ahsan Se3r. A confirmation
+    # email from a name the recipient has never heard of reads as phishing,
+    # and the likely outcomes are deletion or a spam report, either of which
+    # leaves the account unconfirmed and quietly hurts the domain's sending
+    # reputation for everyone after them.
+    h_link = escape(link, quote=True)
     return email_service.send(
         Message(
             to=user.email,
-            subject="Verify your PriceCompare email",
+            subject="Confirm your email for Ahsan Se3r",
             text=(
-                "Welcome to PriceCompare.\n\n"
+                "Welcome to Ahsan Se3r.\n\n"
                 "Confirm this address to finish setting up your account:\n\n"
                 f"{link}\n\n"
                 f"The link works once and expires in {hours} hours.\n\n"
@@ -104,9 +113,9 @@ def send_verification(db: Session, user: User) -> bool:
                 "nothing will happen.\n"
             ),
             html=(
-                "<p>Welcome to PriceCompare.</p>"
+                "<p>Welcome to Ahsan Se3r.</p>"
                 "<p>Confirm this address to finish setting up your account:</p>"
-                f'<p><a href="{link}">Verify my email</a></p>'
+                f'<p><a href="{h_link}">Confirm my email</a></p>'
                 f"<p>The link works once and expires in {hours} hours.</p>"
                 "<p>If you did not create an account, ignore this email — "
                 "nothing will happen.</p>"

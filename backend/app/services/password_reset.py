@@ -27,6 +27,7 @@ single-use stamp. This module is the reset-shaped use of it.
 from __future__ import annotations
 
 import logging
+from html import escape
 
 from sqlalchemy.orm import Session
 
@@ -81,7 +82,11 @@ def send_reset(db: Session, user: User) -> bool:
             ),
             html=(
                 "<p>Someone asked to reset the password for this account.</p>"
-                f'<p><a href="{link}">Choose a new password</a></p>'
+                # Escaped although the link is built here, from settings and a
+                # URL-safe token: every email follows one rule -- nothing
+                # interpolated into HTML unescaped -- so the next edit to this
+                # string cannot be the one that forgets.
+                f'<p><a href="{escape(link, quote=True)}">Choose a new password</a></p>'
                 f"<p>The link works once and expires in {hours} hours.</p>"
                 "<p>If this was not you, ignore this email. Your password has "
                 "not changed.</p>"

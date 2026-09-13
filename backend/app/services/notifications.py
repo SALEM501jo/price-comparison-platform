@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from html import escape
 
 from sqlalchemy.orm import Session
 
@@ -32,6 +33,35 @@ def _product_link(product_id: int) -> str:
 def _message(user: User, product: Product, target, current, store: str | None) -> Message:
     link = _product_link(product.id)
     where = f" at {store}" if store else ""
+
+    # EVERY DYNAMIC VALUE IS ESCAPED BEFORE IT ENTERS THE HTML PART.
+    #
+    # The product name and the store name are not ours. Product names come from
+    # scraped retailer pages, and a merchant's own listing name BECOMES the
+    # canonical name when nobody else sells that product
+    # (services/deduplication.py). Store names are typed by merchants. Neither
+    # schema rejects markup -- the website is safe regardless, because React
+    # escapes text itself -- so this is the one place those strings meet raw
+    # HTML.
+    #
+    # Unescaped, a merchant could name a product with a link or a fake
+    # "confirm your account" button, and this platform would deliver it: from
+    # noreply@ahsanse3r.com, DKIM-signed, passing DMARC, to shoppers who asked
+    # to hear from us. Mail clients do not run scripts, but links, images and
+    # styled lookalike content render fine -- which is all a phishing email
+    # needs. Escaping at the point of output covers every source of the text
+    # at once, including sources added later, which rejecting "<" at each
+    # input would not.
+    #
+    # The plain-text part needs no escaping: a mail client displays it as text,
+    # and the subject is a header, where EmailMessage's default policy already
+    # refuses the CR/LF that header injection needs.
+    h_name = escape(product.canonical_name)
+    h_where = escape(where)
+    h_target = escape(str(target))
+    h_current = escape(str(current))
+    h_link = escape(link, quote=True)
+
     return Message(
         to=user.email,
         subject=f"Price drop: {product.canonical_name}",
@@ -44,11 +74,11 @@ def _message(user: User, product: Product, target, current, store: str | None) -
             "alert on this product; delete it in the app to stop.\n"
         ),
         html=(
-            f"<p><strong>{product.canonical_name}</strong> has reached your "
+            f"<p><strong>{h_name}</strong> has reached your "
             "target price.</p>"
-            f"<p>Your target: {target} JOD<br>Now: <strong>{current} JOD</strong>"
-            f"{where}</p>"
-            f'<p><a href="{link}">View the comparison</a></p>'
+            f"<p>Your target: {h_target} JOD<br>Now: <strong>{h_current} JOD</strong>"
+            f"{h_where}</p>"
+            f'<p><a href="{h_link}">View the comparison</a></p>'
             "<p>Prices include delivery. You are getting this because you set "
             "an alert on this product; delete it in the app to stop.</p>"
         ),
