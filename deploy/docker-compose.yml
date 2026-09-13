@@ -95,6 +95,23 @@ services:
     # compose network. Nothing binds a host port but Caddy's 80 and 443.
     expose:
       - "8000"
+    # OVERRIDES THE IMAGE'S HEALTH CHECK, which calls http://localhost:8000 and
+    # therefore sends "Host: localhost". In production TRUSTED_HOSTS lists only
+    # the real domain, so the host-header middleware answers that with 400
+    # "Invalid host header" -- and the API reads as permanently unhealthy while
+    # serving traffic perfectly. A status that is always red trains everyone to
+    # ignore it, which is how a real outage later goes unnoticed.
+    #
+    # Addressed to the real domain instead, which also means the check exercises
+    # the same host validation a visitor's request passes through. `Host:value`
+    # with no space avoids nesting quotes; $$ defers the expansion to the
+    # container's shell, where SITE_DOMAIN arrives through env_file.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -H Host:$${SITE_DOMAIN} http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
 
   worker:
     build:
@@ -113,6 +130,14 @@ services:
     # occupy a request worker, and because this can be stopped and restarted
     # without taking the site down.
     command: ["python", "-m", "app.services.worker", "--loop"]
+    # The image's health check curls port 8000, and a queue worker serves no
+    # HTTP at all -- so inherited, it could never pass and the worker would
+    # read as unhealthy forever. Disabled rather than faked: `restart:
+    # unless-stopped` already brings back a worker that crashes, and a check
+    # that only proves "the process exists" would add a green light that
+    # means nothing.
+    healthcheck:
+      disable: true
 
   caddy:
     image: caddy:2-alpine
