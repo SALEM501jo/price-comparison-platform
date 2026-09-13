@@ -711,7 +711,7 @@ const translations = {
     'privacy.others.meta':
       'أزرار واتساب وفيسبوك وانستغرام تنقلك إلى شركة ميتا. ما يحدث بعد الضغط تحكمه سياساتها لا سياستنا.',
     'privacy.others.email':
-      'بريدنا — التأكيد وإعادة تعيين كلمة المرور وتنبيهات السعر والرد على الدعم — يمرّ عبر مزوّد بريد يرى عنوانك ونص الرسالة.',
+      'بريدنا — التأكيد وإعادة تعيين كلمة المرور وتنبيهات السعر والرد على الدعم — يمرّ عبر مزوّد البريد Brevo، الذي يرى عنوانك ونص الرسالة. ويستبدل Brevo الروابط داخل الرسائل بروابط تمرّ عبره أولاً ليعرف أنها فُتحت، ولا تسمح خطتنا الحالية بإيقاف ذلك. لهذا نجعل روابط إعادة تعيين كلمة المرور تنتهي خلال ساعة واحدة.',
     'privacy.others.hosting':
       'قاعدة البيانات والذاكرة المؤقتة وسجلّات الخادم تعمل عند مزوّدي استضافة، وهم قادرون تقنياً على الوصول إليها بحكم تشغيلهم لها.',
     'privacy.others.providers':
@@ -726,7 +726,7 @@ const translations = {
       'بصراحة: لا يوجد حتى الآن حذف تلقائي. أغلب السجلات تبقى إلى أن تحذفها أنت أو نحذفها نحن يدوياً عند طلبك. لا نعدك بمدّة لا ينفّذها الكود.',
     'privacy.keep.wishlist': 'المفضلة وتنبيهات السعر: تبقى إلى أن تحذفها أو يُحذف حسابك.',
     'privacy.keep.links':
-      'روابط التأكيد وإعادة تعيين كلمة المرور: تنتهي خلال أربع وعشرين ساعة وتعمل مرة واحدة. ويبقى سجلّ بأن رابطاً قد أُرسل.',
+      'روابط البريد: رابط التأكيد ينتهي خلال أربع وعشرين ساعة، ورابط إعادة تعيين كلمة المرور خلال ساعة واحدة، وكلاهما يعمل مرة واحدة فقط. ويبقى سجلّ بأن رابطاً قد أُرسل.',
     'privacy.keep.sessions':
       'جلسات الدخول: تنتهي صلاحيتها بعد سبعة أيام، ويبقى سجلّ بأن جلسة بدأت وانتهت.',
     'privacy.keep.support':
@@ -1518,7 +1518,7 @@ const translations = {
     'privacy.others.meta':
       'The WhatsApp, Facebook and Instagram buttons hand you to Meta. What happens after the tap is governed by their policies, not ours.',
     'privacy.others.email':
-      'Our email — confirmation, password resets, price alerts and support replies — goes through a mail provider that sees your address and the message.',
+      'Our email — confirmation, password resets, price alerts and support replies — goes through the mail provider Brevo, which sees your address and the message. Brevo also rewrites the links in those emails so a click passes through it first and it knows the link was opened, and our current plan does not allow switching that off. That is why password-reset links expire within an hour.',
     'privacy.others.hosting':
       'The database, the cache and the server logs run at hosting providers, who can technically reach them by virtue of running them.',
     'privacy.others.providers':
@@ -1534,7 +1534,7 @@ const translations = {
     'privacy.keep.wishlist':
       'Wishlist and price alerts: until you remove them or your account is deleted.',
     'privacy.keep.links':
-      'Confirmation and password-reset links: they expire within twenty-four hours and work once. A record that a link was sent remains.',
+      'Email links: a confirmation link expires within twenty-four hours and a password-reset link within one hour, and each works only once. A record that a link was sent remains.',
     'privacy.keep.sessions':
       'Sign-in sessions: they expire after seven days, and a record that a session began and ended remains.',
     'privacy.keep.support':

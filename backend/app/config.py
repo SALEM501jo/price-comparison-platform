@@ -75,6 +75,20 @@ class Settings(BaseSettings):
     # How long a verification link stays valid.
     email_token_ttl_hours: int = 24
 
+    # PASSWORD-RESET LINKS ARE DELIBERATELY FAR SHORTER-LIVED than the
+    # confirmation link above, because what they unlock is not comparable. A
+    # confirmation link can only confirm an address; a reset link sets the
+    # account's password -- and for the admin account, that is the platform.
+    #
+    # The length of the window matters because the link does not only live in
+    # the recipient's inbox. The mail provider (Brevo) rewrites every link for
+    # click tracking and cannot be told not to on transactional mail below its
+    # Enterprise plan, so each reset link also exists in the provider's systems
+    # from the moment it is sent. Nobody waits a day to use a reset link they
+    # asked for; an hour covers the real case and caps how long a copy held
+    # anywhere else stays usable.
+    password_reset_ttl_minutes: int = 60
+
     # Where contact-form messages are forwarded. Optional: with no address
     # set, messages are still STORED and readable in the admin panel -- the
     # notification is the part that is missing, not the message.

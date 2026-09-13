@@ -50,8 +50,19 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def issue(db: Session, user: User, purpose: str = PURPOSE_VERIFY) -> str:
-    """Create a token, store only its hash, and return the plaintext once."""
+def issue(
+    db: Session,
+    user: User,
+    purpose: str = PURPOSE_VERIFY,
+    ttl: timedelta | None = None,
+) -> str:
+    """
+    Create a token, store only its hash, and return the plaintext once.
+
+    `ttl` lets a purpose carry its own lifetime. Confirmation links default to
+    email_token_ttl_hours; password resets pass a much shorter one, because a
+    reset link unlocks the account rather than merely confirming an address.
+    """
     # Any previously issued token for this purpose is retired, so a user who
     # requests a second link cannot leave a first one live.
     db.query(EmailToken).filter(
@@ -68,7 +79,7 @@ def issue(db: Session, user: User, purpose: str = PURPOSE_VERIFY) -> str:
             purpose=purpose,
             user_id=user.id,
             expires_at=datetime.now(timezone.utc)
-            + timedelta(hours=settings.email_token_ttl_hours),
+            + (ttl if ttl is not None else timedelta(hours=settings.email_token_ttl_hours)),
         )
     )
     db.commit()

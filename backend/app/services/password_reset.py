@@ -27,6 +27,7 @@ single-use stamp. This module is the reset-shaped use of it.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from html import escape
 
 from sqlalchemy.orm import Session
@@ -61,11 +62,24 @@ def can_request(db: Session, user: User) -> bool:
     return verification.can_resend(db, user, purpose=PURPOSE_RESET)
 
 
+def _describe_minutes(minutes: int) -> str:
+    """"60" -> "1 hour", "90" -> "90 minutes": what a person reads in an email."""
+    if minutes % 60 == 0:
+        hours = minutes // 60
+        return "1 hour" if hours == 1 else f"{hours} hours"
+    return f"{minutes} minutes"
+
+
 def send_reset(db: Session, user: User) -> bool:
     """Issue a reset token and email the link."""
-    token = verification.issue(db, user, purpose=PURPOSE_RESET)
+    # A reset link carries its own, much shorter lifetime -- see
+    # password_reset_ttl_minutes in app/config.py for why.
+    minutes = settings.password_reset_ttl_minutes
+    token = verification.issue(
+        db, user, purpose=PURPOSE_RESET, ttl=timedelta(minutes=minutes)
+    )
     link = build_reset_link(token)
-    hours = settings.email_token_ttl_hours
+    lifetime = _describe_minutes(minutes)
 
     return email_service.send(
         Message(
@@ -75,10 +89,15 @@ def send_reset(db: Session, user: User) -> bool:
                 "Someone asked to reset the password for this account.\n\n"
                 "Choose a new password here:\n\n"
                 f"{link}\n\n"
-                f"The link works once and expires in {hours} hours.\n\n"
+                f"The link works once and expires in {lifetime}.\n\n"
+                # This used to add "and nobody can use this link without
+                # opening it from your inbox". That stopped being true once the
+                # mail provider rewrote links for click tracking: a copy of the
+                # link exists in the provider's systems too. The reassurance a
+                # recipient can rely on is the short expiry, so that is what it
+                # now says.
                 "If this was not you, ignore this email. Your password has "
-                "not changed, and nobody can use this link without opening "
-                "it from your inbox.\n"
+                "not changed.\n"
             ),
             html=(
                 "<p>Someone asked to reset the password for this account.</p>"
@@ -87,7 +106,7 @@ def send_reset(db: Session, user: User) -> bool:
                 # interpolated into HTML unescaped -- so the next edit to this
                 # string cannot be the one that forgets.
                 f'<p><a href="{escape(link, quote=True)}">Choose a new password</a></p>'
-                f"<p>The link works once and expires in {hours} hours.</p>"
+                f"<p>The link works once and expires in {lifetime}.</p>"
                 "<p>If this was not you, ignore this email. Your password has "
                 "not changed.</p>"
             ),
