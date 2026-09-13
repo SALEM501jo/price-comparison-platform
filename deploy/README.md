@@ -104,12 +104,60 @@ Apple is the only real cost decision. Leave `APPLE_*` blank and that button
 simply does not render; `/auth/providers` advertises only what is credentialed,
 so the site ships complete on Google alone.
 
-## Email
+## Email — Brevo
 
-`EMAIL_BACKEND=console` is refused in production — it logs messages and sends
-nothing, so verification links would never arrive and signups would silently
-never complete. You need real SMTP credentials. Anything works; the app only
-needs host, port, username and password.
+`EMAIL_BACKEND=console` is refused in production: it logs messages and sends
+nothing, so verification links never arrive and signups silently never
+complete. The settings are pre-filled for Brevo in `.env.production.example`;
+you supply the SMTP login and key.
+
+**The credentials are not your Brevo login.** In Brevo go to **SMTP & API →
+SMTP**. It shows a dedicated SMTP username and lets you generate a key. Using
+your account email and password instead fails authentication, and the symptom
+is "the email never arrived" rather than an error.
+
+**Authenticate the domain before you rely on it.** Brevo gives you DKIM and
+SPF records to add at Cloudflare (as **DNS only**, grey cloud). A brand-new
+domain sending without them goes to spam at Gmail, and because every account
+here is confirmed by an emailed link, that means **signups fail silently** —
+the user sees a normal "check your email" screen and nothing ever comes. This
+is the single most likely way a working deploy still looks broken.
+
+Check it end to end after deploying: register with a real address and confirm
+the link arrives in the inbox, not spam.
+
+## Seeding the catalogue
+
+**A fresh database is empty**, and a price-comparison site with no prices is
+not something to show a merchant. Export the catalogue from a working
+instance — tables only, no accounts:
+
+```bash
+for t in stores products product_aliases prices price_history; do
+  docker exec postgres-local pg_dump -U postgres -d price_comparison \
+    --data-only --no-owner --no-privileges -t "$t"
+done > catalogue-seed.sql
+```
+
+One table per call, in that order, deliberately: `pg_dump -t a -t b` emits
+tables in its own internal order rather than the order of the flags, so a
+single call can write `prices` before the `product_aliases` they reference and
+the restore dies on a foreign key.
+
+Never dump the whole database. It contains user accounts — including any demo
+account with a known password — and restoring those to a public server
+publishes them.
+
+Load it after the stack is up and `migrate` has run:
+
+```bash
+scp catalogue-seed.sql root@YOUR_SERVER:/tmp/
+docker compose -f deploy/docker-compose.yml exec -T postgres \
+  psql -U ahsan -d price_comparison --set ON_ERROR_STOP=1 < /tmp/catalogue-seed.sql
+```
+
+The sequences travel with the data, so the first merchant listing does not
+collide with an existing id.
 
 ## What this does not do
 
