@@ -6,6 +6,20 @@
 #
 # Five services: the database, the cache, a one-shot migration, the API (which
 # also serves the built SPA), the scrape worker, and Caddy for TLS.
+#
+# THE SETTINGS FILE MUST BE NAMED EXACTLY deploy/.env -- not .env.production,
+# not anything descriptive. Two different mechanisms read it:
+#
+#   env_file: .env    passes the variables INTO the api/migrate/worker containers
+#   ${POSTGRES_USER}  is substituted into THIS FILE by compose itself, and that
+#                     substitution only ever reads a file literally called .env
+#                     in the project directory
+#
+# Name it anything else and the containers still get their settings, so it
+# looks configured -- but postgres receives a BLANK password and refuses to
+# initialise, and Caddy receives a BLANK domain and gets no certificate.
+# Compose's only complaint is a "variable is not set" warning that scrolls
+# past in the build output.
 
 name: ahsan-se3r
 
@@ -57,7 +71,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    env_file: .env.production
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,7 +83,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
-    env_file: .env.production
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,7 +101,7 @@ services:
       context: ..
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
-    env_file: .env.production
+    env_file: .env
     depends_on:
       postgres:
         condition: service_healthy

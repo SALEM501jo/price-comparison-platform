@@ -7,7 +7,7 @@
 *.p8
 secrets/
 # Real environment files, anywhere in the tree. backend/.gitignore covered
-# backend/.env only, so deploy/.env.production -- which holds the database
+# backend/.env only, so deploy/.env -- which holds the database
 # password, the JWT signing key and the Apple private key -- was committable.
 # The .example files are the ones meant to be tracked.
 .env

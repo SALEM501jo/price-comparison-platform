@@ -21,16 +21,25 @@ network.
 
 ```bash
 git clone <your remote> ahsan-se3r && cd ahsan-se3r
-cp deploy/.env.production.example deploy/.env.production
+cp deploy/.env.example deploy/.env
 ```
 
-Fill in `deploy/.env.production`. The three you must generate rather than
-invent:
+Fill in `deploy/.env`. **It must be named exactly `.env`** — see the note at
+the top of `docker-compose.yml`; any other name silently blanks the database
+password and the domain.
+
+Generate the two secrets rather than inventing them:
 
 ```bash
-openssl rand -hex 32      # JWT_SECRET_KEY
-openssl rand -base64 32   # POSTGRES_PASSWORD  (paste into DATABASE_URL too)
+openssl rand -hex 32   # JWT_SECRET_KEY
+openssl rand -hex 32   # POSTGRES_PASSWORD — paste into DATABASE_URL too
 ```
+
+**Hex for the database password, not base64.** It goes inside
+`postgresql://ahsan:PASSWORD@postgres:5432/...`, and base64 can contain `/`, `+`
+and `=` — a `/` there is read as the start of the URL path, so the app cannot
+reach its own database. It fails for some generated passwords and not others,
+which is the hardest way to diagnose it.
 
 Then:
 
@@ -94,7 +103,7 @@ for days.
 
 | | |
 |---|---|
-| Hetzner CX22 (2 vCPU, 4 GB) | ~€4/month |
+| Hetzner CX23 (2 vCPU x86, 4 GB) + IPv4 | ~$7/month |
 | Domain | ~€10–15/year |
 | TLS certificate | free (Let's Encrypt, automatic) |
 | Sign in with Google | free |
@@ -108,7 +117,7 @@ so the site ships complete on Google alone.
 
 `EMAIL_BACKEND=console` is refused in production: it logs messages and sends
 nothing, so verification links never arrive and signups silently never
-complete. The settings are pre-filled for Brevo in `.env.production.example`;
+complete. The settings are pre-filled for Brevo in `.env.example`;
 you supply the SMTP login and key.
 
 **The credentials are not your Brevo login.** In Brevo go to **SMTP & API →

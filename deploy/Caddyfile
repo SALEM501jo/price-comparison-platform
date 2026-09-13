@@ -24,7 +24,7 @@
 		# THE APP RESOLVES THE CLIENT IP ITSELF from TRUSTED_PROXY_COUNT,
 		# counting from the RIGHT of X-Forwarded-For, because the header is a
 		# client-supplied list that each proxy appends to. Caddy appends the
-		# real peer address here; TRUSTED_PROXY_COUNT=1 in .env.production is
+		# real peer address here; TRUSTED_PROXY_COUNT=1 in deploy/.env is
 		# what tells the app that exactly one entry -- the last -- was written
 		# by infrastructure. Add a CDN in front and that number becomes 2, or
 		# the rate limiter buckets on a forgeable value and stops limiting.
