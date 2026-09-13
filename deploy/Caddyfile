@@ -44,3 +44,18 @@
 		format console
 	}
 }
+
+# www REDIRECTS TO THE BARE DOMAIN, and needs its own site block to do it.
+#
+# A DNS record for www is not enough on its own. Caddy only requests
+# certificates for the names it has a site block for, so without this a visitor
+# who types www. gets a TLS certificate error -- the browser's full-page warning,
+# on the first visit, from someone who typed the address correctly.
+#
+# A redirect rather than serving the site on both: one canonical origin keeps
+# the httpOnly refresh cookie on a single host, so a user who signs in on www
+# does not arrive at the bare domain signed out. It also means ALLOWED_ORIGINS
+# and TRUSTED_HOSTS only ever have to agree about one name serving content.
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
