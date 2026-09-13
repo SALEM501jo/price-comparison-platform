@@ -127,7 +127,21 @@ def mount_frontend(app: FastAPI) -> bool:
         index.html rather than a 404.
         """
         path = "/" + full_path
-        if any(path == p or path.startswith(p + "/") for p in API_PREFIXES):
+        # THE API OWNS WHAT IS BELOW A PREFIX, NOT THE PREFIX ITSELF.
+        #
+        # /merchant and /admin are BOTH an API prefix and a React page -- the
+        # merchant dashboard and the admin panel. This used to match the bare
+        # prefix too, so a hard refresh on either page, a bookmark, or a link
+        # in an email answered with a JSON 404 instead of the page. Navigating
+        # to them from inside the app worked, because that never asks the
+        # server, which is why it survived until the live site was checked
+        # from the outside. The people it hit were exactly the shop owners the
+        # platform is trying to sign up.
+        #
+        # Nothing is lost by dropping the bare match: this fallback only runs
+        # when NO router matched, so any real endpoint at a bare prefix (like
+        # /health) is answered by its router before it ever gets here.
+        if any(path.startswith(p + "/") for p in API_PREFIXES):
             raise HTTPException(status_code=404, detail="Not found")
 
         if full_path:

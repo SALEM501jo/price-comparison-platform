@@ -131,6 +131,43 @@ class TestItDoesNotSwallowTheApi:
         assert "<div id=root>" not in response.text
 
 
+class TestPagesThatShareAPrefixWithTheApi:
+    """
+    /merchant and /admin are an API prefix AND a React page at the same time:
+    the merchant dashboard and the admin panel.
+
+    THE REGRESSION THIS NAMES shipped to the live site. The fallback treated
+    the bare prefix as API-owned, so a hard refresh on either page -- or a
+    bookmark, or a link in an email -- got a JSON 404 instead of the page.
+    Moving to those pages from inside the app still worked, because
+    client-side navigation never asks the server, and every test above only
+    ever probed paths BELOW a prefix. It surfaced when the deployed site was
+    checked page by page from outside, and the people it would have hit first
+    were the shop owners being invited to sign up.
+    """
+
+    @pytest.mark.parametrize("page", ["/merchant", "/admin"])
+    def test_a_hard_refresh_on_the_page_serves_the_app(self, built_site, page):
+        response = built_site.get(page)
+        assert response.status_code == 200, f"{page} did not reach the app shell"
+        assert "<div id=root>" in response.text
+
+    @pytest.mark.parametrize("page", ["/merchant", "/admin"])
+    def test_the_api_still_owns_everything_below_it(self, built_site, page):
+        """The fix must not hand API sub-paths to the shell in the process."""
+        response = built_site.get(f"{page}/definitely-not-a-route")
+        assert response.status_code == 404
+        assert "<div id=root>" not in response.text
+
+    def test_a_real_endpoint_at_a_bare_path_still_wins(self, built_site):
+        """
+        Serving the bare prefix is only safe because the fallback runs after
+        every router. A real endpoint sitting exactly at a prefix path must
+        still answer as itself.
+        """
+        assert built_site.get("/health").json() == {"status": "ok"}
+
+
 class TestTraversal:
     @pytest.mark.parametrize(
         "path",
