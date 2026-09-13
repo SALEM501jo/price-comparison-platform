@@ -37,28 +37,12 @@
       content="قارن أسعار المنتج الذي تريده بالضبط بين المتاجر الأردنية. Compare prices for the exact product you want across Jordanian retailers."
     />
 
-    <!-- Applied before React mounts. Reading the stored choice in a component
-         means the first paint uses the wrong theme and direction, and the page
-         visibly flips a moment later. -->
-    <script>
-      (function () {
-        try {
-          var locale = localStorage.getItem('locale') || 'ar';
-          document.documentElement.lang = locale;
-          document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
-
-          var theme = localStorage.getItem('theme');
-          var prefersDark =
-            window.matchMedia &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (theme === 'dark' || (!theme && prefersDark)) {
-            document.documentElement.classList.add('dark');
-          }
-        } catch (e) {
-          /* private mode: fall through to the markup defaults */
-        }
-      })();
-    </script>
+    <!-- Theme and direction, applied before React mounts. Loaded from a file
+         rather than written inline: the production CSP is script-src 'self'
+         and refuses inline code, so the inline version never ran once
+         deployed. Classic and non-deferred, so it still runs before the body
+         is parsed. See public/theme-init.js for why a CSP hash was rejected. -->
+    <script src="/theme-init.js"></script>
   </head>
   <body>
     <div id="root"></div>
