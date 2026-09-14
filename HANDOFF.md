@@ -3,8 +3,16 @@
 Paste this into a new session to continue without losing context. It replaces
 the earlier handoffs and folds in everything since.
 
-**Repo:** `G:\Downloads\price-comparison-platform` · **Branch:** `frontend`
-(main branch is `main`; nothing merged or pushed) · **46 commits**
+**Repo:** `G:\Downloads\price-comparison-platform` · **Branch:** `frontend`,
+pushed to `origin/frontend` and **deployed** (not yet merged into `main`) ·
+**69 commits**, 65 ahead of `main`
+
+**Live at https://ahsanse3r.com** — see [Production](#production) below.
+
+> **This repository is public.** So is this file. Never put a secret, a key, an
+> SMTP login or anything from `deploy/.env` in it. What is here is already
+> public by other means (the domain resolves to the server IP; the operator's
+> contact address is on `/privacy`).
 
 Read `README.md` for the architecture as written. This file carries what a
 README should not: what was tried and rejected, the traps in this environment,
@@ -42,17 +50,18 @@ there is no checkout anywhere.
 
 | | |
 |---|---|
-| Backend tests | **683** — `cd backend && pytest -q` |
-| Frontend tests | **96** — `cd frontend && npm test` |
+| Backend tests | **822** — `cd backend && pytest -q` |
+| Frontend tests | **162** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
 | Smoke checks | **57/57** — `python scripts/smoke_test.py` |
 | Known CVEs | **0** — `pip-audit -r requirements.txt` |
-| Migrations | **13**, head `ee543f078cff`, verified up **and** down |
+| Migrations | **14**, head `4a1e9c07b3d2`, run from empty to head on production |
 | Working tree | clean |
 
-**Data — all test data was deleted before deploy.** 4 accounts, 3 stores, 423
-products, 455 prices, every one of them scraped:
+**Data — the LOCAL database.** All test data was deleted before deploy. 4
+accounts, 3 stores, 423 products, 455 prices, every one of them scraped.
+Production got the catalogue only — no accounts (see [Production](#production)):
 
 | | |
 |---|---|
@@ -73,8 +82,93 @@ in Arabic. Nothing in the UI is English-only any more.
 2. **There are no merchants.** Every merchant store was a test and was deleted.
    The whole merchant half — contact buttons, tap analytics, used-phone
    disclosure — is fully built and tested but **invisible on the live site**
-   until a real shop signs up. That is the argument for deploying: you cannot
-   ask a shop to register on localhost.
+   until a real shop signs up. **The site is live now, so this is the next job,
+   not a future one** — there is a real URL to send a shop.
+
+---
+
+## Production
+
+**https://ahsanse3r.com** — deployed 2026-09-13. Everything below was verified
+from outside the server, not assumed.
+
+| | |
+|---|---|
+| Server | Hetzner **CX23** (2 vCPU x86, 4 GB), Falkenstein, Ubuntu 24.04, `2.28.103.13`, ~$7/mo |
+| Code | `/opt/ahsan-se3r`, a git clone of branch `frontend` |
+| Settings | `/opt/ahsan-se3r/deploy/.env` — mode `600`, root only. **Must be named exactly `.env`** (see traps) |
+| Stack | `deploy/docker-compose.yml`: postgres, redis, one-shot `migrate`, api (serves the SPA too), worker, caddy |
+| TLS | Caddy + Let's Encrypt, automatic renewal. `www` 301s to the bare domain |
+| DNS | Cloudflare. `A @` and `A www` → server, **grey cloud / DNS only** |
+| Firewall | Hetzner Cloud Firewall `web`: inbound TCP 22, 80, 443 and UDP 443 only |
+| SSH | root, **key only**. Password auth off, verified refused |
+| Email | Brevo SMTP relay, port 587 + STARTTLS. Domain authenticated: `brevo-code` TXT, two DKIM CNAMEs, DMARC `p=none` |
+| Sign-in | Google, **published "In production"**. Apple not configured (needs a paid developer account) |
+| Admin | One admin: the operator's own account. Promoted by SQL, since nothing creates the first admin |
+| Data | Catalogue imported: 3 stores, 423 products, 455 prices. **No accounts copied** |
+| Backups | **OFF.** See Known limitations |
+
+**Verified live:** HSTS with preload, CSP with no third-party origin and no
+`unsafe-inline` scripts, TLS 1.0/1.1 refused, server header hidden, database /
+cache / API ports unreachable from the internet, every SPA route survives a
+hard refresh, fonts self-hosted with zero Google requests, the OAuth binding
+cookie is `Secure; SameSite=None` in production, and an email sent through
+Brevo landed in the Primary inbox, not spam.
+
+### Operating it
+
+Log in (the key is passphrase-protected; load it into the agent first):
+
+```powershell
+ssh-add $HOME\.ssh\id_ed25519
+ssh root@2.28.103.13
+```
+
+Deploy a new commit:
+
+```bash
+cd /opt/ahsan-se3r && git pull && docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+The frontend is baked into the image, so **any change — backend or frontend —
+needs `--build`**. Caddy is not rebuilt, so it keeps its certificates.
+
+Changed only `deploy/.env`? Recreate the two containers that read it:
+
+```bash
+docker compose -f deploy/docker-compose.yml up -d --force-recreate --no-deps api worker
+```
+
+Status and logs:
+
+```bash
+docker compose -f deploy/docker-compose.yml ps
+docker compose -f deploy/docker-compose.yml logs -f api
+```
+
+**Never `docker compose down -v`.** `-v` deletes the database volume *and*
+`caddy_data`, which holds the certificates — Let's Encrypt allows five per
+domain per week.
+
+**Putting a secret on the server without it touching the screen, a chat or
+shell history.** Paste the value at the prompt; `-s` hides it, and the `case`
+refuses a double paste, which is easy to do when nothing appears:
+
+```bash
+cd /opt/ahsan-se3r/deploy
+read -rsp "Secret (paste ONCE, Enter): " S && echo && case "$S" in *PREFIX*PREFIX*) echo "REFUSED: pasted twice" ;; PREFIX*) sed -i "s|^SETTING_NAME=.*|SETTING_NAME=$S|" .env && echo "SAVED: ${#S} chars" ;; *) echo "REFUSED: wrong value" ;; esac; unset S
+```
+
+Google secrets start `GOCSPX-`; Brevo SMTP keys start `xsmtpsib-` (an
+`xkeysib-` key is an API key and will not authenticate SMTP).
+
+Promote an account to admin (match id **and** email, so it cannot hit the
+wrong row):
+
+```bash
+docker exec ahsan-se3r-postgres-1 psql -U ahsan -d price_comparison -c \
+  "update users set role='admin' where id=<ID> and email='<EMAIL>' and role='user';"
+```
 
 ---
 
@@ -136,6 +230,41 @@ in Arabic. Nothing in the UI is English-only any more.
     was behind the source; here, only the log was. **Confirm against the DOM
     (`javascript_tool`) or a fresh tab before believing a console error**, and
     read the dep hash in the stack trace.
+13. **Running commands on the server from this machine: use Windows'
+    `ssh.exe` from Git Bash.** Git Bash's own `ssh` cannot see the Windows
+    ssh-agent, so it prompts for the passphrase and hangs. PowerShell's `ssh`
+    sees the agent but mangles quotes in a multi-line script. Windows' binary
+    driven from Git Bash gets both right:
+    ```bash
+    /c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes root@2.28.103.13 'bash -s' <<'EOF'
+    ...
+    EOF
+    ```
+    `BatchMode=yes` makes it fail immediately instead of hanging if the agent
+    has lost the key. The agent service is disabled by default on Windows and
+    enabling it needs an **Administrator** PowerShell.
+14. **Give `ssh` exactly one stdin.** A pipe *and* a heredoc on the same
+    command hung for five minutes with no output. Upload with a pipe alone,
+    run with a heredoc alone, and wrap both in `timeout`.
+15. **`| tail` swallowed an exit code again** — from the other direction.
+    `cmd; echo "EXIT=$?"; tail log` captured pytest's code and then returned
+    `tail`'s: a background task reported **exit 0 with 5 failures**. End with
+    `exit $CODE` when the task's own status is what gets read.
+16. **A test that passes proves nothing until it has failed.** Twice a test
+    was written against a fix and only checked by switching the fix off: the
+    login-CSRF binding (3 attack tests failed, 5 happy-path tests still
+    passed) and the email escaping (4 failed, 2 unaffected). The split is the
+    evidence. Checking by monkeypatching the fix away needs no file edits.
+17. **The browser pane cannot screenshot while the app window is hidden** — it
+    times out. `javascript_tool` and `read_page` still work; use them.
+18. **Local Docker Desktop crashed again mid-deploy (trap 10).** Once the
+    server existed, validation moved there instead — `caddy validate` ran in a
+    container on the server. The server's Docker is the reliable one now.
+19. **`curl` against the API is not a test of the site.** Every API call
+    returned real data while the deployed page showed nothing, because the
+    built bundle called `localhost:8000`. Only opening the page in a browser
+    found it. The same outside-in page sweep then found `/merchant` returning
+    a JSON 404 on refresh.
 
 ---
 
@@ -162,6 +291,9 @@ register one through the UI to exercise that side, then delete it with
 `scripts/cleanup_test_data.py --apply`.
 
 Emails print to the **backend terminal** (`EMAIL_BACKEND=console`).
+
+That is local development. For the live site, see
+[Production → Operating it](#operating-it).
 
 ---
 
@@ -458,7 +590,11 @@ know what sits in front of the app. An `X-Forwarded-For` arriving while the
 count is 0 proves something is forwarding — and that every visitor shares one
 rate-limit bucket. Logged once per process.
 
-`backend/.env.production.example` lists every value with the failure it causes.
+**`deploy/.env.example` is the one production uses** — copy it to
+`deploy/.env`. It lists every value with the failure it causes, including the
+Brevo and Google settings. `backend/.env.production.example` is the older
+version from before the compose stack existed; it has been superseded and
+could be deleted.
 
 ### Tier explanations are composed in the CLIENT
 
@@ -590,6 +726,67 @@ no untranslated English in the Arabic table.
   48). Inline links inside a sentence are exempt — WCAG 2.5.8 says so, and
   blocking them out breaks the line.
 
+### Deployment and auth — decided 2026-09-13
+
+- **One origin.** The API serves the built SPA (`app/frontend.py`). The refresh
+  token is an httpOnly cookie; across two registrable domains it becomes
+  third-party and Safari blocks it, logging every iPhone user out on refresh.
+- **The API owns what is BELOW a prefix, not the prefix itself.** `/merchant`
+  and `/admin` are both an API prefix and a React page; the bare path serves the
+  app. This shipped wrong and 404'd the merchant dashboard on refresh.
+- **Production builds call the API same-origin** (`resolveApiBaseUrl` in
+  `src/utils/constants.js`). The fallback used to be `localhost:8000`
+  unconditionally, and nothing sets `VITE_API_URL` in the image.
+- **No inline scripts.** Production CSP is `script-src 'self'`. The theme
+  script lives in `public/theme-init.js`. A CSP hash was rejected: it breaks
+  silently the first time someone edits a comment in the script.
+- **Cairo is self-hosted.** It is a variable font — three files, 81 KB, not
+  fifteen. `/fonts` caches a week and revalidates; not `immutable`, because the
+  filenames are hand-written, not content-hashed.
+- **Social sign-in is a server-side redirect, not an SDK.** No Google or Apple
+  script ever loads, so the CSP stays `'self'`. Providers are config-gated:
+  no credentials, no button.
+- **The OAuth state is bound to the browser** with an httpOnly
+  `oauth_binding` cookie. A server-side state alone proves the sign-in is ours,
+  not whose it is — login CSRF worked against a healthy Redis. The cookie is
+  `SameSite=None; Secure` because Apple's callback is a cross-site POST, which
+  carries no Lax cookie.
+- **Identity is keyed on the provider subject, never the email.** Linking a
+  provider to an unverified local account clears that account's password and
+  revokes its sessions: that password was set by someone who never proved they
+  own the mailbox.
+- **Email addresses are normalised at the schema boundary**
+  (`EmailField` in `schemas/auth.py`). Registration was case-sensitive while
+  linking was not, so one mailbox could hold two rows and eviction missed one.
+- **Deleting an account retires a merchant's shop rather than deleting it.**
+  Listings and price history are catalogue data. The retirement name carries a
+  random suffix, because `stores.name` is unique and store ids are public — a
+  predictable name let anyone veto a merchant's erasure.
+- **Support-message addresses are replaced with a random value on deletion**,
+  not a keyed HMAC. An HMAC under the app's own signing key is recoverable by
+  anyone holding the key, which is not erasure.
+- **Every dynamic value in email HTML is escaped** at the point of output.
+  Product and store names come from merchants and scrapers; unescaped, the
+  platform would deliver phishing DKIM-signed as its own domain.
+- **Password-reset links expire in 1 hour**, confirmation links in 24. Brevo
+  rewrites every link for click tracking and cannot turn it off below its
+  Enterprise plan, so a copy of each link exists in Brevo's systems.
+- **No cookie consent banner.** The only cookies are strictly necessary (the
+  refresh token and the ten-minute OAuth binding). There is no analytics,
+  pixel or session recording. The privacy policy explains this instead.
+- **The Hetzner Cloud Firewall, not `ufw`.** Docker writes its own iptables
+  rules that bypass `ufw`, so a port believed blocked can be open.
+- **Cloudflare proxy OFF (grey cloud).** On: Caddy's certificate challenge
+  becomes fragile, and every visitor arrives from Cloudflare's addresses — with
+  `TRUSTED_PROXY_COUNT=1` they would all share one login rate limit. Turning it
+  on later means `TRUSTED_PROXY_COUNT=2` and SSL mode Full (strict).
+- **Hex, not base64, for the database password.** It is embedded in
+  `DATABASE_URL`, where a base64 `/` is read as the start of the path.
+- **The settings file is `deploy/.env`, named exactly that.** Compose's
+  `env_file:` feeds containers, but `${VAR}` substitution in the compose file
+  reads only a file called `.env`. Named `.env.production`, Postgres got a blank
+  password and Caddy a blank domain.
+
 ---
 
 ## Tried and rejected — do not repeat
@@ -623,27 +820,57 @@ no untranslated English in the Arabic table.
   this laptop, with everything else running. 1000 visits/day is ~0.1 req/s —
   roughly 200× headroom. The thing that will actually take the site down is
   `TRUSTED_PROXY_COUNT`, not capacity.
+- **Fly + Neon + Upstash.** The earlier plan. A single Hetzner VPS running the
+  whole compose stack is cheaper, has one origin by construction, and has no
+  managed-service free tier to expire underneath it.
+- **Oracle Cloud's Always Free tier.** Free and large on paper; in practice
+  capacity errors creating Arm instances, payment-verification suspensions, and
+  reclaimed idle instances. Wrong for a site shown to shop owners.
+- **Hetzner CAX11 (Arm).** Recommended, then sold out in the region. CX23
+  (x86) was cheaper anyway, and nothing in the stack is architecture-specific.
+- **Disabling Brevo click tracking.** Not possible on its plan — Brevo staff
+  say "for security reasons", Enterprise only. Mitigated instead (short reset
+  links, anonymous tracking, disclosure). A provider that allows tracking off,
+  such as Resend, needs only SMTP settings and DNS records — no code.
+- **Brevo's automatic Cloudflare authentication.** It asks for permission to
+  edit all of the domain's DNS to add four records. Added by hand instead.
 
 ---
 
 ## Known limitations
 
-1. **Not deployed.** Images build; no live URL. Biggest gap by far.
+1. **No backups.** Hetzner backups are off and nothing dumps the database. A
+   lost disk, a mistaken command or a lapsed payment loses every account and
+   every merchant listing. The biggest operational gap by far.
 2. **One product has more than one price.** See the warning at the top.
 3. **No merchants at all.** See the warning at the top.
-4. `Core 5-120U` parses, but **CPU generation is not captured** — an 8th-gen
-   and a 14th-gen i7 both resolve to `i7`.
-5. **Merchant photos are served from the API's own origin.** Re-encoding is
-   the control that matters and it is in place; a separate origin is the
-   defence in depth that is not.
-6. **Merchant photos are not moderated.** Nothing stops a verified shop
-   uploading something irrelevant.
-7. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
-   Running them re-pollutes the database. `scripts/e2e_test.py` cleans up after
-   itself; the other two do not. Run `scripts/cleanup_test_data.py --apply`
-   afterwards.
-8. No email verification enforcement on *access* — gates outbound mail only
-   (deliberate).
+4. **No uptime monitoring.** If the site goes down, nobody is told.
+5. **Brevo rewrites every link** in outgoing email for click tracking and it
+   cannot be switched off on this plan. Mitigated: reset links last 1 hour,
+   anonymous tracking, disclosed in the privacy policy.
+6. **Emails are English only** while the site is Arabic by default. A shopper
+   who registers in Arabic gets an English confirmation.
+7. **DMARC is `p=none`** — report only. Forged mail from the domain is not yet
+   rejected. Tighten once Brevo's reports show real mail passing.
+8. **Apple's Hide My Email forks one person into two accounts.** No shared
+   verified identifier exists to join them safely; anything weaker would be a
+   takeover path. Needs an authenticated "link another sign-in" feature.
+9. **Deleting an account does not revoke the grant at Google.** Disclosed in
+   the privacy policy rather than adding a network call that can fail midway
+   through a deletion.
+10. `Core 5-120U` parses, but **CPU generation is not captured** — an 8th-gen
+    and a 14th-gen i7 both resolve to `i7`.
+11. **Merchant photos are served from the API's own origin.** Re-encoding is
+    the control that matters and it is in place; a separate origin is the
+    defence in depth that is not.
+12. **Merchant photos are not moderated.** Nothing stops a verified shop
+    uploading something irrelevant.
+13. **`smoke_test.py` and `attack_probes.py` leave their fixtures behind.**
+    Running them re-pollutes the database. **Never point them at
+    production.** `scripts/e2e_test.py` cleans up after itself; the other two
+    do not. Run `scripts/cleanup_test_data.py --apply` afterwards, locally.
+14. No email verification enforcement on *access* — gates outbound mail only
+    (deliberate).
 
 ---
 
@@ -663,52 +890,29 @@ no untranslated English in the Arabic table.
 
 ## Next steps, in the order I would do them
 
-### 1. Deploy
+### 1. Make the live site survivable
 
-Everything is built and the pre-flight is done: config refuses to boot when
-wrong, images build (backend 395MB, frontend 74MB), no CVEs, migrations
-reversible. Needs a host, managed Postgres + Redis, and the values in
-`backend/.env.production.example`.
+Deployment is done (see [Production](#production)). What is not done is the
+part that matters the day something goes wrong:
 
-**Get `TRUSTED_PROXY_COUNT` right.** Fly behind its own edge: 1. Cloudflare in
-front of Fly: 2. Directly exposed: 0. Wrong, and every visitor shares one
-rate-limit bucket — the 101st request in a minute returns 429 to everybody,
-which looks exactly like an outage.
+- **Turn on backups.** Hetzner server page → Backups → **Enable** (~$1.30/mo,
+  daily, seven kept). Then add an **off-server** copy: a nightly `pg_dump` sent
+  somewhere outside Hetzner. Hetzner's backups live in the same account as the
+  server, so they do not survive losing the account.
+- **Uptime monitoring.** A free external checker hitting
+  `https://ahsanse3r.com/health` every few minutes, emailing the operator.
+- **Brevo anonymous tracking** → Settings → Automations → Transactional emails
+  → Tracking → Yes. Not yet confirmed done.
+- **`ssh-add -D`** on the laptop when not deploying, so the key goes back
+  behind its passphrase.
+- **Image updates.** Ubuntu security updates apply automatically
+  (`unattended-upgrades` is on); the Postgres, Redis and Caddy images do not.
+  Pull and rebuild monthly.
+- **Merge `frontend` into `main`** — production runs a branch nothing else
+  treats as the source of truth.
 
-**Same-origin is now BUILT IN.** `app/frontend.py` serves `frontend/dist` from
-the API itself, so there is one origin, no CORS, and the refresh cookie is
-never third-party — which is what stops **Safari killing every iPhone session
-on page refresh**. It mounts only when a build exists, so `npm run dev` on
-:5173 is untouched.
-
-Two things it had to get right, both tested: an unknown path under an API
-prefix answers as the API (never `index.html`, which would hand an axios call
-a page of HTML), and the catch-all resolves paths before serving them, so
-`../../etc/passwd` cannot walk out of `dist`. Hashed assets are cached for a
-year; `index.html` is `no-cache`, because it is the one filename that never
-changes.
-
-**The CSP had to be widened for it.** Serving the app same-origin puts it under
-the API's own Content-Security-Policy, which was `style-src 'self'` /
-`font-src 'self'` — that silently drops the whole site to a fallback face,
-Arabic included. `fonts.googleapis.com` (the stylesheet) and
-`fonts.gstatic.com` (the files) are now allowed. **Self-hosting the four Cairo
-weights would take both back to `'self'`**, remove a render-blocking
-third-party request and stop Google seeing every visitor — the same instinct
-that put `referrerPolicy="no-referrer"` on the product images. Worth doing.
-
-**Still to write for a deploy:** a production `docker-compose.yml` (the one in
-the repo is dev-only — Postgres and Redis for a laptop) and a Caddyfile for
-TLS. The cheapest shape is one small VPS running API + Postgres + Redis +
-worker + the static build.
-
-**Cost:** ~$2–4/month (Fly machine + Neon free Postgres + Upstash free Redis),
-plus ~$12/year for a domain. Fly has **no free tier** any more, and **Render's
-free Postgres is deleted after 30 days** — use Neon, and use its **pooled**
-connection string.
-
-Also needed: **a worker process** — `python -m app.services.worker --loop`, or
-the GitHub Actions cron. Without one, queued scrapes sit there.
+Later: tighten DMARC to `p=quarantine` once reports look clean; bilingual
+emails; Apple sign-in if anyone asks for it ($99/yr, config only).
 
 ### 2. Get real supply
 
@@ -771,3 +975,16 @@ the first 50 shops.
   the worst failure mode there is: it passes every health check.
 - **Say what is not done.** The two warnings at the top of this file are more
   useful than anything else in it.
+- **Deploy by running it, not by reading it.** The production stack was
+  written carefully and still held seven bugs, every one invisible until the
+  thing ran for real: a settings file compose half-ignored, a base64 password
+  breaking a URL, no certificate for `www`, health checks that could never
+  pass, a bundle calling `localhost`, a CSP-blocked inline script, and a
+  merchant dashboard that 404'd on refresh.
+- **Adversarial review earns its keep.** A four-lens audit with two skeptics
+  per finding found a login-CSRF hole the module's own comments claimed to
+  prevent. The test that "covered" it drove both halves through one client, so
+  it could not see the bug.
+- **Verify from outside.** Port probes told a firewall-blocked port (timeout)
+  from an allowed one (refused); DNS checks against two public resolvers; every
+  page requested by path. The server's own view is not the visitor's.
