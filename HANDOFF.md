@@ -95,7 +95,7 @@ from outside the server, not assumed.
 | | |
 |---|---|
 | Server | Hetzner **CX23** (2 vCPU x86, 4 GB), Falkenstein, Ubuntu 24.04, `2.28.103.13`, ~$7/mo |
-| Code | `/opt/ahsan-se3r`, a git clone tracking **`main`** (switched 2026-09-14 at `214c1c1`, no rebuild). The running image was built from `3cd25cd`; nothing between the two runs in production (docs, CI, a CI-only script, a downgrade-only migration fix), so the next `--build` changes nothing a visitor sees |
+| Code | `/opt/ahsan-se3r`, a git clone tracking **`main`**. Deployed and rebuilt at `e1ccbb5` on 2026-09-14 (search engines + brand icons), CI green first |
 | Settings | `/opt/ahsan-se3r/deploy/.env` — mode `600`, root only. **Must be named exactly `.env`** (see traps) |
 | Stack | `deploy/docker-compose.yml`: postgres, redis, one-shot `migrate`, api (serves the SPA too), worker, caddy |
 | TLS | Caddy + Let's Encrypt, automatic renewal. `www` 301s to the bare domain |
