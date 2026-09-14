@@ -75,7 +75,13 @@ jobs:
         run: alembic upgrade head
 
       - name: Migrations reverse cleanly
-        run: alembic downgrade base
+        # Down AND back up. A downgrade can exit 0 and still leave objects
+        # behind -- the initial migration left its `userrole` enum type -- and
+        # only the next upgrade notices. Checking the round trip here makes
+        # that fail in this step, not in whichever step happens to upgrade next.
+        run: |
+          alembic downgrade base
+          alembic upgrade head
 
       - name: Smoke test against a running stack
         run: |

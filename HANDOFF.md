@@ -806,7 +806,11 @@ no untranslated English in the Arabic table.
   dependency audit after it never ran. It now seeds a fixed, invented
   catalogue (`scripts/seed_ci_catalogue.py`); scraping for real would load
   real retailers' sites on every push and make the result depend on their
-  stock.
+  stock. **Behind that was a second fault:** `alembic downgrade base` left
+  the `userrole` enum type in Postgres, so the next `upgrade head` died on
+  "type userrole already exists". "Migrations reverse cleanly" passed because
+  a downgrade that leaves debris still exits 0; that step now goes down and
+  back up. Only a downgrade path -- production never runs one.
 
 - **UptimeRobot's free plan.** Its terms have restricted the free plan to
   personal, non-commercial use since late 2024, with suspension as the penalty.

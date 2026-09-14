@@ -147,3 +147,11 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_products_brand'), table_name='products')
     op.drop_table('products')
     # ### end Alembic commands ###
+
+    # Dropping the users table does not drop the PostgreSQL enum its role
+    # column created, and autogenerate never writes this line. Without it a
+    # downgrade to base "succeeds" and leaves `userrole` behind, so the next
+    # upgrade dies on "type userrole already exists" -- which is exactly what
+    # CI's smoke step hit, one step after "Migrations reverse cleanly" passed.
+    # checkfirst keeps it a no-op on databases without named enum types.
+    sa.Enum(name='userrole').drop(op.get_bind(), checkfirst=True)
