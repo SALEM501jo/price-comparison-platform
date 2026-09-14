@@ -95,7 +95,7 @@ from outside the server, not assumed.
 | | |
 |---|---|
 | Server | Hetzner **CX23** (2 vCPU x86, 4 GB), Falkenstein, Ubuntu 24.04, `2.28.103.13`, ~$7/mo |
-| Code | `/opt/ahsan-se3r`, a git clone still tracking branch `frontend` — switch it to `main` on the next deploy (below) |
+| Code | `/opt/ahsan-se3r`, a git clone tracking **`main`** (switched 2026-09-14 at `214c1c1`, no rebuild). The running image was built from `3cd25cd`; nothing between the two runs in production (docs, CI, a CI-only script, a downgrade-only migration fix), so the next `--build` changes nothing a visitor sees |
 | Settings | `/opt/ahsan-se3r/deploy/.env` — mode `600`, root only. **Must be named exactly `.env`** (see traps) |
 | Stack | `deploy/docker-compose.yml`: postgres, redis, one-shot `migrate`, api (serves the SPA too), worker, caddy |
 | TLS | Caddy + Let's Encrypt, automatic renewal. `www` 301s to the bare domain |
@@ -866,7 +866,10 @@ no untranslated English in the Arabic table.
 
 1. **No backups.** Hetzner backups are off and nothing dumps the database. A
    lost disk, a mistaken command or a lapsed payment loses every account and
-   every merchant listing. The biggest operational gap by far.
+   every merchant listing. The biggest operational gap by far. **The owner
+   decided on 2026-09-14 to enable them once there are customers and stores**,
+   while the data is test accounts and a re-scrapable catalogue. Enable them
+   before the first real shop signs up, not after.
 2. **One product has more than one price.** See the warning at the top.
 3. **No merchants at all.** See the warning at the top.
 4. **Prices refresh only when an admin presses scrape.** `/admin/scrape`
@@ -925,7 +928,8 @@ no untranslated English in the Arabic table.
 Deployment is done (see [Production](#production)). What is not done is the
 part that matters the day something goes wrong:
 
-- **Turn on backups.** Hetzner server page → Backups → **Enable** (~$1.30/mo,
+- **Turn on backups** -- deferred by the owner until the first real shop
+  signs up (see Known limitations). Hetzner server page → Backups → **Enable** (~$1.30/mo,
   daily, seven kept). Then add an **off-server** copy: a nightly `pg_dump` sent
   somewhere outside Hetzner. Hetzner's backups live in the same account as the
   server, so they do not survive losing the account.
@@ -935,10 +939,8 @@ part that matters the day something goes wrong:
 - **Image updates.** Ubuntu security updates apply automatically
   (`unattended-upgrades` is on); the Postgres, Redis and Caddy images do not.
   Pull and rebuild monthly.
-- **Point the server at `main`.** `main` caught up with `frontend` on
-  2026-09-14; the server clone still tracks `frontend`. On the next deploy, once:
-  `cd /opt/ahsan-se3r && git fetch && git checkout main && git pull`, then the
-  usual `docker compose ... up -d --build`. After that, `frontend` can be deleted.
+- **Delete the `frontend` branch** on GitHub when convenient. Nothing uses it:
+  the laptop and the server both track `main` (2026-09-14).
 
 Later: tighten DMARC to `p=quarantine` once reports look clean; bilingual
 emails; Apple sign-in if anyone asks for it ($99/yr, config only).
