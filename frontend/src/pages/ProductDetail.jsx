@@ -7,6 +7,7 @@ import StorePriceTable from '../components/prices/StorePriceTable';
 import { formatPrice } from '../utils/format';
 import { attributeName, translateValue } from '../utils/matchDifference';
 import ProductImage from '../components/ui/ProductImage';
+import { fillTemplate, useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 import Spinner from '../components/ui/Spinner';
 
@@ -17,6 +18,9 @@ export default function ProductDetail() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // A 404 is kept apart from the error MESSAGE because it changes what a
+  // crawler should do, not just what the page says. See the meta below.
+  const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -24,6 +28,7 @@ export default function ProductDetail() {
     const fetchProduct = async () => {
       setLoading(true);
       setError(null);
+      setMissing(false);
       try {
         const [detail, priceHistory] = await Promise.all([
           getProduct(productId, { signal: controller.signal }),
@@ -35,11 +40,13 @@ export default function ProductDetail() {
         setHistory(priceHistory);
       } catch (err) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') return;
-        setError(
-          err.response?.status === 404
-            ? t('product.notFound')
-            : t('product.loadError'),
-        );
+        // 422 is as permanent as 404 here: it means the id in the URL is not
+        // a number at all (/product/abc), and no retry will make that page
+        // exist. Treating it as an outage left it indexable under the home
+        // page's title.
+        const gone = [404, 422].includes(err.response?.status);
+        setMissing(gone);
+        setError(gone ? t('product.notFound') : t('product.loadError'));
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -48,6 +55,56 @@ export default function ProductDetail() {
     fetchProduct();
     return () => controller.abort();
   }, [productId, t]);
+
+  // Split by comparison group. The backend already labels every offer, so the
+  // grouping is applied here rather than re-derived from `condition` strings.
+  //
+  // Worked out ABOVE the early returns, and from a product that may not be
+  // here yet, because the page title needs the price and a hook cannot sit
+  // below a return.
+  const offers = product?.prices ?? [];
+  const newOffers = offers.filter((o) => o.comparison_group !== 'second_hand');
+  const secondHandOffers = offers.filter((o) => o.comparison_group === 'second_hand');
+
+  const cheapestOf = (rows) => {
+    const inStock = rows.filter((row) => row.availability);
+    return inStock.length
+      ? Math.min(...inStock.map((row) => row.total_cost))
+      : null;
+  };
+  const cheapestNew = cheapestOf(newOffers);
+  const cheapestUsed = cheapestOf(secondHandOffers);
+
+  // Titled by the product only once THIS product has loaded: while the next
+  // one is on its way, `product` still holds the last, and its name in the
+  // tab would be a claim about a page that is no longer showing.
+  //
+  // The price is the NEW one, for the reason ProductActions is seeded with
+  // it: a used offer in the title would advertise a sealed phone at a
+  // second-hand price. Filled with fillTemplate, not t(), because the name
+  // comes from a scraper or a shop owner.
+  //
+  // A product that is gone answers with the app and a 200 like every route,
+  // so it asks for noindex itself -- otherwise a deleted product lingers in
+  // search as a page saying it does not exist. Any OTHER failure stays
+  // indexable: an outage is temporary, and a noindex seen during one can
+  // drop a real product from the index until Google happens to come back.
+  const shown = !loading && !error ? product : null;
+  const vars = { name: shown?.canonical_name, price: formatPrice(cheapestNew) };
+  useDocumentMeta(
+    shown
+      ? {
+          title:
+            cheapestNew === null
+              ? shown.canonical_name
+              : fillTemplate(t('meta.product.titleFrom'), vars),
+          description: fillTemplate(
+            t(cheapestNew === null ? 'meta.product.description' : 'meta.product.descriptionFrom'),
+            vars,
+          ),
+        }
+      : { title: missing ? t('common.notFound') : undefined, noindex: missing },
+  );
 
   if (loading) {
     return (
@@ -73,21 +130,6 @@ export default function ProductDetail() {
   // Prefer the structured matching attributes; `specs` is the legacy column
   // holding the old extractor's output and reads as junk ({"model_year": "15"}).
   const specs = product.attributes ?? {};
-
-  // Split by comparison group. The backend already labels every offer, so the
-  // grouping is applied here rather than re-derived from `condition` strings.
-  const offers = product.prices ?? [];
-  const newOffers = offers.filter((o) => o.comparison_group !== 'second_hand');
-  const secondHandOffers = offers.filter((o) => o.comparison_group === 'second_hand');
-
-  const cheapestOf = (rows) => {
-    const inStock = rows.filter((row) => row.availability);
-    return inStock.length
-      ? Math.min(...inStock.map((row) => row.total_cost))
-      : null;
-  };
-  const cheapestNew = cheapestOf(newOffers);
-  const cheapestUsed = cheapestOf(secondHandOffers);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">

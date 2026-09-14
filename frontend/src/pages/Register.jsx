@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -7,6 +8,7 @@ import { extractApiError, PASSWORD_RULES, passwordProblems } from '../utils/erro
 
 export default function Register() {
   const { t } = useLocale();
+  useDocumentMeta({ title: t('auth.register'), noindex: true });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

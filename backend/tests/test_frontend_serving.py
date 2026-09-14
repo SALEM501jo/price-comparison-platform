@@ -15,7 +15,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.frontend import API_PREFIXES, mount_frontend
+from app.frontend import API_PREFIXES, looks_like_a_file, mount_frontend
 
 
 @pytest.fixture
@@ -28,6 +28,7 @@ def built_site(tmp_path, monkeypatch):
     (dist / "fonts").mkdir()
     (dist / "fonts" / "cairo-arabic.woff2").write_bytes(b"wOF2fake")
     (dist / "favicon.svg").write_text("<svg/>")
+    (dist / "site.webmanifest").write_text('{"name": "Ahsan Se3r"}')
 
     # A file OUTSIDE dist, for the traversal test to try to reach.
     (tmp_path / "secret.txt").write_text("do not serve me")
@@ -104,6 +105,80 @@ class TestServing:
         filenames that no longer exist.
         """
         assert built_site.get("/").headers["cache-control"] == "no-cache"
+
+
+class TestMissingFilesAreNotPages:
+    """
+    A path shaped like a file that is not in the build answers 404.
+
+    THE SOFT 404 THIS REPLACES. The fallback used to hand the app shell, with
+    a 200, to anything it did not recognise -- including /robots.txt and
+    /sitemap.xml before they had routes. Google read those as a broken robots
+    file and no sitemap, rather than as files that are missing, and nothing
+    in a browser looked wrong: the page simply rendered the home screen.
+    """
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/favicon.png",
+            "/old.xml",
+            "/x.txt",
+            # This test app has no SEO router, so these two are exactly the
+            # live bug: files nothing serves. They must not be the shell.
+            "/robots.txt",
+            "/sitemap.xml",
+            "/deep/inside/logo.webp",
+            "/.env",
+            "/wp-login.php",
+        ],
+    )
+    def test_a_missing_file_is_a_404_not_the_shell(self, built_site, path):
+        response = built_site.get(path)
+        assert response.status_code == 404, f"{path} answered {response.status_code}"
+        assert "<div id=root>" not in response.text
+
+    def test_a_head_request_for_a_missing_file_is_a_404_too(self, built_site):
+        assert built_site.head("/favicon.png").status_code == 404
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/product/123",
+            "/browse/phones",
+            "/results?q=iphone+15",
+            # A dot in the QUERY is not a file extension: only the path counts.
+            "/results?q=galaxy+s24.5",
+            "/reset-password?token=header.payload.signature",
+            "/oauth/callback",
+        ],
+    )
+    def test_a_client_route_still_gets_the_shell(self, built_site, path):
+        response = built_site.get(path)
+        assert response.status_code == 200, f"{path} lost the app shell"
+        assert "<div id=root>" in response.text
+
+    def test_the_manifest_is_served_as_a_manifest(self, built_site):
+        response = built_site.get("/site.webmanifest")
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/manifest+json")
+
+    @pytest.mark.parametrize(
+        ("path", "expected"),
+        [
+            ("favicon.ico", True),
+            ("icons/icon-192.png", True),
+            ("x.txt/", True),
+            (".env", True),
+            ("", False),
+            ("product/123", False),
+            ("browse/phones", False),
+            ("some.dir/page", False),
+        ],
+    )
+    def test_where_the_line_is_drawn(self, path, expected):
+        """Only the LAST segment decides; a dotted directory is not a file."""
+        assert looks_like_a_file(path) is expected
 
 
 class TestItDoesNotSwallowTheApi:

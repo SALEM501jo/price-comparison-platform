@@ -23,6 +23,7 @@ from app.routers import (
     oauth,
     prices,
     products,
+    seo,
     support,
 )
 
@@ -155,6 +156,11 @@ app.include_router(prices.router, prefix="/prices", tags=["prices"])
 app.include_router(support.router, prefix="/support", tags=["support"])
 app.include_router(merchant.router, prefix="/merchant", tags=["merchant"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+# /robots.txt and /sitemap.xml. No prefix, and nothing to add to API_PREFIXES
+# in app/frontend.py: they are two exact paths, and a router answers before the
+# SPA catch-all is ever consulted. Left to that catch-all they were the app
+# shell with a 200, which is what Google was reading as the site's robots file.
+app.include_router(seo.router, tags=["seo"])
 
 
 @app.get("/health")

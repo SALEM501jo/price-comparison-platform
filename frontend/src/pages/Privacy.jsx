@@ -1,4 +1,6 @@
 import LegalPage from '../components/layout/LegalPage';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { useLocale } from '../hooks/useLocale';
 
 /**
  * The privacy policy, as an outline. LegalPage turns it into the page.
@@ -168,6 +170,9 @@ const SECTIONS = [
 const UNFILLED = ['legal.field.entity', 'legal.field.dataContact'];
 
 export default function Privacy() {
+  const { t } = useLocale();
+  useDocumentMeta({ title: t('privacy.title'), description: t('privacy.blurb') });
+
   return (
     <LegalPage
       title="privacy.title"

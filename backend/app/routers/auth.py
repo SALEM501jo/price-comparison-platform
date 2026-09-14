@@ -37,6 +37,7 @@ from app.security.password import get_dummy_hash, hash_password, verify_password
 from app.security.rate_limiter import rate_limit, strict_rate_limit
 from app.services import tokens as token_service
 from app.services import account, password_reset, verification
+from app.services.cache import bump_catalogue_version
 
 router = APIRouter()
 logger = get_security_logger("app.auth")
@@ -519,6 +520,12 @@ async def delete_me(
 
     summary = account.delete_account(db, current_user)
     clear_refresh_cookie(response)
+    if summary.store_retired:
+        # Retiring the store hides its prices in the database, but search,
+        # browse, deals and the sitemap are cached by catalogue version --
+        # without a bump they keep serving the closed shop for up to the cache
+        # TTL. The admin decline and unverify routes bump for the same reason.
+        await bump_catalogue_version()
 
     logger.warning(
         "Account deleted",

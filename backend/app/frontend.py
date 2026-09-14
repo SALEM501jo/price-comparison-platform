@@ -19,6 +19,7 @@ backend keeps behaving exactly as it does today when run from a checkout.
 from __future__ import annotations
 
 import logging
+import mimetypes
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -26,6 +27,16 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 logger = logging.getLogger(__name__)
+
+# /site.webmanifest is JSON, but the type a browser and a PWA audit expect is
+# application/manifest+json, and FileResponse labels a file with whatever
+# `mimetypes` says. Python's built-in table happens to know the extension, but
+# mimetypes layers the HOST's tables over it -- /etc/mime.types where the image
+# has one, the registry on Windows -- and where they disagree, the host wins.
+# Registering it here makes the answer this code's rather than the base
+# image's. add_type loads the host tables first, so they cannot override it
+# afterwards.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 # backend/app/frontend.py -> backend/ -> repo root -> frontend/dist
 DIST = (Path(__file__).resolve().parent.parent.parent / "frontend" / "dist").resolve()
@@ -46,6 +57,28 @@ API_PREFIXES = (
     "/redoc",
     "/openapi.json",
 )
+
+
+def looks_like_a_file(full_path: str) -> bool:
+    """
+    Whether a path names a FILE rather than a page of the app.
+
+    The test is a dot in the last segment. Every React Router path in this app
+    is dot-free -- /product/123, /browse/phones, /reset-password -- and every
+    file the build emits has an extension, so the two never collide. The query
+    string is not part of the path, so /results?q=galaxy+s24.5 is still a page.
+
+    A dot anywhere in the segment rather than a strict extension, so dotfiles
+    count too: /.env and /.htpasswd are among the first things scanners probe,
+    and a 200 for /.env in the access log reads as a leaked secret to whoever
+    is looking at it.
+
+    IF A ROUTE WITH A DOT IN ITS LAST SEGMENT IS EVER ADDED (a slug like
+    /product/123-galaxy-s24-6.1in), a hard refresh on it will 404 here, and
+    this is the function to change.
+    """
+    last = full_path.rstrip("/").rpartition("/")[2]
+    return "." in last
 
 
 class ImmutableStatic(StaticFiles):
@@ -153,6 +186,22 @@ def mount_frontend(app: FastAPI) -> bool:
             inside = candidate == DIST or DIST in candidate.parents
             if inside and candidate.is_file():
                 return FileResponse(candidate)
+
+        # A FILE THAT IS NOT THERE IS A 404, NOT THE APP SHELL.
+        #
+        # The shell with a 200 is a "soft 404": the status says the file
+        # exists and the body is a web page. That is exactly how /robots.txt
+        # and /sitemap.xml looked before they had routes -- valid responses
+        # full of HTML, which Google took as a broken robots file and no
+        # sitemap rather than as missing ones. The same applies to a renamed
+        # favicon, a stale link to an old asset, or an icon a manifest names
+        # but the build no longer ships: each one "worked" and was wrong.
+        #
+        # Checked AFTER the real-file lookup, so a file that exists is still
+        # served, and only for file-shaped paths, so client routes still reach
+        # the shell. See looks_like_a_file for where that line is drawn.
+        if looks_like_a_file(full_path):
+            raise HTTPException(status_code=404, detail="Not found")
 
         return FileResponse(
             index,

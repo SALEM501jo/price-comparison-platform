@@ -409,6 +409,39 @@ class TestMerchantShop:
         assert db_session.query(ProductAlias).filter(ProductAlias.id == alias_id).count() == 1
         assert db_session.query(Price).filter(Price.alias_id == alias_id).count() == 1
 
+    def test_retiring_the_shop_empties_the_cached_catalogue(
+        self, client, shop, monkeypatch
+    ):
+        """
+        Search, browse, deals and the sitemap are cached by catalogue version.
+        The retired shop's prices are hidden in the database at once, but
+        without a bump every cached page keeps listing them until the TTL.
+        """
+        bumps = []
+
+        async def bump():
+            bumps.append(True)
+
+        monkeypatch.setattr("app.routers.auth.bump_catalogue_version", bump)
+        headers, _store, _alias = shop
+
+        assert delete_account(client, headers, "merchant@example.com").status_code == 204
+        assert bumps == [True]
+
+    def test_an_account_without_a_shop_leaves_the_cache_alone(
+        self, client, populated, monkeypatch
+    ):
+        bumps = []
+
+        async def bump():
+            bumps.append(True)
+
+        monkeypatch.setattr("app.routers.auth.bump_catalogue_version", bump)
+        headers, _user = populated
+
+        assert delete_account(client, headers).status_code == 204
+        assert bumps == []
+
     def test_deleting_the_owner_does_not_publish_an_unverified_shop(
         self, client, db_session, shop
     ):

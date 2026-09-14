@@ -4,6 +4,7 @@ import SearchBar from '../components/search/SearchBar';
 import DealsGrid from '../components/search/DealsGrid';
 import CatalogueGrid, { CategoryTiles } from '../components/search/CatalogueGrid';
 import { browseCatalogue, getDeals } from '../api/products';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 /**
@@ -28,6 +29,10 @@ import { useLocale } from '../hooks/useLocale';
  */
 export default function Home() {
   const { t } = useLocale();
+  // No title of its own: the home page IS the site, so it wears the site
+  // title. Called anyway, because in English that title is not the Arabic
+  // one index.html was served with.
+  useDocumentMeta();
   // Set by the account page on its way out. The confirmation cannot be shown
   // where the deletion happened: that page is behind RequireAuth and unmounts
   // with the session it just ended, and a user who is silently signed out

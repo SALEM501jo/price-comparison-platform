@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { verifyEmail } from '../api/auth';
 import Spinner from '../components/ui/Spinner';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 /**
@@ -36,6 +37,9 @@ function verifyOnce(token) {
  */
 export default function VerifyEmail() {
   const { t } = useLocale();
+  // The URL carries a one-time token. It should never be linked from
+  // anywhere public, but if it ever is, the page must not become a result.
+  useDocumentMeta({ title: t('meta.verifyEmail.title'), noindex: true });
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 

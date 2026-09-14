@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { forgotPassword } from '../api/auth';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 const field =
@@ -19,6 +20,7 @@ const field =
  */
 export default function ForgotPassword() {
   const { t } = useLocale();
+  useDocumentMeta({ title: t('auth.forgotTitle'), noindex: true });
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);

@@ -638,6 +638,43 @@ and theme are applied in `index.html` **before React mounts**.
 A test enforces key parity, identical `{placeholders}`, no empty strings, and
 no untranslated English in the Arabic table.
 
+### Search engines and the brand icon — added 2026-09-14
+
+- **`/robots.txt` and `/sitemap.xml`** are real routes in `app/routers/seo.py`,
+  registered before the SPA catch-all. They used to return `index.html` with
+  200. The sitemap lists home, legal pages, non-empty categories and every
+  product with an in-stock price from a `visible_to_shoppers()` store (same
+  row), from `settings.app_base_url` -- never the Host header -- cached on the
+  catalogue version. **robots.txt must never Disallow an API a public page
+  fetches**: Googlebot renders the SPA and a blocked `/products` call renders
+  an empty page. `test_seo.py` walks the frontend's real imports and asserts it.
+- **A missing path that looks like a file** (`/x.png`, `/.env`) is a 404, not
+  the app shell. A future client route with a dot in its last segment would
+  404 on refresh.
+- **Per-page `<title>`, description and `noindex`** via
+  `src/hooks/useDocumentMeta.js`. noindex on every private page, on **all of
+  `/results`** (a crafted `?q=` put arbitrary text in an indexable title),
+  on unknown or empty `/browse/<x>` (the tab never echoes an unknown segment),
+  and on a product that 404s or 422s. Values go in through `fillTemplate` /
+  `t()`, both one-pass function replacers.
+- **`GET /products/{id}` is a 404 when no visible store prices it.** It used
+  to answer 200 with the name and an empty table, which published an
+  unverified shop's own listing text on an indexable page.
+- **`index.html`** carries both spellings in the title, Open Graph, and JSON-LD
+  (`WebSite` + `Organization`, alternateName `أحسن سعر` / `Ahsan Se3r`). No
+  static canonical (it would mark every route a duplicate of home) and no
+  hreflang (both languages share URLs). JSON-LD is a data block, so
+  `script-src 'self'` does not apply.
+- **Icons** in `frontend/public/`: the header's price tag, white on brand green
+  (`favicon.svg`, `.ico` 16/32/48, `apple-touch-icon.png`, `icon-192/512.png`
+  for the manifest only -- they are full-bleed maskable squares and must not be
+  `rel=icon`), `site.webmanifest`, and `og-image.png` rendered in headless
+  Chrome with the self-hosted Cairo (Pillow on Windows has no raqm and breaks
+  Arabic shaping). The generator scripts were not kept.
+- **Link previews do not run JavaScript**, so every shared URL previews as the
+  home page. Per-product previews need the server to write `og:*` into
+  `index.html` per product.
+
 ---
 
 ## Decisions already made — don't redo these
@@ -903,6 +940,13 @@ no untranslated English in the Arabic table.
     do not. Run `scripts/cleanup_test_data.py --apply` afterwards, locally.
 14. No email verification enforcement on *access* — gates outbound mail only
     (deliberate).
+15. **The name is shared.** `ahsansaer.com` is a Palestinian price-comparison
+    site called "أحسن سعر", Jordanian Facebook shops use "احسن سعر", and the
+    phrase is generic ("best price"). The brand query that is realistically
+    ownable is "Ahsan Se3r" / "ahsanse3r". Check trademark position in Jordan
+    before spending on the name.
+16. **Unknown dot-free paths (`/some-missing-page`) are soft 404s**: the server
+    cannot tell them from client routes. The page sets noindex.
 
 ---
 
@@ -944,6 +988,15 @@ part that matters the day something goes wrong:
 
 Later: tighten DMARC to `p=quarantine` once reports look clean; bilingual
 emails; Apple sign-in if anyone asks for it ($99/yr, config only).
+
+### 1b. Get found
+
+Code side done 2026-09-14 (see Search engines and the brand icon). Owner side:
+**Google Search Console** -- verify the domain with a TXT record in
+Cloudflare, submit `https://ahsanse3r.com/sitemap.xml`, request indexing of
+the home page; import the property into **Bing Webmaster Tools**. Social
+profiles named "احسن سعر | Ahsan Se3r" linking to the site, and links from
+shops once they join.
 
 ### 2. Get real supply
 

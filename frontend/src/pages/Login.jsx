@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -7,6 +8,10 @@ import { extractApiError } from '../utils/errors';
 
 export default function Login() {
   const { t } = useLocale();
+  // A search for the site's name should land on prices. Left indexable, a
+  // sign-in form is the kind of page that turns up as a sitelink under a
+  // brand result, where it helps nobody who came to shop.
+  useDocumentMeta({ title: t('auth.login'), noindex: true });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

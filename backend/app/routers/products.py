@@ -274,6 +274,18 @@ async def get_product(
         .all()
     )
 
+    # NO VISIBLE OFFER, NO PAGE. Filtering the rows was not enough on its own:
+    # a product that only an UNVERIFIED shop carries was still answered with
+    # 200, its name and an empty table. That name is the shop's own text --
+    # anyone can register a store and list anything -- and the product page
+    # is indexable and titled with it, so "call 079... for 99 JOD iPhones"
+    # could reach a search result before an admin ever saw the store. Same
+    # rule as the sitemap and search: nothing a shopper cannot compare. A 404
+    # also gives the page its noindex. Out-of-stock rows still count: the
+    # product is real and priced, just not available right now.
+    if not prices:
+        raise HTTPException(status_code=404, detail="Product not found")
+
     price_responses = []
     for price, alias, store in prices:
         price_responses.append(StorePriceResponse(

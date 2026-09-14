@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 import { extractApiError } from '../utils/errors';
 
@@ -77,6 +78,7 @@ const formatOpened = (value, locale) => {
 
 export default function Account() {
   const { t, locale } = useLocale();
+  useDocumentMeta({ title: t('account.title'), noindex: true });
   const { user, isMerchant, deleteAccount } = useAuth();
   const navigate = useNavigate();
 

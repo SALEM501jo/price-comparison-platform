@@ -54,9 +54,14 @@ export function LocaleProvider({ children }) {
       }
       if (text === undefined) return key;
       if (!vars) return text;
-      return Object.entries(vars).reduce(
-        (out, [name, value]) => out.replaceAll(`{${name}}`, String(value)),
-        text,
+      // One pass with a function replacer. This was replaceAll per variable,
+      // which reads `$&`, `$'` and `$$` inside a VALUE as replacement patterns
+      // and re-fills a placeholder that a value happened to contain -- and
+      // values include search queries and product names nobody here wrote.
+      // A function replacer is never read for patterns, and a single pass
+      // never revisits what it inserted. Same rule as fillTemplate.
+      return text.replace(/\{(\w+)\}/g, (placeholder, name) =>
+        Object.hasOwn(vars, name) ? String(vars[name]) : placeholder,
       );
     },
     [locale],

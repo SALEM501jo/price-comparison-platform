@@ -4,6 +4,7 @@ import { deleteAlert, getAlerts } from '../api/prices';
 import Spinner from '../components/ui/Spinner';
 import { extractApiError } from '../utils/errors';
 import { formatPrice } from '../utils/format';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 /** How close the current price is to the target, as a percentage over it. */
@@ -16,6 +17,7 @@ function gapToTarget(alert) {
 
 export default function Alerts() {
   const { t } = useLocale();
+  useDocumentMeta({ title: t('alerts.title'), noindex: true });
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

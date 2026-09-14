@@ -1,4 +1,6 @@
 import LegalPage from '../components/layout/LegalPage';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { useLocale } from '../hooks/useLocale';
 
 /**
  * The terms of use, as an outline. LegalPage turns it into the page.
@@ -114,6 +116,9 @@ const SECTIONS = [
 const UNFILLED = ['legal.field.entity', 'legal.field.law'];
 
 export default function Terms() {
+  const { t } = useLocale();
+  useDocumentMeta({ title: t('terms.title'), description: t('terms.blurb') });
+
   return (
     <LegalPage title="terms.title" blurb="terms.blurb" sections={SECTIONS} unfilled={UNFILLED} />
   );

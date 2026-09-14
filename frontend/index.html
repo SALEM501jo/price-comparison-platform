@@ -2,7 +2,6 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Cairo carries Arabic and Latin, so the brand reads as one product in
@@ -31,11 +30,136 @@
       crossorigin
     />
 
-    <title>احسن سعر — قارن الأسعار في الأردن</title>
+    <!-- THE HEAD OF EVERY ROUTE, not just the home page. The API answers
+         /product/42 and /browse/phones with these same bytes, and the page
+         retitles itself once React has rendered (src/hooks/useDocumentMeta.js).
+         So everything below has to be true of the SITE; nothing here may
+         describe one page.
+
+         The title and description are the Arabic defaults in
+         src/i18n/translations.js, character for character -- a crawler has
+         no stored locale, so this is what it gets both before and after the
+         script runs, and a test fails if the two drift apart.
+
+         BOTH SPELLINGS OF THE NAME IN THE TITLE. Searching "Ahsan Se3r" finds
+         only pages that say "Ahsan Se3r", and "احسن سعر" alone is already
+         used by other sites; the title is the strongest place to carry both. -->
+    <title>احسن سعر | Ahsan Se3r — قارن أسعار الإلكترونيات في الأردن</title>
     <meta
       name="description"
-      content="قارن أسعار المنتج الذي تريده بالضبط بين المتاجر الأردنية. Compare prices for the exact product you want across Jordanian retailers."
+      content="قارن أسعار الهواتف واللابتوبات والشاشات بين متاجر الأردن، واعثر على المنتج الذي تريده بالضبط بأقل سعر. Compare phone, laptop and monitor prices across shops in Jordan and find the exact product you want at the lowest price."
     />
+
+    <!-- NO rel=canonical, ON PURPOSE. A canonical has to name the page it is
+         on, and this file cannot know which page that is. A static one
+         pointing at "/" would tell Google that every product and category
+         page is a duplicate of the home page, and Google would drop them
+         from its index in the home page's favour -- the exact pages people
+         search for.
+
+         No hreflang either: the English toggle does not change the URL, and
+         hreflang can only point from one URL to another. -->
+
+    <!-- Icons: the tab, the home screen, and the search result. All of them
+         are in public/ and served from the root under fixed names.
+
+         THE 192 AND 512 PNGs ARE NOT rel=icon. They are full-bleed squares
+         cut for install surfaces (maskable, no rounded corners, a smaller
+         tag), so a browser that picked one for a tab would show a hard green
+         block instead of the tab icon. The manifest lists them, which is the
+         only place they belong. Google's search-result favicon needs a square
+         multiple of 48px: the SVG has no fixed size and the .ico carries a
+         48px frame, so both qualify without them.
+
+         THE .ico DECLARES sizes="32x32", NOT "any". It holds 16, 32 and 48,
+         but Chrome treats an "any" icon as a perfect fit and prefers it to
+         the SVG; one concrete size lets the vector icon win wherever SVG
+         favicons work and keeps the .ico for the browsers where they do not. -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <!-- iOS labels a home-screen icon with the page title unless told
+         otherwise, and the full title does not fit under an icon. -->
+    <meta name="apple-mobile-web-app-title" content="احسن سعر" />
+    <!-- The browser's own toolbar on Android and in Safari: brand-600. -->
+    <meta name="theme-color" content="#057854" />
+
+    <!-- A link preview -- WhatsApp, Facebook, X, Telegram. Those crawlers do
+         not run JavaScript, so they read this static head and never see the
+         per-page title: every link to the site previews as the site, whatever
+         route it names. og:url says the same thing rather than pretend to
+         know the route. A preview naming the product would need the server
+         to write these tags into the HTML it sends for that URL, which no
+         amount of React can do.
+
+         Absolute URLs are correct here and only here: Open Graph requires
+         them, and https://ahsanse3r.com is the one production origin. Code
+         that builds a URL at runtime takes it from settings.app_base_url,
+         never from a request's Host header.
+
+         X reads og:* for everything but the card size, so twitter:card is
+         the only tag of its own. -->
+    <meta property="og:site_name" content="احسن سعر" />
+    <meta property="og:title" content="احسن سعر | Ahsan Se3r — قارن أسعار الإلكترونيات في الأردن" />
+    <meta
+      property="og:description"
+      content="قارن أسعار الهواتف واللابتوبات والشاشات بين متاجر الأردن، واعثر على المنتج الذي تريده بالضبط بأقل سعر. Compare phone, laptop and monitor prices across shops in Jordan and find the exact product you want at the lowest price."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ahsanse3r.com/" />
+    <meta property="og:image" content="https://ahsanse3r.com/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="احسن سعر | Ahsan Se3r" />
+    <meta property="og:locale" content="ar_JO" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Structured data: how Google learns the site's NAME, which is not the
+         same thing as its title. The name is shared -- a Palestinian site and
+         several Facebook pages use it -- so alternateName lists every way
+         people type this one: with the hamza and without, and in Latin
+         letters with and without the space.
+
+         THIS IS NOT AN EXCEPTION TO THE CSP. script-src governs script that
+         a browser EXECUTES. The HTML standard treats a <script> whose type is
+         not a JavaScript type as a data block: the element is abandoned
+         before the policy's inline check is even reached, and it is never
+         compiled or run, so script-src 'self' needs no hash and no
+         'unsafe-inline' for it. That holds only while the type says
+         application/ld+json -- a test fails on any other inline script in
+         this file.
+
+         The WebSite and the Organization point at each other by @id, so
+         Google reads them as one entity rather than two that happen to share
+         a name. No SearchAction: Google has retired the sitelinks search box
+         it used to feed. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://ahsanse3r.com/#website",
+            "name": "احسن سعر",
+            "alternateName": ["أحسن سعر", "Ahsan Se3r", "AhsanSe3r"],
+            "url": "https://ahsanse3r.com/",
+            "inLanguage": ["ar", "en"],
+            "publisher": { "@id": "https://ahsanse3r.com/#organization" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://ahsanse3r.com/#organization",
+            "name": "احسن سعر",
+            "alternateName": ["أحسن سعر", "Ahsan Se3r", "AhsanSe3r"],
+            "url": "https://ahsanse3r.com/",
+            "logo": "https://ahsanse3r.com/icon-512.png"
+          }
+        ]
+      }
+    </script>
 
     <!-- Theme and direction, applied before React mounts. Loaded from a file
          rather than written inline: the production CSP is script-src 'self'

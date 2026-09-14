@@ -18,6 +18,7 @@ import SupportMessages from '../components/admin/SupportMessages';
 import Spinner from '../components/ui/Spinner';
 import { useAuth } from '../hooks/useAuth';
 import { extractApiError } from '../utils/errors';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 // Merchants can write prices that shoppers see, so they get their own colour
@@ -184,6 +185,7 @@ function AdminListingRow({ listing, onChanged, onRemoved, onError }) {
 
 export default function Admin() {
   const { t } = useLocale();
+  useDocumentMeta({ title: t('admin.title'), noindex: true });
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);

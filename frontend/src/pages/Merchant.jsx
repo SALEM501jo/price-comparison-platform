@@ -7,6 +7,7 @@ import ContactStats from '../components/merchant/ContactStats';
 import ListingRow from '../components/merchant/ListingRow';
 import StoreRegistration from '../components/merchant/StoreRegistration';
 import Spinner from '../components/ui/Spinner';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 import { extractApiError } from '../utils/errors';
 
@@ -26,6 +27,10 @@ import { extractApiError } from '../utils/errors';
 
 export default function Merchant() {
   const { t } = useLocale();
+  // Out of search although shops want to be found: this is the dashboard a
+  // shop is run from, not what a shopper looks for. Shoppers reach a shop
+  // through its products.
+  useDocumentMeta({ title: t('nav.myShop'), noindex: true });
   const [store, setStore] = useState(null);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);

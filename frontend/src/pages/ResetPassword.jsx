@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../api/auth';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 import { passwordProblems } from '../utils/errors';
 
@@ -23,6 +24,8 @@ const field =
  */
 export default function ResetPassword() {
   const { t } = useLocale();
+  // Same reasoning as VerifyEmail: the URL is a live reset token.
+  useDocumentMeta({ title: t('auth.resetTitle'), noindex: true });
   const [params] = useSearchParams();
   const token = params.get('token') || '';
 

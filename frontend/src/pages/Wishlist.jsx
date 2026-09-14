@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 import { Link } from 'react-router-dom';
 import { getWishlist, removeFromWishlist } from '../api/prices';
@@ -8,6 +9,7 @@ import { formatPrice, formatStoreCount } from '../utils/format';
 
 export default function Wishlist() {
   const { t } = useLocale();
+  useDocumentMeta({ title: t('wishlist.title'), noindex: true });
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

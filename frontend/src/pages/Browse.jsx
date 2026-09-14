@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import CatalogueGrid from '../components/search/CatalogueGrid';
 import Spinner from '../components/ui/Spinner';
 import { browseCatalogue } from '../api/products';
+import { fillTemplate, useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 const PER_PAGE = 24;
@@ -91,6 +92,25 @@ export default function Browse() {
   const title = CATEGORY_LABEL[category]
     ? t(CATEGORY_LABEL[category])
     : category;
+
+  // The heading may echo an unknown segment -- it is the visitor's own URL --
+  // but the TAB AND SEARCH SNIPPET must not: /browse/<any text> answers 200,
+  // so echoing it there would let a crafted link put its words in a Google
+  // result under this domain. An unknown category, or a known one that turned
+  // out empty, is a page with nothing on it: noindex, and the generic title.
+  // The sitemap only lists categories that have products, so no real page is
+  // affected. fillTemplate, not t(), for the same reason as before: the value
+  // is data.
+  const known = Boolean(CATEGORY_LABEL[category]);
+  const empty = !loading && !error && total === 0;
+  useDocumentMeta(
+    known && !empty
+      ? {
+          title,
+          description: fillTemplate(t('meta.browse.description'), { category: title }),
+        }
+      : { title: known ? title : t('common.notFound'), noindex: true },
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16 pt-8">

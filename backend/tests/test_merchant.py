@@ -342,9 +342,11 @@ class TestVerificationGate:
         listing = add_listing(client, headers, price=1.0)
         product_id = listing["matched_product_id"]
 
+        # Not an empty table: no page at all. The product's name is the shop's
+        # own unreviewed text, and an empty 200 still published it.
         detail = client.get(f"/products/{product_id}")
-        assert detail.status_code == 200
-        assert detail.json()["prices"] == []
+        assert detail.status_code == 404
+        assert "Unverified" not in detail.text
 
     def test_verifying_the_store_reveals_its_price(self, client, db_session):
         headers, store = open_shop(client, "reveal@example.com", "Reveal Shop")
@@ -374,7 +376,7 @@ class TestVerificationGate:
         assert client.get(f"/products/{product_id}").json()["prices"] != []
 
         client.post(f"/admin/stores/{store['id']}/unverify", headers=admin_headers)
-        assert client.get(f"/products/{product_id}").json()["prices"] == []
+        assert client.get(f"/products/{product_id}").status_code == 404
 
     def test_an_unverified_price_does_not_move_the_lowest_price(
         self, client, db_session

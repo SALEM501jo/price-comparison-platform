@@ -8,6 +8,7 @@ import TierSection from '../components/search/TierSection';
 import Spinner from '../components/ui/Spinner';
 import { extractApiError } from '../utils/errors';
 import { MATCH_TIERS } from '../utils/constants';
+import { fillTemplate, useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 export default function Results() {
@@ -19,6 +20,28 @@ export default function Results() {
   // 'exact' in the URL means the shopper rejected our correction. It
   // lives in the URL so the choice survives a reload and a shared link.
   const exact = searchParams.get('exact') === '1';
+
+  // The query is whatever the link said, so it is filled in as text rather
+  // than through t() -- see fillTemplate. Trimmed, or "?q=%20" titles the tab
+  // with an empty pair of quotes.
+  const typed = query.trim();
+  // NEVER INDEXED. The query is whatever a link says, and it lands in the
+  // title, the description and the heading -- so an indexable results page
+  // lets anyone publish "call 079... for cheap iPhones" as a search result
+  // under this domain by posting a link. Every q/sort/page combination would
+  // also be its own URL, an endless crawl of near-duplicates. Products and
+  // categories reach Google through the sitemap and their own pages; links
+  // on this page are still followed. Not Disallowed in robots.txt either:
+  // Google has to fetch the page to see the noindex on URLs it already knows.
+  useDocumentMeta(
+    typed
+      ? {
+          title: fillTemplate(t('meta.results.title'), { query: typed }),
+          description: fillTemplate(t('meta.results.description'), { query: typed }),
+          noindex: true,
+        }
+      : { title: t('search.button'), noindex: true },
+  );
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);

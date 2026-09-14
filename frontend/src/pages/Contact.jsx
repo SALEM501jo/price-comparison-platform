@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { sendSupportMessage } from '../api/support';
 import { useAuth } from '../hooks/useAuth';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useLocale } from '../hooks/useLocale';
 
 const field =
@@ -18,6 +19,7 @@ const field =
  */
 export default function Contact() {
   const { t } = useLocale();
+  useDocumentMeta({ title: t('support.title'), description: t('support.blurb') });
   const { user } = useAuth();
   const [form, setForm] = useState({
     email: user?.email ?? '',

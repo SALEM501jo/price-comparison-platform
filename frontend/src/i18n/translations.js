@@ -38,6 +38,36 @@ const translations = {
     'nav.toggleTheme': 'الوضع الليلي',
     'nav.toggleThemeLight': 'الوضع النهاري',
 
+    // --- What a browser tab and a search engine read (hooks/useDocumentMeta)
+    //
+    // meta.siteTitle and meta.description in THIS table are index.html's
+    // <title> and description, character for character, and a test holds
+    // them together. Arabic is what a crawler gets -- it has no stored
+    // locale -- so the head the server sends and the head the page sets once
+    // it has rendered must say the same thing, or Google is shown two
+    // descriptions of one URL and picks for itself.
+    //
+    // BOTH SPELLINGS OF THE NAME IN THE SITE TITLE. People search for the
+    // Latin "Ahsan Se3r" as often as for the Arabic, and the Arabic name
+    // alone is already shared with other sites; a title that carries only
+    // one spelling cannot match the other search at all.
+    //
+    // The description is bilingual for the same reason and in the same order
+    // as the page: Arabic first, because that is what shows when a result is
+    // cut short.
+    'meta.siteTitle': 'احسن سعر | Ahsan Se3r — قارن أسعار الإلكترونيات في الأردن',
+    'meta.pageTitle': '{page} — احسن سعر',
+    'meta.description':
+      'قارن أسعار الهواتف واللابتوبات والشاشات بين متاجر الأردن، واعثر على المنتج الذي تريده بالضبط بأقل سعر. Compare phone, laptop and monitor prices across shops in Jordan and find the exact product you want at the lowest price.',
+    'meta.results.title': 'أسعار «{query}»',
+    'meta.results.description':
+      'قارن أسعار «{query}» بين متاجر الأردن، من التطابق التام إلى المنتجات القريبة والمشابهة.',
+    'meta.browse.description': '{category}: قارن الأسعار بين متاجر الأردن واعثر على أقل سعر.',
+    'meta.product.titleFrom': '{name} ابتداءً من {price}',
+    'meta.product.description': 'قارن أسعار {name} بين متاجر الأردن.',
+    'meta.product.descriptionFrom': 'قارن أسعار {name} بين متاجر الأردن. جديد ابتداءً من {price}.',
+    'meta.verifyEmail.title': 'تأكيد البريد الإلكتروني',
+
     // --- Home
     'home.title': 'قارن الأسعار في الأردن',
     'home.subtitle':
@@ -893,6 +923,22 @@ const translations = {
     'nav.toggleLanguage': 'العربية',
     'nav.toggleTheme': 'Dark mode',
     'nav.toggleThemeLight': 'Light mode',
+
+    // The Arabic name stays in the English site title: it is the name on the
+    // logo, and the one a shopper who switched language will still recognise.
+    // No crawler reads this table -- see the note on the Arabic one.
+    'meta.siteTitle': 'Ahsan Se3r | احسن سعر — Compare electronics prices in Jordan',
+    'meta.pageTitle': '{page} — Ahsan Se3r',
+    'meta.description':
+      'Compare phone, laptop and monitor prices across shops in Jordan and find the exact product you want at the lowest price.',
+    'meta.results.title': 'Prices for “{query}”',
+    'meta.results.description':
+      'Compare prices for “{query}” across shops in Jordan, from exact matches to close and similar products.',
+    'meta.browse.description': '{category}: compare prices across shops in Jordan and find the lowest.',
+    'meta.product.titleFrom': '{name} from {price}',
+    'meta.product.description': 'Compare prices for {name} across shops in Jordan.',
+    'meta.product.descriptionFrom': 'Compare prices for {name} across shops in Jordan. New from {price}.',
+    'meta.verifyEmail.title': 'Confirm your email',
 
     'home.title': 'Compare prices in Jordan',
     'home.subtitle':
