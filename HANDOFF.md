@@ -991,10 +991,15 @@ emails; Apple sign-in if anyone asks for it ($99/yr, config only).
 
 ### 1b. Get found
 
-Code side done 2026-09-14 (see Search engines and the brand icon). Owner side:
-**Google Search Console** -- verify the domain with a TXT record in
-Cloudflare, submit `https://ahsanse3r.com/sitemap.xml`, request indexing of
-the home page; import the property into **Bing Webmaster Tools**. Social
+Code side done 2026-09-14 (see Search engines and the brand icon). **Google
+Search Console: domain property `ahsanse3r.com` verified 2026-09-14** through
+Cloudflare's one-time authorization -- **never delete the
+`google-site-verification` TXT record at the apex**, or ownership lapses.
+Sitemap submitted the same day; "Couldn't fetch" on day one is Google's delay
+for new properties (the file was checked as Googlebot: 200, application/xml,
+371 URLs, valid lastmods). Still to do: confirm the sitemap reads Success,
+request indexing of the home page, import the property into **Bing Webmaster
+Tools**. Social
 profiles named "احسن سعر | Ahsan Se3r" linking to the site, and links from
 shops once they join.
 
