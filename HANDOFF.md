@@ -104,6 +104,8 @@ from outside the server, not assumed.
 | SSH | root, **key only**. Password auth off, verified refused |
 | Email | Brevo SMTP relay, port 587 + STARTTLS. Domain authenticated: `brevo-code` TXT, two DKIM CNAMEs, DMARC `p=none` |
 | Sign-in | Google, **published "In production"**. Apple not configured (needs a paid developer account) |
+| Monitoring | Better Stack (free), every 3 min, email alerts. `/health` proves the app answers; `/products/483` must contain `iPhone 16`, which proves **Postgres** answers (`/health` never touches the database, and `/products/deals` is served from Redis cache). Deleting or renaming product 483 turns that monitor red; point it at another product. A deploy's rebuild can trip one alert |
+| Account security | Two-factor login on Hetzner, Cloudflare, Brevo and Google (2026-09-14) |
 | Admin | One admin: the operator's own account. Promoted by SQL, since nothing creates the first admin |
 | Data | Catalogue imported: 3 stores, 423 products, 455 prices. **No accounts copied** |
 | Backups | **OFF.** See Known limitations |
@@ -791,6 +793,10 @@ no untranslated English in the Arabic table.
 
 ## Tried and rejected — do not repeat
 
+- **UptimeRobot's free plan.** Its terms have restricted the free plan to
+  personal, non-commercial use since late 2024, with suspension as the penalty.
+  This is a business site. Better Stack's free plan is used instead.
+
 - **Facebook scraping.** Their `robots.txt` prohibits automated collection,
   Meta litigates, and Jordan's PDPL No. 24 of 2023 covers the contact details.
   **The route in is the shop's permission, not Facebook's.**
@@ -899,12 +905,9 @@ part that matters the day something goes wrong:
   daily, seven kept). Then add an **off-server** copy: a nightly `pg_dump` sent
   somewhere outside Hetzner. Hetzner's backups live in the same account as the
   server, so they do not survive losing the account.
-- **Uptime monitoring.** A free external checker hitting
-  `https://ahsanse3r.com/health` every few minutes, emailing the operator.
-- **Brevo anonymous tracking** → Settings → Automations → Transactional emails
-  → Tracking → Yes. Not yet confirmed done.
 - **`ssh-add -D`** on the laptop when not deploying, so the key goes back
-  behind its passphrase.
+  behind its passphrase. (Uptime monitoring, Brevo anonymous tracking and
+  two-factor login are done, 2026-09-14.)
 - **Image updates.** Ubuntu security updates apply automatically
   (`unattended-upgrades` is on); the Postgres, Redis and Caddy images do not.
   Pull and rebuild monthly.
