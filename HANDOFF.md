@@ -3,9 +3,9 @@
 Paste this into a new session to continue without losing context. It replaces
 the earlier handoffs and folds in everything since.
 
-**Repo:** `G:\Downloads\price-comparison-platform` · **Branch:** `frontend`,
-pushed to `origin/frontend` and **deployed** (not yet merged into `main`) ·
-**69 commits**, 65 ahead of `main`
+**Repo:** `G:\Downloads\price-comparison-platform` · **Branches:** `main` and
+`frontend` point at the same commit (fast-forwarded 2026-09-14, after a full
+history secret scan came back clean). **Work on `main` from now on.**
 
 **Live at https://ahsanse3r.com** — see [Production](#production) below.
 
@@ -95,7 +95,7 @@ from outside the server, not assumed.
 | | |
 |---|---|
 | Server | Hetzner **CX23** (2 vCPU x86, 4 GB), Falkenstein, Ubuntu 24.04, `2.28.103.13`, ~$7/mo |
-| Code | `/opt/ahsan-se3r`, a git clone of branch `frontend` |
+| Code | `/opt/ahsan-se3r`, a git clone still tracking branch `frontend` — switch it to `main` on the next deploy (below) |
 | Settings | `/opt/ahsan-se3r/deploy/.env` — mode `600`, root only. **Must be named exactly `.env`** (see traps) |
 | Stack | `deploy/docker-compose.yml`: postgres, redis, one-shot `migrate`, api (serves the SPA too), worker, caddy |
 | TLS | Caddy + Let's Encrypt, automatic renewal. `www` 301s to the bare domain |
@@ -908,8 +908,10 @@ part that matters the day something goes wrong:
 - **Image updates.** Ubuntu security updates apply automatically
   (`unattended-upgrades` is on); the Postgres, Redis and Caddy images do not.
   Pull and rebuild monthly.
-- **Merge `frontend` into `main`** — production runs a branch nothing else
-  treats as the source of truth.
+- **Point the server at `main`.** `main` caught up with `frontend` on
+  2026-09-14; the server clone still tracks `frontend`. On the next deploy, once:
+  `cd /opt/ahsan-se3r && git fetch && git checkout main && git pull`, then the
+  usual `docker compose ... up -d --build`. After that, `frontend` can be deleted.
 
 Later: tighten DMARC to `p=quarantine` once reports look clean; bilingual
 emails; Apple sign-in if anyone asks for it ($99/yr, config only).
