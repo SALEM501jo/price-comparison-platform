@@ -997,9 +997,14 @@ Cloudflare's one-time authorization -- **never delete the
 `google-site-verification` TXT record at the apex**, or ownership lapses.
 Sitemap submitted the same day; "Couldn't fetch" on day one is Google's delay
 for new properties (the file was checked as Googlebot: 200, application/xml,
-371 URLs, valid lastmods). Still to do: confirm the sitemap reads Success,
-request indexing of the home page, import the property into **Bing Webmaster
-Tools**. Social
+371 URLs, valid lastmods). Home page indexing requested; Google's live test
+rendered the full page on a phone (products, prices, no console errors; 1 of
+21 resources failed, unidentified, harmless to the render). **Bing Webmaster
+Tools**: property imported from Search Console and sitemap submitted
+2026-09-15 (it imports from whichever Google account owns the property --
+the first attempt picked the other account and found nothing). Still to do:
+confirm both sitemaps read Success. Later: IndexNow (Bing supports it) so
+price changes are pushed instead of waiting for a crawl. Social
 profiles named "احسن سعر | Ahsan Se3r" linking to the site, and links from
 shops once they join.
 
