@@ -54,9 +54,11 @@ jobs:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v4
+      # Node 24 majors: the v4/v5 releases run on Node 20, which GitHub has
+      # deprecated and now forces onto Node 24 with a warning on every run.
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -78,7 +80,11 @@ jobs:
       - name: Smoke test against a running stack
         run: |
           alembic upgrade head
-          python -m app.services.scraper
+          # A fixed, invented catalogue -- not a real scrape. The module this
+          # used to call was deleted, which failed this step on import on every
+          # push; scraping for real would load real retailers' sites on every
+          # run. See the script's docstring for what it seeds and why.
+          python scripts/seed_ci_catalogue.py
           uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-server-header &
           python - <<'PY'
           import time, httpx, sys
@@ -94,8 +100,11 @@ jobs:
 
       - name: Build the production image
         # A Dockerfile that has never been built is a Dockerfile that does not
-        # work. This catches a broken build before a deploy does.
-        run: docker build -t pricecompare-api:ci .
+        # work. This catches a broken build before a deploy does -- so it
+        # builds the one production actually uses: deploy/Dockerfile, from the
+        # repository root, exactly as deploy/docker-compose.yml does.
+        # backend/Dockerfile is not what the server runs.
+        run: docker build -f ../deploy/Dockerfile -t ahsan-se3r:ci ..
 
       - name: Dependency audit
         # No `continue-on-error`: a known CVE in a dependency should fail the
@@ -109,11 +118,12 @@ jobs:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          # Matches deploy/Dockerfile (node:22-slim), which builds what ships.
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 

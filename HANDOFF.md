@@ -793,6 +793,21 @@ no untranslated English in the Arabic table.
 
 ## Tried and rejected — do not repeat
 
+- **Scraping production from GitHub Actions (`scrape.yml`, deleted
+  2026-09-14).** It needed the production `DATABASE_URL` in GitHub secrets and
+  Postgres reachable from the internet; the server's firewall allows only
+  22/80/443, and opening 5432 to feed a cron is the wrong trade. It had never
+  run, and on `main` it would have failed every six hours on the missing
+  secret. It also pasted a dispatch input straight into a `python -c` string.
+- **CI filling its catalogue by scraping real stores.** CI's smoke step called
+  `python -m app.services.scraper`, deleted with the dead pipeline, so **CI
+  failed on every push from the first one until 2026-09-14** -- unit tests and
+  migrations passed, the smoke step died on import, and the image build and
+  dependency audit after it never ran. It now seeds a fixed, invented
+  catalogue (`scripts/seed_ci_catalogue.py`); scraping for real would load
+  real retailers' sites on every push and make the result depend on their
+  stock.
+
 - **UptimeRobot's free plan.** Its terms have restricted the free plan to
   personal, non-commercial use since late 2024, with suspension as the penalty.
   This is a business site. Better Stack's free plan is used instead.
@@ -850,7 +865,11 @@ no untranslated English in the Arabic table.
    every merchant listing. The biggest operational gap by far.
 2. **One product has more than one price.** See the warning at the top.
 3. **No merchants at all.** See the warning at the top.
-4. **No uptime monitoring.** If the site goes down, nobody is told.
+4. **Prices refresh only when an admin presses scrape.** `/admin/scrape`
+   queues a job and the worker runs it; nothing queues one on a schedule. The
+   old GitHub `scrape.yml` cron could never have done it (see Tried and
+   rejected). The fix is a cron on the server that enqueues a job every six
+   hours, so it stays behind the firewall.
 5. **Brevo rewrites every link** in outgoing email for click tracking and it
    cannot be switched off on this plan. Mitigated: reset links last 1 hour,
    anonymous tracking, disclosed in the privacy policy.
@@ -887,6 +906,7 @@ no untranslated English in the Arabic table.
 | `scripts/e2e_test.py` | 124 checks, real server, limiter ON, cleans up after itself |
 | `scripts/attack_probes.py` | 41 active attack probes |
 | `scripts/smoke_test.py` | 57 critical-path checks |
+| `scripts/seed_ci_catalogue.py` | Invented 4-listing catalogue for CI's smoke test. **Refuses production** |
 | `scripts/cleanup_test_data.py` | Deletes test accounts/stores. **Whitelist**, not blocklist — refuses to run if no admin would survive |
 | `scripts/prune_unparseable_products.py` | Re-parses every product with current rules, deletes what they reject. Run after any `rules.py` change |
 | `scripts/backfill_attributes.py` | Recomputes `match_category`/`match_attributes`. **Run after any rules change** — ingest never re-parses existing rows, so a rules improvement only reaches new listings |
