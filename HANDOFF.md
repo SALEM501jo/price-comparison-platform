@@ -141,6 +141,12 @@ Changed only `deploy/.env`? Recreate the two containers that read it:
 docker compose -f deploy/docker-compose.yml up -d --force-recreate --no-deps api worker
 ```
 
+**Stop the automatic scraping** (a retailer complains or blocks the bot): add
+`SCRAPE_INTERVAL_HOURS=0` to `deploy/.env` and recreate the worker as above.
+Never edit `docker-compose.yml` on the server -- the next `git pull` fails on
+the local change. Job history: `/admin/scrape-jobs`, or
+`docker compose -f deploy/docker-compose.yml logs worker`.
+
 Status and logs:
 
 ```bash
@@ -551,6 +557,24 @@ database decides, so two workers cannot both run one job. Portable on purpose:
 no `SKIP LOCKED`, so SQLite tests exercise the production path. Stale jobs are
 requeued; failures are written to the row, not just logged.
 
+**The worker schedules itself** (added 2026-09-15): with
+`SCRAPE_INTERVAL_HOURS` set -- `6` on the production worker in
+`deploy/docker-compose.yml`, default `0` = off so a local worker never scrapes
+by surprise -- each loop pass queues a full run if none is pending and the
+last full run was queued that long ago (`jobs.enqueue_if_due`). Not a host
+crontab (invisible to the repo, lost with the server) and not GitHub (cannot
+reach Postgres). **A run isolates each store** (one down store, or one that
+returns nothing, no longer fails the job), always bumps the catalogue version,
+and sends price alerts only if every store refreshed -- capped at
+`ALERT_EMAILS_PER_RUN` (100), each `notified_at` committed as its email goes
+out. The alerts used to run only in the deleted GitHub scrape. **One full run
+may be pending at a time**, enforced by a partial unique index (migration
+`7d3b9e21c5a8`); a second admin "scrape all" gets 409. An admin's "scrape all"
+is stored as empty `store_codes`, the same as a scheduled run, so it resets
+the six-hour clock. Seeding a fresh database: stop the worker first
+(`deploy/README.md`). Before this, production
+prices were 19 days old because nothing had scraped since launch.
+
 ### Scraping — `app/services/scrapers/`
 
 Shopify `/products.json`. One adapter covers every store, and the barcode
@@ -909,11 +933,14 @@ no untranslated English in the Arabic table.
    before the first real shop signs up, not after.
 2. **One product has more than one price.** See the warning at the top.
 3. **No merchants at all.** See the warning at the top.
-4. **Prices refresh only when an admin presses scrape.** `/admin/scrape`
-   queues a job and the worker runs it; nothing queues one on a schedule. The
-   old GitHub `scrape.yml` cron could never have done it (see Tried and
-   rejected). The fix is a cron on the server that enqueues a job every six
-   hours, so it stays behind the firewall.
+4. **Prices are refreshed every ~6 hours, not live** -- when a store's run
+   succeeds. A store that blocks the bot or is down keeps its last prices
+   until it answers again; the job row says `FAILED <store>` and **price
+   alerts are held back for the whole run**, so nobody is emailed about a
+   figure that was not re-checked. A store that fails every run therefore
+   blocks alerts until it is fixed or removed from the registry. A deploy
+   during a run requeues it (SIGTERM handler) and it restarts from the first
+   store.
 5. **Brevo rewrites every link** in outgoing email for click tracking and it
    cannot be switched off on this plan. Mitigated: reset links last 1 hour,
    anonymous tracking, disclosed in the privacy policy.

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -84,9 +85,25 @@ async def trigger_scrape(
             )
         targets = (config,)
 
-    job = job_queue.enqueue(
-        db, [s.code for s in targets], requested_by=admin.id
-    )
+    # "Every store" is stored as NO codes, not as today's list of them. The
+    # schedule recognises a full run by empty store_codes, so a spelled-out
+    # list made an admin's "scrape all" look partial: the clock never reset
+    # and the worker scraped every store again the moment it finished. It is
+    # also what run_job already reads as "all", and stays correct when a
+    # store is added after the job was queued.
+    try:
+        job = job_queue.enqueue(
+            db, [config.code for config in targets] if store else [], requested_by=admin.id
+        )
+    except IntegrityError:
+        # One full run may be pending at a time (a partial unique index); a
+        # second would fetch every store twice in a row. Said plainly, rather
+        # than the global handler's generic "may already exist".
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A full scrape is already queued or running. Watch /admin/scrape-jobs.",
+        )
 
     logger.warning(
         "Admin queued a scrape",

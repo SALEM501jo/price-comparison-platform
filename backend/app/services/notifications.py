@@ -85,12 +85,15 @@ def _message(user: User, product: Product, target, current, store: str | None) -
     )
 
 
-def process_alerts(db: Session) -> dict:
+def process_alerts(db: Session, limit: int | None = None) -> dict:
     """
     Notify on every alert whose target is now met, and reset those that are not.
 
+    At most `limit` emails per call (default: settings.alert_emails_per_run).
     Returns counts, so a scrape run can report what it did.
     """
+    limit = settings.alert_emails_per_run if limit is None else limit
+    deferred = 0
     rows = (
         db.query(PriceAlert, Product, User)
         .join(Product, PriceAlert.product_id == Product.id)
@@ -99,7 +102,13 @@ def process_alerts(db: Session) -> dict:
         .all()
     )
     if not rows:
-        return {"checked": 0, "notified": 0, "reset": 0, "skipped_unverified": 0}
+        return {
+            "checked": 0,
+            "notified": 0,
+            "reset": 0,
+            "skipped_unverified": 0,
+            "deferred": 0,
+        }
 
     prices = price_summary(db, (product.id for _, product, _ in rows))
 
@@ -136,10 +145,24 @@ def process_alerts(db: Session) -> dict:
             skipped_unverified += 1
             continue
 
+        # A CAP PER RUN. Alerts share the mail account -- and its daily quota
+        # -- with verification and password-reset mail, and a send the
+        # provider refuses fails quietly. One run meeting hundreds of targets
+        # at once must not leave nobody able to confirm an address for the
+        # rest of the day. The rest stay unnotified and go out next run.
+        if notified >= limit:
+            deferred += 1
+            continue
+
         store = offers.get("best")
         if email_service.send(_message(user, product, alert.target_price, current, store)):
             alert.notified_at = datetime.now(timezone.utc)
             notified += 1
+            # Committed per email, not once after the loop. A deploy kills the
+            # worker mid-loop routinely; with one commit at the end the emails
+            # already sent kept no marker, the run was retried, and the same
+            # people were emailed again.
+            db.commit()
             logger.info(
                 "Price alert notified",
                 extra={
@@ -147,6 +170,16 @@ def process_alerts(db: Session) -> dict:
                     "action": "alert_notify",
                     "target": product.canonical_name,
                     "success": True,
+                },
+            )
+        else:
+            logger.warning(
+                "Price alert email was not sent",
+                extra={
+                    "user_id": user.id,
+                    "action": "alert_notify",
+                    "target": product.canonical_name,
+                    "success": False,
                 },
             )
 
@@ -157,6 +190,7 @@ def process_alerts(db: Session) -> dict:
         "notified": notified,
         "reset": reset,
         "skipped_unverified": skipped_unverified,
+        "deferred": deferred,
     }
     logger.info(
         "Alerts processed",

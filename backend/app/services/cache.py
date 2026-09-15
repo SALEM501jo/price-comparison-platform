@@ -75,6 +75,32 @@ async def bump_catalogue_version() -> None:
         logger.warning("Could not bump catalogue version", exc_info=True)
 
 
+def bump_catalogue_version_sync() -> None:
+    """
+    bump_catalogue_version() for code that is not async -- the scrape worker.
+
+    NOT asyncio.run(bump_catalogue_version()). The async client above is a
+    module-level singleton, and redis.asyncio binds its connections to the
+    event loop that first used them; asyncio.run makes a new loop each call,
+    so the second scrape of a worker's life would bump through a client tied
+    to a closed loop, fail, and have the failure swallowed below -- leaving
+    search serving pre-scrape prices until the TTL, silently. A short-lived
+    synchronous client has no loop to be wrong about.
+    """
+    try:
+        import redis
+
+        client = redis.Redis.from_url(
+            settings.redis_url, socket_timeout=5, socket_connect_timeout=5
+        )
+        try:
+            client.incr(VERSION_KEY)
+        finally:
+            client.close()
+    except Exception:
+        logger.warning("Could not bump catalogue version", exc_info=True)
+
+
 async def cached_json(key: str):
     """
     Read a cached JSON payload, or None.

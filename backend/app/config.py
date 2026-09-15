@@ -89,6 +89,20 @@ class Settings(BaseSettings):
     # anywhere else stays usable.
     password_reset_ttl_minutes: int = 60
 
+    # How often the worker queues a full scrape of every store by itself.
+    # 0 turns the schedule off, and 0 IS THE DEFAULT: a developer running the
+    # worker locally should not start fetching real retailers' sites every few
+    # hours without asking to. Production sets it on the worker service in
+    # deploy/docker-compose.yml, where it is visible in the repository rather
+    # than hidden in a server's .env.
+    scrape_interval_hours: int = 0
+
+    # Price-alert emails one run may send. They share the mail provider's
+    # daily quota (Brevo's free tier is 300/day) with verification and reset
+    # mail, which must never be starved by a burst of alerts. The remainder
+    # goes out on the next run.
+    alert_emails_per_run: int = 100
+
     # Where contact-form messages are forwarded. Optional: with no address
     # set, messages are still STORED and readable in the admin panel -- the
     # notification is the part that is missing, not the message.

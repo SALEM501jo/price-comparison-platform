@@ -385,8 +385,10 @@ engine — exact SKU match — work on real identifiers.
 cd backend && python -m app.services.ingest
 ```
 
-Also runs on a six-hourly cron (`.github/workflows/scrape.yml`) and from
-`POST /admin/scrape`.
+In production the worker (`python -m app.services.worker --loop`) queues a
+full scrape of every store every six hours by itself (`SCRAPE_INTERVAL_HOURS`,
+off by default, `6` on the production worker), then refreshes cached pages and
+sends price alerts. `POST /admin/scrape` queues one on demand.
 
 Money is stored as `Numeric(10,3)`, not `Float`. JOD has three decimal places,
 the feeds return `"136.000"`, and these values are summed and then *compared* —
@@ -465,11 +467,7 @@ opinion.
 
 **Also outstanding:**
 
-- `POST /admin/scrape` runs the real ingest, but via `BackgroundTasks` — the
-  work dies with a restart and does not spread across replicas. A real
-  deployment wants a task queue. The scheduled path does not depend on it.
 - The matching rules cover phones and laptops only
-- `/admin/scrape` uses BackgroundTasks, so the work dies with a restart
 
 ---
 

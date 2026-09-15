@@ -157,12 +157,17 @@ Never dump the whole database. It contains user accounts — including any demo
 account with a known password — and restoring those to a public server
 publishes them.
 
-Load it after the stack is up and `migrate` has run:
+Load it after the stack is up and `migrate` has run, **with the worker
+stopped**. On an empty database the worker queues a full scrape within seconds
+of starting, and the stores and products that scrape writes collide with the
+seed's ids and store names -- `ON_ERROR_STOP` then aborts the whole restore:
 
 ```bash
 scp catalogue-seed.sql root@YOUR_SERVER:/tmp/
+docker compose -f deploy/docker-compose.yml stop worker
 docker compose -f deploy/docker-compose.yml exec -T postgres \
   psql -U ahsan -d price_comparison --set ON_ERROR_STOP=1 < /tmp/catalogue-seed.sql
+docker compose -f deploy/docker-compose.yml start worker
 ```
 
 The sequences travel with the data, so the first merchant listing does not

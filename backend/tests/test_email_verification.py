@@ -354,3 +354,80 @@ class TestAlertNotifications:
         assert "SmartBuy" in body, (
             "the alert email did not name the shop with the best price: " + body
         )
+
+
+class TestAlertSendingUnderPressure:
+    """
+    Alerts now run after every scheduled scrape, unattended, through the same
+    mail account as verification and reset mail.
+    """
+
+    def _three_met_alerts(self, db):
+        user = User(
+            email="many@example.com",
+            password_hash="x",
+            email_verified_at=datetime.now(timezone.utc),
+        )
+        store = Store(name="SmartBuy")
+        db.add_all([user, store])
+        db.commit()
+        for n in range(3):
+            product = Product(canonical_name=f"Phone {n}", match_category="phones")
+            db.add(product)
+            db.commit()
+            alias = ProductAlias(
+                product_id=product.id,
+                store_id=store.id,
+                store_product_name=f"Phone {n}",
+                store_product_id=f"P{n}",
+            )
+            db.add(alias)
+            db.commit()
+            db.add(Price(alias_id=alias.id, price=Decimal("100"), delivery_cost=Decimal("0"), availability=True))
+            db.add(PriceAlert(user_id=user.id, product_id=product.id, target_price=Decimal("150")))
+        db.commit()
+
+    def test_one_run_sends_at_most_the_cap(self, db_session, mail):
+        """A burst of met targets must not spend the day's quota for sign-up mail."""
+        from app.services.notifications import process_alerts
+
+        self._three_met_alerts(db_session)
+        result = process_alerts(db_session, limit=2)
+
+        assert result["notified"] == 2
+        assert result["deferred"] == 1
+        assert len(mail.sent) == 2
+
+    def test_the_deferred_alert_goes_out_next_run(self, db_session, mail):
+        from app.services.notifications import process_alerts
+
+        self._three_met_alerts(db_session)
+        process_alerts(db_session, limit=2)
+        second = process_alerts(db_session, limit=2)
+
+        assert second["notified"] == 1
+        assert len(mail.sent) == 3, "someone was emailed twice or not at all"
+
+    def test_an_email_sent_before_a_kill_is_not_sent_again(self, db_session, mail, monkeypatch):
+        """
+        A deploy stops the worker mid-loop. With one commit after the loop, the
+        emails already sent kept no marker and went out again on the retry.
+        """
+        from app.services import notifications
+
+        self._three_met_alerts(db_session)
+        sends = []
+
+        def send_then_die(message):
+            if sends:
+                raise KeyboardInterrupt  # the worker is stopped here
+            sends.append(message)
+            return True
+
+        monkeypatch.setattr(notifications.email_service, "send", send_then_die)
+        with pytest.raises(KeyboardInterrupt):
+            notifications.process_alerts(db_session)
+        db_session.rollback()
+
+        marked = db_session.query(PriceAlert).filter(PriceAlert.notified_at.isnot(None)).count()
+        assert marked == 1, "the email that went out was not recorded"

@@ -21,6 +21,8 @@ already solves.
 import enum
 
 from sqlalchemy import (
+    Index,
+    text,
     Column,
     DateTime,
     ForeignKey,
@@ -70,6 +72,19 @@ class ScrapeJob(Base):
     # summary can change without a migration.
     result = Column(Text)
     error = Column(Text)
+
+    # At most one full run (every store) queued or running at a time -- the
+    # database's answer to two workers scheduling at once. See migration
+    # 7d3b9e21c5a8 for why this is an index and not a check in Python.
+    __table_args__ = (
+        Index(
+            "ux_scrape_jobs_one_pending_full_run",
+            "store_codes",
+            unique=True,
+            postgresql_where=text("store_codes = '' AND status IN ('queued', 'running')"),
+            sqlite_where=text("store_codes = '' AND status IN ('queued', 'running')"),
+        ),
+    )
 
     @property
     def is_finished(self) -> bool:

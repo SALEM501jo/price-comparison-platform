@@ -130,6 +130,20 @@ services:
     # occupy a request worker, and because this can be stopped and restarted
     # without taking the site down.
     command: ["python", "-m", "app.services.worker", "--loop"]
+    environment:
+      # A full scrape of every store, queued by the worker itself. Six hours:
+      # retail prices do not move by the minute, and each run is deliberately
+      # slow and polite to the stores. Here rather than in .env because it is
+      # behaviour, not a secret, and belongs where a reviewer can see it.
+      # Only the worker reads it.
+      #
+      # OVERRIDABLE FROM deploy/.env without editing this tracked file: a
+      # service's `environment:` beats its `env_file:`, so a plain "6" here
+      # could not be switched off from .env at all -- and editing this file on
+      # the server breaks the next `git pull`. Compose fills ${...} from
+      # deploy/.env. To stop scraping in an emergency: SCRAPE_INTERVAL_HOURS=0
+      # in deploy/.env, then recreate the worker.
+      SCRAPE_INTERVAL_HOURS: "${SCRAPE_INTERVAL_HOURS:-6}"
     # The image's health check curls port 8000, and a queue worker serves no
     # HTTP at all -- so inherited, it could never pass and the worker would
     # read as unhealthy forever. Disabled rather than faked: `restart:
