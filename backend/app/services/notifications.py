@@ -127,7 +127,15 @@ def process_alerts(db: Session, limit: int | None = None) -> dict:
         offers = offers_for(prices, product.id)
         current = offers.get("best_total")
 
-        if current is None or current > alert.target_price:
+        if current is None:
+            # NO CURRENT OFFER IS NOT A PRICE RISE. The listing went out of
+            # stock, was delisted, or has not been re-read within the
+            # freshness window -- none of which says the price recovered. Reset
+            # here, and the same offer coming back at the same price emailed
+            # the same person the same drop a second time.
+            continue
+
+        if current > alert.target_price:
             # Back above target: clear the marker so a future drop notifies
             # again rather than being suppressed forever by one old send.
             if alert.notified_at is not None:

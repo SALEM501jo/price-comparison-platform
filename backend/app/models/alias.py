@@ -14,6 +14,7 @@ import enum
 from sqlalchemy import (
     Boolean,
     Column,
+    DateTime,
     Float,
     ForeignKey,
     Integer,
@@ -67,6 +68,16 @@ class ProductAlias(Base):
     store_product_name = Column(String(255), nullable=False)
     store_product_id = Column(String(100))
     store_product_url = Column(String(500))
+
+    # When the store stopped listing this, as established by a COMPLETE read
+    # of its feed that did not contain it (or a link check that found the
+    # product page gone). Null while the store lists it. A delisted listing is
+    # not an offer: it leaves every price, total, best-deal and link a shopper
+    # sees, and its "Visit store" link would lead to a 404 page. Cleared the
+    # moment a later read sees the listing again. Kept rather than deleted so
+    # price history and wishlists survive a product going briefly unpublished.
+    # Never set for merchant listings: nothing reads a merchant's feed.
+    delisted_at = Column(DateTime(timezone=True), index=True)
 
     match_confidence = Column(Float, default=0.0)
     match_method = Column(String(20), default="manual")

@@ -40,6 +40,7 @@ from app.models.price import Price
 from app.models.product import Product
 from app.models.store import Store
 from app.services import catalogue
+from app.services.offers import current_offer
 
 # THE MODULE, NOT THE FUNCTIONS. `from app.services.cache import cached_json`
 # would bind the function into this namespace, and tests/conftest.py disables
@@ -235,6 +236,22 @@ def _product_rows(db: Session, *, limit: int) -> list[tuple[int, datetime | None
     that page. Rows from hidden stores cannot move it, or the sitemap would
     say when an unverified shop last edited its prices.
 
+    "VISIBLE OFFER" MEANS A CURRENT ONE -- offers.current_offer(), the rule
+    the product page itself applies. A product whose only in-stock listing the
+    store has removed, or nobody has re-read in two days, answers 404 there,
+    and a sitemap URL that 404s is an error in Search Console and crawl budget
+    spent on nothing. It sits in the WHERE, where store visibility sat, for
+    the reason above: the in-stock HAVING must see only rows that are offers,
+    or a delisted listing still marked in stock would qualify a product whose
+    current offers are all sold out.
+
+    lastmod is still Price.last_updated -- when a price CHANGED -- and never
+    checked_at, which moves on every six-hourly re-read of an unchanged price
+    and would tell a crawler every page in the catalogue changed four times a
+    day. A listing LEAVING does not move lastmod: nothing records when a price
+    went stale, and dating only the delisted half of that change would make
+    the date mean two different things.
+
     Ordered by id so the document is stable between builds. The LIMIT bounds
     the document, not the work: the grouping still reads every visible offer,
     which is what the route's cache is for.
@@ -244,7 +261,7 @@ def _product_rows(db: Session, *, limit: int) -> list[tuple[int, datetime | None
         db.query(ProductAlias.product_id, func.max(Price.last_updated))
         .join(Price, Price.alias_id == ProductAlias.id)
         .join(Store, Store.id == ProductAlias.store_id)
-        .filter(Store.visible_to_shoppers())
+        .filter(current_offer())
         .group_by(ProductAlias.product_id)
         .having(in_stock == 1)
         .order_by(ProductAlias.product_id)
@@ -258,16 +275,18 @@ def _category_lastmod(db: Session) -> dict[str, datetime]:
     """
     When each category page last changed: the newest visible offer it draws on.
 
-    Scoped the way the browse listing is -- visible stores, new condition,
-    browsable categories -- so a second-hand listing or a hidden store's edit
-    does not claim a change on a page that never shows it.
+    Scoped the way the browse listing is -- current offers, new condition,
+    browsable categories -- so a second-hand listing, a hidden store's edit or
+    a listing the store has removed does not claim a change on a page that
+    never shows it. current_offer() is what catalogue.category_counts applies
+    to decide which of these categories are listed at all.
     """
     rows = (
         db.query(Product.match_category, func.max(Price.last_updated))
         .join(ProductAlias, ProductAlias.product_id == Product.id)
         .join(Price, Price.alias_id == ProductAlias.id)
         .join(Store, Store.id == ProductAlias.store_id)
-        .filter(Store.visible_to_shoppers())
+        .filter(current_offer())
         .filter(ProductAlias.condition == Condition.new.value)
         .filter(Product.match_category.in_(catalogue.BROWSABLE))
         .group_by(Product.match_category)

@@ -104,7 +104,7 @@ from outside the server, not assumed.
 | SSH | root, **key only**. Password auth off, verified refused |
 | Email | Brevo SMTP relay, port 587 + STARTTLS. Domain authenticated: `brevo-code` TXT, two DKIM CNAMEs, DMARC `p=none` |
 | Sign-in | Google, **published "In production"**. Apple not configured (needs a paid developer account) |
-| Monitoring | Better Stack (free), every 3 min, email alerts. `/health` proves the app answers; `/products/483` must contain `iPhone 16`, which proves **Postgres** answers (`/health` never touches the database, and `/products/deals` is served from Redis cache). Deleting or renaming product 483 turns that monitor red; point it at another product. A deploy's rebuild can trip one alert |
+| Monitoring | Better Stack (free), every 3 min, email alerts. `/health` proves the app answers. The second monitor must be **`/health/catalogue`** ("URL becomes unavailable"): it touches Postgres and goes 503 when scraped prices have not been refreshed for 14 h, a day and a half before they would leave the site. It replaced `/products/483` contains `iPhone 16`, which now legitimately 404s whenever that product has no current offer. A deploy's rebuild can trip one alert |
 | Account security | Two-factor login on Hetzner, Cloudflare, Brevo and Google (2026-09-14) |
 | Admin | One admin: the operator's own account. Promoted by SQL, since nothing creates the first admin |
 | Data | Catalogue imported: 3 stores, 423 products, 455 prices. **No accounts copied** |
@@ -146,6 +146,16 @@ docker compose -f deploy/docker-compose.yml up -d --force-recreate --no-deps api
 Never edit `docker-compose.yml` on the server -- the next `git pull` fails on
 the local change. Job history: `/admin/scrape-jobs`, or
 `docker compose -f deploy/docker-compose.yml logs worker`.
+**Stopping it for more than ~2 days empties the site**: scraped prices not
+re-read within 48 h stop being offers (see Current offers).
+
+**Check every store link** (read the dry run before `--apply`; not while a
+scrape runs):
+
+```bash
+docker compose -f deploy/docker-compose.yml exec worker python scripts/audit_store_links.py
+docker compose -f deploy/docker-compose.yml exec worker python scripts/audit_store_links.py --apply
+```
 
 Status and logs:
 
@@ -588,15 +598,47 @@ SmartBuy 150 listings (18 price changes), iGeek 282 (10), AmmanCart 100 (1);
 catalogue 423 -> 532 products, 455 -> 567 prices. Second run after
 `checked_at` shipped: 0 price changes, **512 of 567 prices re-read**.
 
-**The 55 not re-read are the next trust problem.** A listing the scraper no
-longer sees -- delisted, or beyond a store's `max_products` cap (SmartBuy 150,
-AmmanCart 100 in `scrapers/registry.py`) -- keeps its last price forever and
-can still win "best price". Live example 2026-09-15: iPhone 16 128GB, SmartBuy
-689 JOD "updated 18 days ago" marked best price beside AmmanCart checked today.
-Fix before inviting shops: raise the caps or scrape by collection so every
-listed product is re-read, and treat a scraped price not re-read for N runs as
-unavailable (out of the comparison) rather than current. Before this, production
-prices were 19 days old because nothing had scraped since launch.
+### Current offers and removed listings — fixed 2026-09-15
+
+**The bug:** a listing a store removed simply stopped appearing in its feed and
+kept its last price forever, winning "best price" beside a link to a 404 (iPhone
+16 128GB at SmartBuy, `abj1501st0307`, 689 JOD). The per-store caps (150/400/100
+kept variants) also cut off the OLDEST relevant listings, so they were never
+re-read. Measured: SmartBuy 3,158 products (158 kept), iGeek 5,074 (284),
+AmmanCart 5,431 (61 products / 110 variants); a full read is ~140 pages at 100
+per page, about 5 minutes.
+
+- **Complete reads.** `scrapers/base.py FeedRead`: a read is complete only if
+  every target ended on an empty page. Any early stop (non-200 after retries,
+  blocked/oversize page, bad JSON, robots, `MAX_PAGES`, `max_products` now 2000
+  as a runaway guard) is logged and leaves it incomplete; `run_job` fails that
+  store. Pages retry twice (5 s, 10 s) on 429/5xx/timeouts. `PAGE_SIZE` 100
+  keeps pages ~1.4-1.6 MB under the 5 MB response cap.
+- **Delisting** (`ingest.py _reconcile_listings`): only from a complete read that
+  kept listings and where most listings ingested; only this store's scraped
+  aliases; sets `ProductAlias.delisted_at` (migration `c1e8a4b6d207`), cleared when
+  the listing reappears. **Safety valve:** one run may not delist more than
+  `max(25, 25%)` of a store's *fresh* offers -- over that it delists only
+  already-stale ones and records `delist_refused`, which fails the store. The
+  feed's URL now overwrites a stale `store_product_url` (renamed handles).
+- **One definition of an offer** (`app/services/offers.py current_offer()`):
+  visible store AND not delisted AND (merchant store OR read within
+  `SCRAPED_PRICE_MAX_AGE_HOURS`, 48). Applied to price_summary (search cards,
+  best deal, wishlist, alerts), browse, deals, product detail (404 with no
+  current offer), price history, sitemap; search candidates and suggestions only
+  return products that have one (`pricing.has_current_offer`).
+- **Alerts** go out only after a clean run of EVERY store (a one-store admin run
+  sends none), and a product with no current offer no longer resets
+  `notified_at` (it used to re-email the same drop).
+- **Link audit** `scripts/audit_store_links.py`: GET `<url>.js` per current
+  scraped link (hard 404 = gone), verdicts OK / RENAMED / GONE / VARIANT_GONE /
+  UNKNOWN, JSON report outside the repo. Dry run by default; refuses while a
+  scrape job is pending; `--apply` refuses to delist more than
+  `max(3, 20%)` of a store without `--force`; UNKNOWN is never changed.
+- **The 48-hour cliff:** every run stamps all prices within minutes, so if the
+  worker dies or every store fails, the whole catalogue leaves the site at once
+  48 hours later. `GET /health/catalogue` answers 503 once the newest scraped
+  read is over 14 hours old -- the Better Stack database monitor points there.
 
 ### Scraping — `app/services/scrapers/`
 
@@ -957,7 +999,7 @@ no untranslated English in the Arabic table.
 2. **One product has more than one price.** See the warning at the top.
 3. **No merchants at all.** See the warning at the top.
 4. **Prices are refreshed every ~6 hours, not live** -- when a store's run
-   succeeds. A store that blocks the bot or is down keeps its last prices
+   succeeds. A scraped price not re-read for 48 h stops being shown at all. A store that blocks the bot or is down keeps its last prices
    until it answers again; the job row says `FAILED <store>` and **price
    alerts are held back for the whole run**, so nobody is emailed about a
    figure that was not re-checked. A store that fails every run therefore
@@ -1009,6 +1051,7 @@ no untranslated English in the Arabic table.
 | `scripts/smoke_test.py` | 57 critical-path checks |
 | `scripts/seed_ci_catalogue.py` | Invented 4-listing catalogue for CI's smoke test. **Refuses production** |
 | `scripts/cleanup_test_data.py` | Deletes test accounts/stores. **Whitelist**, not blocklist — refuses to run if no admin would survive |
+| `scripts/audit_store_links.py` | Checks every current store link still leads to the product (GET `.js`). Dry run by default; `--apply` delists GONE, relinks RENAMED, never touches UNKNOWN |
 | `scripts/prune_unparseable_products.py` | Re-parses every product with current rules, deletes what they reject. Run after any `rules.py` change |
 | `scripts/backfill_attributes.py` | Recomputes `match_category`/`match_attributes`. **Run after any rules change** — ingest never re-parses existing rows, so a rules improvement only reaches new listings |
 | `../scripts/repair-docker.ps1` | Recovers Docker from the stale-socket crash |

@@ -173,6 +173,12 @@ docker compose -f deploy/docker-compose.yml start worker
 The sequences travel with the data, so the first merchant listing does not
 collide with an existing id.
 
+A seed shows NO scraped prices if they were last read more than 48 hours
+before it is loaded (`SCRAPED_PRICE_MAX_AGE_HOURS`): an offer nobody has
+re-checked is not shown as current. That is expected -- starting the worker
+queues a full scrape at once, and the prices appear when it finishes (about
+five minutes).
+
 ## What this does not do
 
 - **No CI.** Tests run on your machine, not on push.

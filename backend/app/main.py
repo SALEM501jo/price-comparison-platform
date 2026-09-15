@@ -5,17 +5,25 @@ Wires all components together: routers, middleware, exception handlers, lifespan
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
+from fastapi.responses import JSONResponse
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import get_settings
 from app.frontend import mount_frontend
-from app.database import Base, engine
+from app.database import Base, engine, get_db
+from app.dependencies import get_rate_limited
 from app.exceptions import setup_exception_handlers
 from app.logging_config import setup_logging
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.models.alias import ProductAlias
+from app.models.price import Price
+from app.models.store import Store
 from app.routers import (
     admin,
     auth,
@@ -29,6 +37,11 @@ from app.routers import (
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+# /health/catalogue answers 503 once the newest scraped read is this old. The
+# worker re-reads every store every 6 hours, so 14 means two runs in a row
+# failed -- and scraped prices only leave the site at 48.
+CATALOGUE_STALE_AFTER_HOURS = 14
 
 
 @asynccontextmanager
@@ -167,6 +180,42 @@ app.include_router(seo.router, tags=["seo"])
 async def health_check():
     """Health check endpoint for monitoring."""
     return {"status": "ok", "version": "1.0.0", "environment": settings.environment}
+
+
+@app.get("/health/catalogue")
+async def catalogue_health(
+    db: Session = Depends(get_db),
+    _: None = Depends(get_rate_limited),
+):
+    """
+    Are scraped prices still being refreshed? 503 when they are not.
+
+    WHY THIS EXISTS. A scraped price not re-read within
+    settings.scraped_price_max_age_hours (48) stops being an offer, and every
+    run re-reads every store within minutes -- so if the worker dies, or every
+    store starts failing, the whole catalogue leaves the site at once, 48 hours
+    later, with nothing to warn anyone first. This answers 503 once the newest
+    read is older than CATALOGUE_STALE_AFTER_HOURS, well inside that window:
+    an external monitor emails a person with a day and a half still in hand.
+
+    It also answers only if the database does, so it replaces the monitor on a
+    product page, which now legitimately 404s when that product's offers go.
+    Returns ages only -- no prices, stores or products.
+    """
+    newest = (
+        db.query(func.max(func.coalesce(Price.checked_at, Price.last_updated)))
+        .join(ProductAlias, Price.alias_id == ProductAlias.id)
+        .join(Store, ProductAlias.store_id == Store.id)
+        .filter(Store.owner_user_id.is_(None))
+        .scalar()
+    )
+    if newest is None:
+        return JSONResponse({"status": "stale", "newest_read_hours": None}, status_code=503)
+    newest = newest if newest.tzinfo else newest.replace(tzinfo=timezone.utc)
+    hours = round((datetime.now(timezone.utc) - newest).total_seconds() / 3600, 1)
+    body = {"status": "ok" if hours <= CATALOGUE_STALE_AFTER_HOURS else "stale",
+            "newest_read_hours": hours}
+    return JSONResponse(body, status_code=200 if body["status"] == "ok" else 503)
 
 
 # --- The built frontend, LAST ---

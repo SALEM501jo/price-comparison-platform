@@ -15,11 +15,55 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Iterable
 
+from sqlalchemy import exists
 from sqlalchemy.orm import Session
 
 from app.models.alias import ProductAlias, comparison_group
 from app.models.price import Price
+from app.models.product import Product
 from app.models.store import Store
+from app.services.offers import current_offer
+
+
+def has_current_offer():
+    """
+    SQL predicate for a query over Product: at least one shop offers it now.
+
+    For the paths that hand a shopper a PRODUCT rather than a price -- search
+    candidates and type-ahead suggestions. Each of those used to offer any
+    product in the table, so a listing the store had since removed still came
+    up as a suggestion, and the suggestion led to a product page that now
+    answers 404. Anything offered to a shopper must lead somewhere.
+
+    OUT-OF-STOCK OFFERS COUNT, deliberately, because they count on the product
+    page: the offer is real and the page shows it as such. This asks the same
+    question the page's 404 rule asks, so the two cannot disagree about whether
+    a product exists.
+
+    AN EXISTS, NOT A JOIN. A join would return one row per listing -- a product
+    four shops carry would come back four times and use up four of the
+    candidate LIMIT's slots -- and a DISTINCT to undo that sorts the whole
+    candidate set. EXISTS stops at the first qualifying listing, and every step
+    of it is an indexed lookup: product_aliases.product_id, the unique
+    prices.alias_id, and the stores primary key. Its cost is per candidate
+    row the outer query reads, and those queries all carry a LIMIT.
+
+    CORRELATED ON Product ONLY, explicitly. SQLAlchemy otherwise correlates
+    every table the outer query also names, so dropped into a query that
+    already joins product_aliases, the subquery would stop asking "does ANY
+    listing of this product qualify" and quietly ask it of the outer row's
+    listing instead.
+    """
+    return (
+        exists()
+        .where(
+            ProductAlias.product_id == Product.id,
+            Price.alias_id == ProductAlias.id,
+            Store.id == ProductAlias.store_id,
+            current_offer(),
+        )
+        .correlate(Product)
+    )
 
 
 def price_summary(db: Session, product_ids: Iterable[int]) -> dict[int, dict]:
@@ -48,11 +92,15 @@ def price_summary(db: Session, product_ids: Iterable[int]) -> dict[int, dict]:
         .join(Price, Price.alias_id == ProductAlias.id)
         .join(Store, Store.id == ProductAlias.store_id)
         .filter(ProductAlias.product_id.in_(ids))
-        # Unverified merchant stores are invisible here. Applied in the query
-        # rather than after it: this function produces the lowest price, the
-        # best-deal store name and the store count, so a row filtered out
-        # later would still have moved every one of those numbers.
-        .filter(Store.visible_to_shoppers())
+        # Only CURRENT offers: from a store a shopper may see (an unverified
+        # merchant is invisible), still listed by that store, and -- if
+        # scraped -- read recently. Applied in the query rather than after it:
+        # this function produces the lowest price, the best-deal store name and
+        # the store count, so a row filtered out later would still have moved
+        # every one of those numbers. It feeds search cards, the wishlist and
+        # the alert emails, so a listing the store removed would otherwise go
+        # on winning "best price" and on telling people their target was met.
+        .filter(current_offer())
         .all()
     )
 

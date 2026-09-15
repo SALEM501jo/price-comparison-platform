@@ -306,14 +306,47 @@ def run_job(db: Session, job: ScrapeJob) -> None:
                 },
             )
             continue
-        # NOTHING SEEN IS A FAILURE TOO. The scraper does not raise on a 403,
-        # a 429, a robots refusal or a feed that stopped being JSON -- it stops
-        # and yields nothing, which is the polite thing to do. Counted as a
-        # success, a store blocking the bot would read "succeeded" on every
-        # run while its prices silently aged. No store on the registry has an
-        # empty catalogue.
-        if not outcome.get("seen"):
+        # AN INCOMPLETE READ IS A FAILURE. The scraper does not raise on a 403,
+        # a 429, a robots refusal, a page over the size cap or a feed that
+        # stopped being JSON -- it stops, which is the polite thing to do, and
+        # says the read was incomplete. Counted as a success, a store blocking
+        # the bot on page three would read "succeeded" on every run while the
+        # listings past page three silently aged. And a partial read cannot
+        # show what the store removed -- run_store delists nothing from one --
+        # so a listing taken down may still be on show. Failing the store holds
+        # alerts back (below) for the same reason as a store that raised.
+        #
+        # `is False` rather than falsy, because failing closed is already done
+        # where the fact is made: every scraper's FeedRead starts incomplete
+        # and only a read reaching the end changes that, and run_store always
+        # reports it. Checked before "nothing seen", because its reason says
+        # why a store saw nothing.
+        if outcome.get("complete") is False:
+            failures.append(
+                f"{config.name}: feed read incomplete: "
+                f"{outcome.get('incomplete_reason') or 'no reason given'}"
+            )
+        # NOTHING SEEN IS A FAILURE TOO, even from a read that reached the
+        # end. No store on the registry has an empty catalogue; a feed that
+        # suddenly keeps nothing is broken, not sold out.
+        elif not outcome.get("seen"):
             failures.append(f"{config.name}: returned no listings")
+        # MOST LISTINGS FAILING TO INGEST IS A FAILURE. The read was fine; our
+        # side was not. Counted as a success, a bug in matching or ingest would
+        # leave every price unread while the job row said "succeeded", until
+        # the freshness window quietly took the store off the site.
+        elif outcome.get("failed", 0) * 2 > outcome.get("seen", 0):
+            failures.append(
+                f"{config.name}: {outcome['failed']} of {outcome['seen']} "
+                "listings failed to ingest"
+            )
+        # A REFUSED MASS DELISTING IS A FAILURE, so a person sees it. The
+        # read claimed to be complete and would have removed a large share of
+        # the store at once -- the shape of a feed fault, not of a store
+        # clearing stock. run_store kept those offers; this puts the reason
+        # on the job row and holds alerts back.
+        if outcome.get("delist_refused"):
+            failures.append(f"{config.name}: {outcome['delist_refused']}")
         outcomes.append(str(outcome))
 
     # Cached pages are retired whatever happened: listings are committed one
@@ -332,8 +365,15 @@ def run_job(db: Session, job: ScrapeJob) -> None:
     # has dropped" on a figure nobody re-checked is the wrong message to send
     # under this name. A store that keeps failing therefore holds alerts back
     # until it is fixed or removed, and the job row says so on every run.
+    #
+    # AND ONLY AFTER A RUN OF EVERY STORE. A one-store run (an admin's
+    # ?store=) proves nothing about the others, one of which may have failed
+    # its last read and still show an offer it has since removed; the next
+    # full run -- at most six hours away -- sends what this one would have.
     if failures:
         outcomes.append("alerts skipped: a store failed this run")
+    elif codes:
+        outcomes.append("alerts skipped: not every store was read")
     else:
         try:
             outcomes.append(f"alerts: {process_alerts(db)}")

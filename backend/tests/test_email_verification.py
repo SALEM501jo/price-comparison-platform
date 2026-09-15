@@ -431,3 +431,27 @@ class TestAlertSendingUnderPressure:
 
         marked = db_session.query(PriceAlert).filter(PriceAlert.notified_at.isnot(None)).count()
         assert marked == 1, "the email that went out was not recorded"
+
+
+class TestAnOfferThatDisappearsIsNotAPriceRise:
+    def test_a_product_with_no_current_offer_keeps_its_notified_marker(self, db_session, mail):
+        """
+        Out of stock, delisted or not re-read lately: none of those means the
+        price recovered. Treated as one, the offer returning at the same price
+        emailed the same drop again.
+        """
+        from app.services.notifications import process_alerts
+
+        TestAlertNotifications()._catalogue(db_session, price="800.000", target="850.000")
+        process_alerts(db_session)
+        assert len(mail.sent) == 1
+
+        price = db_session.query(Price).one()
+        price.availability = False
+        db_session.commit()
+        assert process_alerts(db_session)["reset"] == 0
+
+        price.availability = True
+        db_session.commit()
+        assert process_alerts(db_session)["notified"] == 0
+        assert len(mail.sent) == 1, "the same drop was emailed twice"

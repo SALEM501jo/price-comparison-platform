@@ -27,8 +27,20 @@ class StoreConfig:
     # Seconds between requests. Overridden upward by robots.txt Crawl-delay,
     # never downward -- a site asking for more space gets it.
     delay_seconds: float = 1.5
-    # Cap per run so a bug cannot walk an entire catalogue.
-    max_products: int = 250
+    # A RUNAWAY GUARD, NOT A QUOTA. More kept listings than this and the
+    # scraper stops, and the read counts as INCOMPLETE: nothing is delisted on
+    # it and the job records the store as failed.
+    #
+    # It used to be a per-store cap sized close to the real counts (150, 400,
+    # 100), and there it truncated: whatever relevant listings came furthest
+    # down the feed -- the oldest -- were never re-read, so their prices aged
+    # and a store removing them could never be noticed. Measured on
+    # 2026-09-15 the kept counts are 158 (SmartBuy), 284 (iGeek) and 110
+    # (AmmanCart) variants. 2,000 is seven times the largest, room for a new
+    # category in app/matching/rules.py to widen what is kept; a category
+    # filter broken into keeping everything still trips it on every store,
+    # since each catalogue holds more than 3,000 products.
+    max_products: int = 2000
     # Optional collection handles. Empty means the whole catalogue feed, which
     # is more reliable -- collection handles are merchant-chosen and differ per
     # store ("mobile-phones" returned nothing on a store whose phones live
@@ -56,6 +68,29 @@ class ScrapedProduct:
     delivery_cost: float = 0.0
 
 
+@dataclass(frozen=True)
+class FeedRead:
+    """
+    Whether the last scrape() read the store's WHOLE feed, and if not, why.
+
+    WHY THIS EXISTS: a listing a store removes simply stops appearing in its
+    feed, so the only evidence of a removal is a read that reached the end
+    and did not contain it. A read that stopped early -- a 403, a page over
+    the size cap, a feed that stopped being JSON -- is missing listings too,
+    and treating that absence as removal would delist half a store because
+    its server hiccuped on page four. The scraper used to stop on all of
+    those with a log line and nothing more for its caller, which was harmless
+    while nothing drew conclusions from what was missing. Now something
+    does, so the scraper has to say.
+
+    Incomplete by default: `complete` is True only when an adapter reached
+    the end of every target and met no problem on the way.
+    """
+
+    complete: bool = False
+    reason: str | None = "the feed has not been read"
+
+
 class StoreScraper(ABC):
     """
     One store's adapter.
@@ -69,6 +104,9 @@ class StoreScraper(ABC):
         self.config = config
         self.allowed_hosts = allowed_hosts
         self._last_request_at = 0.0
+        # Replaced by scrape() when it finishes. Read it only after iterating
+        # scrape() to exhaustion; until then it says the read is incomplete.
+        self.feed = FeedRead()
 
     def throttle(self, minimum: float | None = None) -> None:
         """Space out requests. Called before every fetch."""
@@ -80,4 +118,10 @@ class StoreScraper(ABC):
 
     @abstractmethod
     def scrape(self) -> Iterator[ScrapedProduct]:
-        """Yield listings. Implementations should stop at config.max_products."""
+        """
+        Yield listings, then record in self.feed whether that was all of them.
+
+        Implementations must stop at config.max_products, and must mark the
+        read complete only when every target was read to its end. Every early
+        stop is logged and leaves self.feed incomplete, with the reason.
+        """

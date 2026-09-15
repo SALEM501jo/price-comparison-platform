@@ -18,6 +18,7 @@ from app.models.alias import ProductAlias
 from app.models.price import Price
 from app.models.product import Product
 from app.models.store import Store
+from app.services.offers import current_offer
 
 
 def best_savings(db: Session, limit: int = 8) -> list[dict]:
@@ -46,13 +47,22 @@ def best_savings(db: Session, limit: int = 8) -> list[dict]:
     store_count = func.count(distinct(ProductAlias.store_id))
 
     def visible_new(query):
-        """The filters that define a comparable offer. Applied to both passes."""
+        """
+        The filters that define a comparable offer. Applied to both passes.
+
+        current_offer() rather than store visibility alone, and in BOTH passes.
+        A saving is the gap between two prices a shopper can act on today; a
+        listing the store removed at its old, higher price manufactures a
+        saving that does not exist, and one it removed at its old, LOWER price
+        sends the shopper to a 404 as the cheapest shop. In pass 1 alone it
+        would still be named the cheapest store in pass 2.
+        """
         return (
             query.join(Price, Price.alias_id == ProductAlias.id)
             .join(Store, Store.id == ProductAlias.store_id)
             .filter(Price.availability.is_(True))
             .filter(ProductAlias.condition == "new")
-            .filter(Store.visible_to_shoppers())
+            .filter(current_offer())
         )
 
     # Pass 1: let the database find the biggest gaps.

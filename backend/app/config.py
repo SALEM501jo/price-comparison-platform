@@ -103,6 +103,14 @@ class Settings(BaseSettings):
     # goes out on the next run.
     alert_emails_per_run: int = 100
 
+    # How long a SCRAPED price may go without being re-read before it stops
+    # counting as an offer. The worker re-reads every store every six hours,
+    # so 48 hours is eight missed runs: a store that has blocked the bot or
+    # gone down for two days no longer has its last-known prices presented as
+    # current -- or crowned best price. Merchant prices are exempt; a person
+    # sets those, and they carry their own staleness warning.
+    scraped_price_max_age_hours: int = 48
+
     # Where contact-form messages are forwarded. Optional: with no address
     # set, messages are still STORED and readable in the admin panel -- the
     # notification is the part that is missing, not the message.

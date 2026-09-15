@@ -29,7 +29,7 @@ from app.matching import CLOSE, EXACT, SIMILAR, parse, score_match
 from app.matching import spelling
 from app.models.product import Product
 from app.services import photos
-from app.services.pricing import price_summary
+from app.services.pricing import has_current_offer, price_summary
 from app.schemas.search import (
     MatchDifference,
     MatchedProduct,
@@ -75,8 +75,16 @@ def _candidates(
     Prefers the indexed (match_category, brand) pair. Falls back to a name
     search when the query did not parse into anything structured -- a search
     for "playstation" should still return something.
+
+    ONLY PRODUCTS SOMEBODY OFFERS NOW, in both paths. The price figures on a
+    card already come from current offers only, so without this a product
+    whose every listing the store had removed still came back as a result --
+    a name with no price, linking to a product page that answers 404. Filtered
+    HERE rather than after scoring so those rows never take a slot under
+    CANDIDATE_LIMIT, and so the structured path falls through to the name
+    search when every structured match is gone.
     """
-    query = db.query(Product)
+    query = db.query(Product).filter(has_current_offer())
     if category:
         query = query.filter(Product.category == category)
 
@@ -111,7 +119,7 @@ def _candidates(
     if not conditions:
         return []
 
-    fallback = db.query(Product)
+    fallback = db.query(Product).filter(has_current_offer())
     if category:
         fallback = fallback.filter(Product.category == category)
     return (

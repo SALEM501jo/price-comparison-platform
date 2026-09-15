@@ -90,7 +90,17 @@ def make_product(db, name, *, category="phones"):
     return product
 
 
-def offer(db, store, product, *, available=True, last_updated=None):
+def offer(db, store, product, *, available=True, last_updated=None, checked_at=None):
+    """
+    One store's listing, priced.
+
+    `checked_at` is when a scraper last READ the price, `last_updated` when it
+    last CHANGED. A scraped price whose newer of the two is past the age limit
+    is not a current offer and leaves the sitemap, so a test that dates the
+    CHANGE weeks back, to pin lastmod, must also say the price was read
+    recently -- which is exactly the state of a real price confirmed
+    unchanged on every run.
+    """
     alias = ProductAlias(
         product_id=product.id,
         store_id=store.id,
@@ -99,7 +109,13 @@ def offer(db, store, product, *, available=True, last_updated=None):
     )
     db.add(alias)
     db.flush()
-    price = Price(alias_id=alias.id, price=100, delivery_cost=0, availability=available)
+    price = Price(
+        alias_id=alias.id,
+        price=100,
+        delivery_cost=0,
+        availability=available,
+        checked_at=checked_at,
+    )
     if last_updated is not None:
         price.last_updated = last_updated
     db.add(price)
@@ -530,8 +546,10 @@ class TestSitemapProducts:
         unverified shop last touched its prices.
         """
         product = make_product(db_session, "Galaxy S24")
+        # Read a moment ago, changed on the 1st: lastmod is the change.
         offer(db_session, shop, product,
-              last_updated=datetime(2026, 9, 1, 12, 30, tzinfo=timezone.utc))
+              last_updated=datetime(2026, 9, 1, 12, 30, tzinfo=timezone.utc),
+              checked_at=datetime.now(timezone.utc))
         pending = make_store(db_session, "Pending Shop", merchant=True, verified=False)
         offer(db_session, pending, product,
               last_updated=datetime(2026, 9, 13, 8, 0, tzinfo=timezone.utc))
@@ -595,7 +613,8 @@ class TestSitemapCategories:
 
     def test_category_lastmod_ignores_hidden_stores(self, client, db_session, shop):
         offer(db_session, shop, make_product(db_session, "Galaxy S24"),
-              last_updated=datetime(2026, 9, 2, 9, 0, tzinfo=timezone.utc))
+              last_updated=datetime(2026, 9, 2, 9, 0, tzinfo=timezone.utc),
+              checked_at=datetime.now(timezone.utc))
         pending = make_store(db_session, "Pending Shop", merchant=True, verified=False)
         offer(db_session, pending, make_product(db_session, "Pending Phone"),
               last_updated=datetime(2026, 9, 14, 9, 0, tzinfo=timezone.utc))

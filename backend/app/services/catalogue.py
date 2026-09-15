@@ -31,6 +31,7 @@ from app.models.price import Price
 from app.models.product import Product
 from app.models.store import Store
 from app.services import photos
+from app.services.offers import current_offer
 
 # The categories this platform carries, in the order the home page shows them.
 # Read from rules.py rather than hardcoded would be circular -- the matching
@@ -54,12 +55,20 @@ def _total():
 
 
 def _visible_offers(query):
-    """The filters that define an offer a shopper may see. Applied everywhere."""
+    """
+    The filters that define an offer a shopper may see. Applied everywhere.
+
+    current_offer(), not just store visibility: every tile here carries a
+    "from X JOD at Y" line and every category tile a count, and a listing the
+    store has removed -- or one nobody has re-read in two days -- would keep
+    both. Browse is the page a visitor lands on before searching, so it is the
+    first place a price that no longer exists would be believed.
+    """
     return (
         query.join(Price, Price.alias_id == ProductAlias.id)
         .join(Store, Store.id == ProductAlias.store_id)
         .filter(Price.availability.is_(True))
-        .filter(Store.visible_to_shoppers())
+        .filter(current_offer())
     )
 
 

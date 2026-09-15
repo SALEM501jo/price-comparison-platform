@@ -156,6 +156,25 @@ class TestTheStoreKeepsItsOwnNaming:
 
         assert db.query(ProductAlias).count() == 1
 
+    def test_a_renamed_handle_moves_the_link_with_it(self, db, store):
+        """
+        The URL used to be written once, when the alias was created. A store
+        renaming a product's handle moved its page, and "Visit store" went on
+        pointing at the old address -- a 404.
+        """
+        from dataclasses import replace
+
+        first = listing("SB-1", FEED[0].name, 899.0)
+        moved = replace(
+            first, url="https://smartbuy-me.com/products/apple-iphone-15-128gb-black"
+        )
+        run(db, store, [first])
+        run(db, store, [moved])
+
+        row = db.query(ProductAlias).one()
+        assert row.store_product_url == moved.url
+        assert db.query(Price).count() == 1
+
 
 class TestWhenAPriceWasLastChecked:
     """

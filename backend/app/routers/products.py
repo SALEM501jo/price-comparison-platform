@@ -27,6 +27,8 @@ from app.matching import spelling
 from app.services import photos
 from app.services import catalogue
 from app.services.deals import best_savings
+from app.services.offers import current_offer
+from app.services.pricing import has_current_offer
 from app.services.search import escape_like, search_products
 from app.config import get_settings
 from app.services.cache import cached_json, catalogue_version, store_json
@@ -231,6 +233,12 @@ async def suggest(
         # Only products search can actually return. A suggestion that leads to
         # an empty result page is worse than no suggestion.
         .filter(Product.match_category.isnot(None))
+        # ...and only products somebody offers NOW. A suggestion is a link to
+        # the product page, which answers 404 once no current offer is left --
+        # so a listing the store removed would otherwise go on being suggested,
+        # by its exact name, straight into a dead end. The same predicate
+        # search's candidates use, so the two lists cannot disagree.
+        .filter(has_current_offer())
         .filter(or_(*conditions))
         .order_by(func.length(Product.canonical_name), Product.id)
         .limit(limit)
@@ -270,11 +278,17 @@ async def get_product(
         # An unverified merchant store must not reach a shopper here either.
         # The comparison table is the most visible place a fabricated price
         # could land, so the same predicate that guards search guards it.
-        .filter(Store.visible_to_shoppers())
+        #
+        # And only CURRENT offers. This table is where "best price" is decided
+        # and where the "Visit store" link lives: a listing the store removed
+        # kept its last price here, won best price, and linked to a 404 on the
+        # store's site. A scraped price nobody has re-read in two days is
+        # dropped for the same reason -- it may be exactly that, unnoticed.
+        .filter(current_offer())
         .all()
     )
 
-    # NO VISIBLE OFFER, NO PAGE. Filtering the rows was not enough on its own:
+    # NO CURRENT OFFER, NO PAGE. Filtering the rows was not enough on its own:
     # a product that only an UNVERIFIED shop carries was still answered with
     # 200, its name and an empty table. That name is the shop's own text --
     # anyone can register a store and list anything -- and the product page
@@ -283,6 +297,10 @@ async def get_product(
     # rule as the sitemap and search: nothing a shopper cannot compare. A 404
     # also gives the page its noindex. Out-of-stock rows still count: the
     # product is real and priced, just not available right now.
+    #
+    # A product whose every listing is delisted or stale is the same case: a
+    # page of nothing, still titled and indexable. 404 until a store lists it
+    # again -- the rows are kept, so it comes back with its history intact.
     if not prices:
         raise HTTPException(status_code=404, detail="Product not found")
 
@@ -349,6 +367,11 @@ async def get_product_photo(
     photo: `photo_for_product` filters on the same predicate the prices do,
     so a pending claim cannot put a picture on a product page.
 
+    That filter is store visibility, not current_offer(), and it does not need
+    to be: only a merchant can upload a photo, and a merchant listing is never
+    delisted and is exempt from the scraped-price age limit. A photo carries no
+    price, and the page it decorates already 404s without a current offer.
+
     Served with an ETag because these bytes come out of the database. A
     thumbnail grid that revalidates is a page of 304s with no bodies; one
     that does not is a page of blob reads on every scroll.
@@ -399,16 +422,29 @@ async def get_price_history(
 
     Grouping in Python is safe here in a way it is not for the deals list:
     the rows are already restricted to one product.
+
+    ONLY LISTINGS THAT ARE CURRENT OFFERS, the same set as the price table.
+    A delisted or stale listing's history is true, but the chart does not say
+    when a series ENDS: it draws one line per shop, named in the legend, and a
+    line for a shop that has left the table reads as that shop still selling
+    at its last point. The chart sits beside the table, so the two must list
+    the same shops. Nothing is deleted -- a listing that comes back brings its
+    whole line back with it.
     """
     rows = (
         db.query(PriceHistory, ProductAlias.id.label("alias_id"), Store.name)
         .join(ProductAlias, ProductAlias.id == PriceHistory.alias_id)
+        # The listing's CURRENT price row, joined only to ask whether it is
+        # still an offer: freshness is a property of that row, not of the
+        # history. One row per listing (uq_price_current_per_alias), so the
+        # join cannot multiply the points.
+        .join(Price, Price.alias_id == ProductAlias.id)
         .join(Store, Store.id == ProductAlias.store_id)
         .filter(ProductAlias.product_id == product_id)
-        # Same visibility rule as the price table. Without it an unverified
-        # store's history is readable even though its current price is
-        # hidden, which leaks both the price and that the store exists.
-        .filter(Store.visible_to_shoppers())
+        # Same rule as the price table. Without it an unverified store's
+        # history is readable even though its current price is hidden, which
+        # leaks both the price and that the store exists.
+        .filter(current_offer())
         .order_by(PriceHistory.recorded_at)
         .all()
     )
@@ -472,6 +508,12 @@ async def record_contact(
     impossible, which is exactly why the figure is reported as taps rather
     than as calls or customers.
     """
+    # STORE visibility, not current_offer(), on purpose. A tap is about the
+    # shop, not about a price: nothing here is shown to anyone, and a shopper
+    # who tapped a number on a page loaded a minute before a listing went
+    # stale still made that tap. The buttons only exist on merchant listings,
+    # which are never delisted and never go stale, so for them the two rules
+    # already agree.
     store = (
         db.query(Store)
         .filter(Store.id == body.store_id)
