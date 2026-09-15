@@ -52,8 +52,8 @@ MAX_REDIRECTS = 3
 # Identify ourselves honestly. A scraper that pretends to be a browser is
 # both rude and a reason for a site to block the whole IP range.
 USER_AGENT = (
-    "PriceCompareBot/0.1 (+https://github.com/price-comparison-platform; "
-    "price comparison research)"
+    "PriceCompareBot/0.1 (+https://ahsanse3r.com; "
+    "Ahsan Se3r price comparison)"
 )
 
 

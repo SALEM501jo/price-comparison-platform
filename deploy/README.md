@@ -181,7 +181,9 @@ five minutes).
 
 ## What this does not do
 
-- **No CI.** Tests run on your machine, not on push.
+- **No continuous deployment.** GitHub Actions (`.github/workflows/ci.yml`)
+  tests every push, but deploying is still the manual `git pull` and
+  `docker compose up -d --build` above.
 - **No log aggregation.** `docker compose logs -f api` is the whole story.
 - **No second replica.** One API container. Fine at this size; the stack is
   shaped so adding one is a `--scale`, because migrations are a separate

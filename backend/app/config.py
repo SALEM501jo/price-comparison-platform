@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # get_sender() refuses this in production rather than silently pretending
     # to send.
     email_backend: str = "console"
-    email_from: str = "PriceCompare <noreply@localhost>"
+    email_from: str = "Ahsan Se3r <noreply@localhost>"
     smtp_host: str = "localhost"
     smtp_port: int = 587
     smtp_username: str = ""

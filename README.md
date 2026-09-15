@@ -1,536 +1,304 @@
-# PriceCompare
+# Ahsan Se3r (احسن سعر)
 
-A price comparison platform for Jordanian retailers. Search for a specific
-product variant — *iPhone 15 128GB Black* — and get the exact match first, then
-close variants, then similar products, each labelled with **why** it differs.
+A Jordanian price-comparison site that recognises the same phone, laptop or
+monitor across stores that each name it differently, and ranks every result as
+an exact, close or similar match, with the reason why.
 
-```
-$ search "iPhone 15 128GB Black"
-Looking for:  [iphone 15] [128gb] [black]
+**Live: https://ahsanse3r.com** (Arabic by default, right-to-left, with an
+English toggle)
 
-EXACT MATCH · Everything you asked for
-  100%  Apple iPhone 15 128GB 5G Smartphone - Black    877.50 JOD · SmartBuy · 4 stores
+FastAPI · SQLAlchemy · Alembic · PostgreSQL · Redis · React · Vite · Tailwind ·
+Docker Compose · Caddy, on one Hetzner VPS.
 
-$ search "iPhone 15 256GB Black"
-Looking for:  [iphone 15] [256gb] [black]
+## What it does
 
-CLOSE · Same product, one detail differs
-   90%  Apple iPhone 15 256GB 5G - Blue          different colour (blue, not black)
+A shopper types a specific product, such as `iPhone 15 128GB Black` or the same
+query in Arabic, `ايفون ١٥ ١٢٨ جيجا اسود`. The results come back in three tiers:
 
-SIMILAR · Related, but not what you searched for
-   75%  Apple iPhone 15 128GB 5G Smartphone      different storage (128gb, not 256gb)
-```
-
-Four stores list that first handset under four different names — including
-Carrefour's *"Midnight"*, which is Apple's name for the black colourway. All
-four collapse into one row with one price comparison.
-
----
-
-## The problem this solves
-
-Four stores sell the same phone under four different names:
-
-| Store | Listing |
-|---|---|
-| DNA Jordan | `Apple iPhone 15 128GB 5G Smartphone - Black` |
-| SmartBuy | `iPhone 15 128GB Black (5G)` |
-| Carrefour Jordan | `Apple iPhone 15 128GB 5G - Midnight` |
-| City Center | `Apple iPhone 15 128GB Black` |
-
-Same product. Four names. A comparison site has to recognise that — and it has
-to do the reverse too: recognise that `iPhone 15 256GB Black` is a *different*
-product that must not be presented as a match.
-
-### Why fuzzy string matching cannot do this
-
-The obvious approach is string similarity. It fails badly, and the failure is
-structural rather than a tuning problem.
-
-Searching `"iPhone 11 Pro Black 128GB"` against a real catalogue, ranked by
-`rapidfuzz.ratio` over normalised names:
-
-```
-1.  94.34  iPhone 11 Pro Black 128GB Smartphone 5G   [exact, reworded]
-2.  70.00  Apple iPhone 11 Pro Max 128GB Black       [WRONG MODEL]
-3.  67.86  Apple iPhone 11 Pro 256GB Black           [WRONG STORAGE]
-4.  67.86  Apple iPhone 11 Pro 128GB Black           <-- what the user asked for
-5.  64.29  Apple iPhone 12 Pro 128GB Black           [WRONG GENERATION]
-```
-
-The correct product ranks **fourth**, tied exactly with the 256GB model — a
-different phone at a different price — and below the Pro Max.
-
-The reason: **edit distance counts characters, not meaning.** `128GB → 256GB`
-is a one-character edit that changes which product you receive. `Black 128GB →
-128GB Black` is a large edit that changes nothing. Levenshtein sees these
-backwards, and no threshold value reorders them.
-
-### What this does instead
-
-Both the query and every listing are parsed into **structured attributes**, then
-scored on weighted attribute agreement:
-
-```python
-"iPhone 11 Pro Black 128GB"
-  -> {brand: apple, model: iphone 11, variant: pro, storage: 128gb, color: black}
-```
-
-| Attribute | Weight | Rationale |
+| Tier | Score | Meaning |
 |---|---|---|
-| brand | *gate* | An Apple result must never be offered for a Samsung query |
-| model | 33 | Generation defines the product |
-| variant | 28 | Pro / Pro Max / base are different phones |
-| storage | 24 | Different SKU, different price |
-| colour | 10 | Cosmetic |
-| memory | 5 | Real listings specify it (`4GB & 128GB`); minor next to storage |
+| **Exact** | 100 | Everything the shopper asked for |
+| **Close** | 85–99 | Same product, a minor detail differs (usually colour) |
+| **Similar** | 70–84 | Related, but a detail that changes the product differs (storage, variant) |
 
-Same query, same catalogue:
+Every result states which attribute differed and what the two values were. The
+product page lists each store's current price with delivery, a link to the
+store, when the price was last checked, and the price history.
+
+Prices come from two sources. Three online stores are read automatically:
+SmartBuy, iGeek Megastore and AmmanCart. The second source is shops that have
+no website: they register as merchants and enter their own prices, and
+shoppers contact them by phone or WhatsApp. That is why there is no checkout.
+
+### The problem: one product, many names
+
+These titles were copied from the live store feeds into `backend/tests/`:
+
+| Store | As the store writes it | What makes it hard |
+|---|---|---|
+| SmartBuy | `Xiaomi Redmi A7 Pro 4G, 4GB & 64GB, 6.9Inch, 6000Mah, Black` | Two capacities, neither labelled as memory or storage |
+| SmartBuy | `Honor X7e Plus 5G, 8GB & 256GB, 6.8Inch, 8100MAh, Meteor Grey` | Letter-and-digit model code, decorated colour name |
+| AmmanCart | `Redmi Note 15 Pro+ 5G` | No brand. SmartBuy writes `Xiaomi Redmi …` |
+| AmmanCart | `oppo Smart Phones A5 PRO 5G` | Filler between brand and model, and `5G` looks like a model code |
+| iGeek Megastore | product type `iPhone 17` | The store's category label is a model name |
+
+String similarity cannot sort this out, and more tuning will not help. It was
+measured against a real catalogue (`backend/app/matching/scorer.py` records the
+result). For the query `iPhone 11 Pro Black 128GB`, the correct listing scored
+67.9, tied with the 256GB model and below the Pro Max. Changing `128GB` to
+`256GB` is a one-character edit that gives a different product, while
+reordering the words is a large edit that changes nothing.
+
+### How the matching works
+
+Listings and queries go through the same parser (`backend/app/matching/`),
+which extracts structured attributes. A scorer then compares them:
+
+- **Scoring starts at 100.** Each attribute the shopper asked for and did not
+  get subtracts its weight. Phone weights are model 33, variant 28, storage 24,
+  colour 10 and memory 5. Laptops and monitors have their own weights.
+- **Brand is a gate.** An Apple result is never offered for a Samsung query.
+- **Categories are data.** `rules.py` holds phones, laptops and monitors, and
+  attributes are stored as JSON, so adding a category needs no migration.
+
+These are the scores `score_match()` gives the listings in
+`backend/tests/test_matching.py` for the query `iPhone 11 Pro Black 128GB`:
 
 ```
-100.0%  EXACT     Apple iPhone 11 Pro 128GB Black
-100.0%  EXACT     iPhone 11 Pro Black 128GB Smartphone 5G
- 90.0%  CLOSE     Apple iPhone 11 Pro 128GB Midnight Green   different colour
- 76.0%  SIMILAR   Apple iPhone 11 Pro 256GB Black            different storage
- 72.0%  SIMILAR   Apple iPhone 11 Pro Max 128GB Black        different variant
- 67.0%  excluded  Apple iPhone 12 Pro 128GB Black            different model
-  0.0%  excluded  Samsung Galaxy S24 128GB Black             different brand
+100.0  exact     Apple iPhone 11 Pro 128GB Black
+100.0  exact     iPhone 11 Pro Black 128GB Smartphone 5G
+ 90.0  close     Apple iPhone 11 Pro 128GB Midnight Green    colour: black / midnight green
+ 76.0  similar   Apple iPhone 11 Pro 256GB Black             storage: 128gb / 256gb
+ 72.0  similar   Apple iPhone 11 Pro Max 128GB Black         variant: pro / pro max
+ 67.0  excluded  Apple iPhone 12 Pro 128GB Black             model: iphone 11 / iphone 12
+  0.0  excluded  Samsung Galaxy S24 128GB Black              brand gate
 ```
 
-A score starts at 100 and loses the weight of each attribute the shopper asked
-for and did not get. It deliberately does **not** divide by "how much the query
-mentioned": normalising that way made the same difference between the same two
-products land in different tiers depending on how the search was worded.
+Four more pieces make this work on real data:
 
-Every score is **explainable**. The UI can say *"90% — same model and storage,
-different colour"* rather than showing an opaque number.
+- **Arabic** (`arabic.py`). Spelling variants are folded before any word is
+  looked up (ايفون / آيفون / أيفون, Arabic-Indic digits, diacritics, the
+  definite article) into the same English tokens, so the engine sees one language.
+- **Spelling correction** (`spelling.py`) against a closed vocabulary built from
+  `rules.py`: `smasung` becomes `samsung`. A token containing a digit is never
+  changed, because `a15` and `a16` are different phones. The correction is
+  always shown, and `?correct=false` searches the literal text.
+- **The store's own category is trusted.** An accessory names what it fits:
+  `IPHONE 15 PRO CASE` states a model exactly like a handset does. The store's
+  product type decides whether a listing is a phone at all.
+- **Merging listings is stricter than search.** At ingest, two listings become
+  one product only on an identical SKU or an exact two-way attribute match
+  (`services/deduplication.py`). A wrong merge would show one phone's price
+  under another.
 
-### Categories are data, not code
+## Features
 
-`app/matching/rules.py` holds the rules; the parser and scorer never mention a
-product type. Supporting washing machines means adding a `CategoryRules` entry
-with `capacity_kg` and `energy_rating` — no engine changes, and no migration,
-because attributes are stored as JSON rather than one column each.
+**Shoppers**
+- Tiered search in Arabic or English, with suggestions while typing and chips
+  showing how the query was understood
+- Category browsing (phones, laptops, monitors) with colour variants grouped
+  into one tile, and a home page of the biggest savings between stores
+- Prices sorted by total cost including delivery, a price-history chart, and
+  new and second-hand stock kept apart (used listings disclose battery health
+  and damage)
+- Email-and-password or Google sign-in, email verification, a wishlist,
+  price-drop email alerts, password reset by link, and account deletion
+- Dark and light themes and a mobile-first layout
 
----
+**Merchants** (built and tested, but no shop has signed up yet, so none
+appear on the live site)
+- Register a shop, list products as new or used, and upload a photo per listing
+- A shop's prices stay hidden from shoppers until an admin verifies it
+- A dashboard counting how often shoppers tapped Call or WhatsApp. It counts
+  taps only and stores no personal data.
+
+**Admins**
+- Verify, unverify or decline shops, and moderate merchant listings
+- Manage roles. Nobody can change their own role, and the last admin cannot be
+  demoted.
+- Queue scrapes and read the job history. See price anomalies, platform stats
+  and support messages.
 
 ## Architecture
 
-Two matching problems that look alike and are not:
+```mermaid
+flowchart LR
+    B["Browser"] -->|"HTTPS"| C["Caddy<br/>automatic TLS"]
+    C --> A["api<br/>FastAPI + built React app"]
+    A --> P[("PostgreSQL 16")]
+    A --> R[("Redis 7<br/>rate limits, cache, OAuth state")]
+    W["worker<br/>scrape queue, 6-hour schedule"] --> P
+    W --> R
+    W -->|"SSRF-checked HTTPS"| S["Store feeds<br/>SmartBuy, iGeek, AmmanCart"]
+    M["migrate<br/>alembic upgrade head, one-shot"] --> P
+    A -->|"SMTP"| E["Brevo"]
+    W -->|"SMTP, price alerts"| E
+    A -->|"OAuth 2.0"| G["Google"]
+```
 
-|  | Entity resolution (ingest) | Search relevance (query) |
-|---|---|---|
-| Question | Are these two listings the same product? | Which products answer this query? |
-| Output | Merge / don't — binary | Ranked tiers |
-| Needs | High precision — a wrong merge shows one phone's price under another | Good ordering plus explainability |
-| Code | `services/deduplication.py` | `services/search.py` |
-
-Both parse names with `app/matching/parse()` — one code path, which is what
-makes their attributes comparable. They differ in what they do with the score:
-ingest merges only on an **exact, symmetric** attribute match, because scoring
-one direction over-merges (a bare `iPhone 15` scores 100% against
-`iPhone 15 128GB Black`, since unspecified attributes are not penalised — correct
-for search, wrong for deciding two listings are the same object).
-
-Search runs in two stages: cheap candidate generation in Postgres on the indexed
-`(match_category, brand)` pair, then reranking in Python where the weights live.
-
-**Data model.** `products` are canonical items; `product_aliases` map each
-store's name/SKU/URL onto one; `prices` and `price_history` hang off aliases.
-That indirection is what lets four differently-named listings show as one row
-with four prices.
-
----
+- **One origin.** The API serves the built frontend (`backend/app/frontend.py`),
+  so the httpOnly refresh-token cookie stays first-party. Split across two
+  domains, Safari would block it and sign iPhone users out on every refresh.
+- **Only Caddy is reachable from outside.** Postgres, Redis and the API publish
+  no ports (`deploy/docker-compose.yml`).
+- **The scrape queue is a database table**, not Celery. A worker claims a job
+  with a conditional `UPDATE`, so two workers cannot run the same job, and the
+  worker schedules its own runs (`services/jobs.py`, `services/worker.py`).
+- **The matching engine imports nothing else from the app** (no database, no
+  framework, no third-party package), so it is tested on its own.
+- **Data model.** `products` are canonical items. `product_aliases` link each
+  store's listing to one, and `prices` and `price_history` hang off the aliases.
+  Money is `Numeric(10,3)`, because the dinar has three decimal places.
+  17 Alembic migrations.
 
 ## Security
 
-The OWASP Top 10 is a design requirement here, not an afterthought.
+The OWASP Top 10 (2021) was a design requirement from the start. Paths are
+relative to `backend/app/` unless shown otherwise.
 
-| Category | What is done |
-|---|---|
-| **A01 Access control** | Centralised auth dependencies; `require_admin` for RBAC; wishlist and alerts scoped by `user_id`; 401 vs 403 distinguished correctly |
-| **A02 Cryptographic failures** | Refresh token in an httpOnly cookie, unreadable by JavaScript; access token in memory only, never in storage; bcrypt cost 12; `JWT_SECRET_KEY` minimum 32 chars enforced at boot |
-| **A03 Injection** | SQLAlchemy parameterises everything; `ILIKE` wildcards in user input escaped, so `%%%%` cannot force a table scan |
-| **A04 Insecure design** | Redis rate limiting (5/min on auth, 100/min elsewhere), per IP and per endpoint; limits are not client-controllable |
-| **A05 Misconfiguration** | CSP, HSTS, `X-Frame-Options`, `nosniff`, Referrer-Policy, Permissions-Policy; `Server` header suppressed; strict CORS allow-list; docs disabled in production |
-| **A06 Vulnerable components** | `pip-audit` in CI, failing the build on any known CVE, and running weekly as well as on push |
-| **A07 Authentication failures** | Refresh token rotation with automatic reuse detection; `POST /auth/logout` revokes every session; timing-safe login; password policy; email verification with single-use, hashed, expiring tokens |
-| **A08 Integrity failures** | CI runs tests, applies **and reverses** migrations from an empty database, runs the smoke test, and audits dependencies |
-| **A09 Logging failures** | Structured JSON audit log of every auth and admin action; email addresses stored as keyed-HMAC tags rather than plaintext |
-| **A10 SSRF** | Live scraping fetches remote URLs. Scheme and host allowlists, DNS resolution checked against private/loopback/link-local ranges, no redirect following, bounded time and size — see *Scraping* |
+| OWASP category | Controls | Where |
+|---|---|---|
+| **A01 Broken Access Control** | `require_admin` / `require_merchant` dependencies. Merchant routes look up the store from the signed-in user and never accept a store id, so another shop's listing returns 404. Unverified shops are filtered out in the query. Admins cannot change their own role or demote the last admin. | `dependencies.py`, `routers/merchant.py`, `services/offers.py`, `routers/admin/users.py` |
+| **A02 Cryptographic Failures** | bcrypt with cost 12. JWT secret of at least 32 characters, checked at boot. Only token ids and SHA-256 hashes of email-link tokens are stored. HSTS with preload, TLS from Caddy. | `security/password.py`, `config.py`, `services/tokens.py`, `services/verification.py`, `middleware/security_headers.py` |
+| **A03 Injection** | Parameterised SQLAlchemy queries. LIKE wildcards in search input are escaped. Every merchant or scraped value in email HTML is escaped. CSP `script-src 'self'` with no inline scripts. | `services/search.py`, `services/notifications.py`, `middleware/security_headers.py` |
+| **A04 Insecure Design** | Redis rate limits per IP and path: 5/min on registration, sign-in, email verification, password reset, OAuth and the contact form; 100/min on the catalogue, merchant and token-refresh routes. Per-account throttles on verification and reset emails. Enumeration-safe `202` responses. Uploaded photos are decoded and re-encoded to WebP (drops EXIF and polyglots, refuses SVG and decompression bombs). | `security/rate_limiter.py`, `routers/auth.py`, `services/images.py` |
+| **A05 Security Misconfiguration** | CSP, X-Frame-Options, nosniff, Referrer-Policy and Permissions-Policy. Trusted-host check and strict CORS allow-list. API docs are off in production. A production configuration that is wrong refuses to boot (`production_problems()`). | `middleware/security_headers.py`, `main.py`, `config.py` |
+| **A06 Vulnerable and Outdated Components** | `pip-audit` fails CI on any known CVE in the Python runtime dependencies, on every push and weekly. PyJWT replaced python-jose, which has unfixed advisories. `npm ci` installs exactly the lockfile. | `.github/workflows/ci.yml`, `backend/requirements.txt` |
+| **A07 Identification and Authentication Failures** | 15-minute access token held in memory. Refresh token in an httpOnly cookie, rotated on every use; reusing a spent token revokes the whole chain. JWT algorithm pinned, `alg=none` rejected. Login runs a bcrypt check even for unknown accounts, so response time does not reveal which accounts exist. Google OAuth runs server-side with PKCE, nonce and single-use state tied to the browser by a cookie (blocks login CSRF). Reset links last 1 hour and revoke every refresh token, so other sessions end when their 15-minute access token expires. | `services/tokens.py`, `security/jwt_handler.py`, `routers/oauth.py`, `services/oauth/flow.py`, `services/oauth_state.py`, `services/password_reset.py`, `frontend/src/api/axios.js` |
+| **A08 Software and Data Integrity Failures** | CI runs the tests, applies migrations to an empty database and reverses them, runs a smoke test against a live stack, and builds the production image on every push. No third-party scripts, and fonts are self-hosted. | `.github/workflows/ci.yml`, `deploy/Dockerfile` |
+| **A09 Security Logging and Monitoring Failures** | JSON security log of sign-in and admin actions, with email addresses replaced by keyed-HMAC tags. Scrape failures are recorded on the job row. `/health/catalogue` returns 503 when prices go stale, and an external uptime monitor watches it. | `logging_config.py`, `services/jobs.py`, `main.py` |
+| **A10 Server-Side Request Forgery** | The scraper allows HTTPS only, and only to hosts in the store registry. DNS is resolved and every address checked against private, loopback, link-local and reserved ranges before connecting. Redirects are validated hop by hop. Responses are capped at 5 MB with a timeout. `robots.txt` is fetched through the same client. | `services/scrapers/http.py`, `services/scrapers/registry.py`, `services/scrapers/robots.py` |
 
-### Email verification
+`backend/scripts/attack_probes.py` runs **41** attack checks against a running
+local server: privilege escalation through mass assignment, cross-tenant access
+to listings, wishlists and alerts, the admin surface, SQL injection, and JWT
+tampering. Checked from outside against production: HSTS with preload, a CSP
+with no third-party or inline scripts, TLS 1.0 and 1.1 refused, the server
+header hidden, and database and cache ports unreachable.
 
-Free to run: `EMAIL_BACKEND=console` prints the message to the server log, so
-the whole flow works with **no provider account, no domain and no DNS records**.
-Switching to `smtp` and filling in credentials is a config change — the backend
-uses stdlib SMTP, which every free-tier provider speaks, so there is no vendor
-SDK and nothing extra for `pip-audit` to find a CVE in.
+**Not solved yet:** DNS rebinding in the scraper (the host allow-list limits the
+exposure), merchant photos are served from the app's own origin, and DMARC is
+still `p=none`.
 
-Only the token's SHA-256 hash is stored; the token exists in the email and
-nowhere else, so a database dump yields no working links. (SHA-256 is correct
-here and bcrypt is not: these are 256 bits of CSPRNG output, so there is nothing
-to brute-force and the hash only has to be one-way and fast.)
+## Data pipeline
 
-The security shape of the feature is the unauthenticated endpoints:
+1. **Schedule.** The worker queues a full run every 6 hours
+   (`SCRAPE_INTERVAL_HOURS` in `deploy/docker-compose.yml`, off by default
+   locally). A partial unique index allows only one pending full run.
+2. **Complete reads.** Each store's Shopify `/products.json` is read to the end:
+   100 products per page, two retries on 429, 5xx or timeout, 2 seconds between
+   requests, all through the SSRF-checked client and `robots.txt`. The three
+   stores list about 13,660 products (3,158 + 5,074 + 5,431, measured
+   2026-09-15), and a full run takes about five minutes. A read counts as
+   complete only if it ended on an empty page. Otherwise that store fails for
+   the run (`scrapers/shopify.py`, `scrapers/base.py`).
+3. **Ingest.** Listings the store files outside our categories are dropped. The
+   rest are parsed, merged and priced. A price keeps `last_updated` (last
+   changed) separate from `checked_at` (last read).
+4. **Delisting with a safety valve.** A listing missing from a complete read is
+   marked delisted, and the mark clears if it comes back. One run may delist at
+   most `max(25, 25%)` of a store's fresh offers. Beyond that it removes only
+   already-stale listings and fails the store, so a person looks
+   (`services/ingest.py`, `_reconcile_listings`).
+5. **One definition of an offer.** `current_offer()` (`services/offers.py`)
+   requires a visible store, a listing that is not delisted, and, for scraped
+   stores, a read within 48 hours. Search, product pages, browse, deals, the
+   sitemap and alerts all use it.
+6. **Alerts** go out only after every store refreshed cleanly, at most 100
+   emails per run.
+7. **Link audit.** `backend/scripts/audit_store_links.py` requests `<link>.js`
+   for every store link a shopper can click and classifies each as OK, RENAMED,
+   GONE, VARIANT_GONE or UNKNOWN. It is a dry run by default. `--apply` refuses
+   to remove more than `max(3, 20%)` of a store without `--force`, and never
+   acts on UNKNOWN. The production run on 2026-09-15 checked **526 listings
+   (501 links), and every one was OK**.
 
-- **`/auth/resend-verification` always returns 202** — whether the address
-  exists, is already verified, or is throttled. A 404 for unknown addresses
-  would make it a membership check anyone could run.
-- **Resending is throttled per account**, not only per IP. An IP limit alone
-  still lets someone rotate addresses and bury a stranger's inbox using our
-  sending reputation.
-- **Every redemption failure returns one message.** Distinguishing "expired"
-  from "already used" from "never existed" informs an attacker holding a stale
-  link and helps a real user not at all.
-- **Alert emails are never sent to an unverified address.** Anyone can type a
-  stranger's email at signup; that is precisely how a notification feature
-  becomes a way to mail someone who never asked.
+## Testing & CI
 
-Verification gates outbound email, not access — browsing needs no confirmed
-address, and locking a new user out over an unclicked link would lose them for
-no security gain.
+| Suite | Size | What it covers |
+|---|---|---|
+| `backend/tests` (pytest) | **1,079 tests** | Matching, Arabic, spelling, routes, auth and token rotation, OAuth, SSRF, delisting, link audit, SEO, production config. SQLite, with the rate limiter stubbed. |
+| `frontend/src` (Vitest) | **197 tests** in 18 files | Tier explanations, price table ordering, i18n key parity, page indexing rules, photo picker, sign-in |
+| `backend/scripts/smoke_test.py` | Critical paths | Real Postgres, Redis and HTTP against a running server |
+| `backend/scripts/e2e_test.py` | User journeys | Register, verify, search, save, alert, sell, moderate. Rate limiter on; cleans up after itself. |
+| `backend/scripts/attack_probes.py` | 41 probes | See Security. Local only. |
 
-### Price alert notifications
+CI (`.github/workflows/ci.yml`) runs on every push to `main`, on pull
+requests, and weekly:
 
-Alerts were previously only evaluated when a user happened to open the page,
-which made "tell me when it drops" a promise the system never kept. They now
-run at the end of each scrape. `notified_at` prevents re-sending on every run
-while a price stays low, and is cleared when it rises back above target so a
-later drop notifies again.
+- **Backend** (Python 3.12, Postgres 16 and Redis 7 services): `pytest -q`;
+  `alembic upgrade head` on an empty database; `downgrade base` then
+  `upgrade head` again; a seeded smoke test against a running uvicorn; a build
+  of the production image; and `pip-audit`.
+- **Frontend** (Node 22): `npm ci`, `npm run lint`, `npm test`, `npm run build`.
 
-### Refresh token rotation
+## Deployment
 
-Every use of a refresh token burns it and issues a new one. This does not
-prevent theft; it makes theft **visible**. A one-time credential presented twice
-means two parties hold it — so the entire token chain is revoked and both must
-reauthenticate. The pattern is from the OAuth 2.0 Security BCP.
+Production runs on one Hetzner VPS (2 vCPU, 4 GB, Ubuntu 24.04) with
+`docker compose -f deploy/docker-compose.yml up -d --build`: Postgres, Redis, a
+one-shot `migrate`, the API, the worker, and Caddy for Let's Encrypt
+certificates and the `www` redirect. Around it: a Hetzner Cloud Firewall that
+allows only ports 22, 80 and 443, key-only SSH, Brevo SMTP with DKIM and DMARC
+on the domain, and Better Stack monitors on `/health` and `/health/catalogue`.
+The step-by-step guide is in [`deploy/README.md`](deploy/README.md).
 
-Only the token's `jti` is stored, never the token, so a database dump is not a
-set of working credentials.
+## Run locally
 
-Access tokens are deliberately stateless and non-revocable: verifying them
-against a table would mean a database read on every request, which is the cost
-the design exists to avoid. Their 15-minute lifetime bounds the damage instead.
-
----
-
-## Getting started
-
-**Requires** Python 3.12, Node 20+, Docker.
+Requires Python 3.12, Node 22 and Docker.
 
 ```bash
-docker compose up -d          # Postgres + Redis
+docker compose up -d            # development Postgres and Redis (postgres-local, redis-local)
 ```
 
 ```bash
 cd backend
-python -m venv .venv && .venv/Scripts/activate    # Linux/macOS: source .venv/bin/activate
+python -m venv .venv
+source .venv/Scripts/activate   # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
-cp .env.example .env          # then set JWT_SECRET_KEY: openssl rand -hex 32
+cp .env.example .env            # set JWT_SECRET_KEY: openssl rand -hex 32
 alembic upgrade head
-python -m app.services.scraper                    # seed mock store data
-uvicorn app.main:app --reload --port 8000 --no-server-header
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-server-header
+```
+
+Fill the catalogue from a second terminal in `backend/`, with one of:
+
+```bash
+python -m app.services.ingest            # reads the three stores' public feeds (a few minutes)
+python scripts/seed_ci_catalogue.py      # a small invented catalogue, as CI uses; contacts no store
 ```
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-App at http://localhost:5173, API docs at http://localhost:8000/docs.
+The app runs at http://localhost:5173 and the API docs at
+http://localhost:8000/docs. Emails are printed in the backend terminal
+(`EMAIL_BACKEND=console`). `python -m app.services.worker --loop` runs queued
+scrapes. Nothing creates the first admin account: register one, then run
+`docker exec postgres-local psql -U postgres -d price_comparison -c "update users set role='admin' where email='you@example.com';"`.
 
-On Windows, `start-dev.ps1` starts all of it in one go.
+Tests: `cd backend && EMAIL_BACKEND=null pytest -q` and
+`cd frontend && npm run lint && npm test`. (`--no-server-header` is needed
+because uvicorn writes its `Server` header after middleware has run.)
 
-> `--no-server-header` matters: the `Server: uvicorn` header cannot be removed
-> from middleware, because uvicorn writes it at the ASGI protocol level after
-> middleware has returned.
+## Known limitations
 
----
+- **Supply is the constraint, not the code.** Only three stores are scraped and
+  no merchant has joined, so few products have prices from more than one store.
+- **No automated backups yet.** The owner plans to enable them before the first
+  real shop signs up.
+- Prices refresh every 6 hours, not live. A scraped price not re-read for
+  48 hours is no longer shown.
+- Emails are English only, while the site defaults to Arabic.
+- Laptop CPU generation is not captured: an 8th-gen and a 14th-gen i7 both
+  parse as `i7`.
 
-## Testing
+## Engineering log
 
-```bash
-cd backend && pytest -q                    # 258 unit tests
-```
-
-```bash
-cd backend && python scripts/smoke_test.py # 55 checks against a running stack
-```
-
-The unit suite uses SQLite and stubs the rate limiter for determinism. The smoke
-test drives the real thing — real Postgres, real Redis, real HTTP — and is what
-catches the things unit tests structurally cannot. It found three bugs that 56
-passing unit tests did not, including a `Server` header that middleware could
-never have removed.
-
-Checks that depend on Redis report **SKIP**, never PASS, when it is unreachable,
-so an unverified control is never mistaken for a working one.
-
-```bash
-cd frontend && npm test && npm run lint && npm run build
-```
-
-36 component tests: price formatting, the tier explanations, and the store
-table's ordering by TOTAL cost rather than sticker price.
-
-### Maintenance scripts
-
-| Script | Purpose |
-|---|---|
-| `scripts/backfill_attributes.py` | Populate matching attributes on existing products; repairs legacy display names |
-| `scripts/merge_duplicates.py` | Merge canonical products the old engine split apart |
-| `scripts/smoke_test.py` | End-to-end verification against a running stack |
-
-The two that modify data support `--dry-run`.
-
----
-
-## API
-
-| Method | Path | |
-|---|---|---|
-| POST | `/auth/register` | Sets refresh cookie |
-| POST | `/auth/login` | Sets refresh cookie |
-| POST | `/auth/refresh` | Rotates; reuse revokes the chain |
-| POST | `/auth/logout` | Revokes every session |
-| POST | `/auth/verify-email` | Redeems a link; single use |
-| POST | `/auth/resend-verification` | Always 202 — never reveals who has an account |
-| GET | `/auth/me` | |
-| GET | `/products/search?q=` | **Tiered results** |
-| GET | `/products/{id}` | All store prices, cheapest total first |
-| GET | `/products/{id}/history` | Price history |
-| GET/POST/DELETE | `/prices/wishlist` | Authenticated |
-| GET/POST/DELETE | `/prices/alerts` | Authenticated |
-| GET | `/products/{id}/photo` | Merchant photo, if a **verified** shop supplied one |
-| PUT/DELETE | `/merchant/listings/{id}/photo` | Merchant's own; re-encoded on upload |
-| GET | `/admin/*` | Admin only |
-| GET | `/mock/{store}/search` | Simulated store feeds |
-
-`GET /products/search?q=iPhone 15 256GB Black` — an actual response, trimmed to
-the interesting fields:
-
-```json
-{
-  "interpretation": {
-    "query": "iPhone 15 256GB Black",
-    "category": "phones",
-    "attributes": {"brand": "apple", "model": "iphone 15",
-                   "storage": "256gb", "color": "black"},
-    "structured": true, "corrected_query": null, "corrections": {}
-  },
-  "exact": [],
-  "close": [{
-    "canonical_name": "Apple iPhone 15 256GB 5G - Blue",
-    "match_score": 90.0,
-    "differences": [{"attribute": "color", "label": "colour",
-                     "query_value": "black", "candidate_value": "blue"}],
-    "lowest_total_cost": 933.82, "best_deal_store": "SmartBuy", "store_count": 1
-  }],
-  "similar": [{
-    "canonical_name": "Apple iPhone 15 128GB 5G Smartphone - Black",
-    "match_score": 76.0,
-    "differences": [{"attribute": "storage", "label": "storage",
-                     "query_value": "256gb", "candidate_value": "128gb"}],
-    "lowest_total_cost": 891.25, "best_deal_store": "SmartBuy", "store_count": 1
-  }],
-  "total": 2
-}
-```
-
-`differences` is structured rather than prose, and that is a deliberate
-reversal. The server used to send the finished sentence -- `"different colour
-(blue, not black)"` -- which put the one piece of text the tiers exist to
-produce permanently in English, on a site whose default language is Arabic.
-A sentence is a rendering decision; the API reports which attribute differed
-and what the two values were, and the client writes it in the reader's
-language. A null `candidate_value` means the listing does not state the
-attribute at all, which reads as a different sentence from having a different
-value.
-
-`lowest_total_cost` is price **plus delivery** — a store with a lower sticker
-price and dearer delivery is not the better deal.
-
-**Product photos.** `image_url` is one resolved field, not a choice for the
-client to make: the shop's scraped image if there is one, else
-`/products/{id}/photo` when a verified merchant has uploaded a photo of the
-actual unit, else null so the UI can draw a placeholder rather than a broken
-image.
-
-Uploads are **decoded and re-encoded to WebP, never stored as sent** — which
-is what makes a polyglot file inert and what drops the GPS coordinates in a
-phone photo's EXIF. SVG is refused outright, decompression bombs are capped,
-and the declared Content-Type is ignored in favour of what the bytes actually
-decode to. The image bytes live in Postgres alongside the listing; see the
-handoff for why that beats object storage at this size.
-
-`interpretation` echoes what the server understood the query to mean. When a
-search surprises someone, the difference between *"we don't stock it"* and
-*"it read 128GB and you meant 256"* is otherwise invisible.
-
----
-
-## Scraping
-
-Live data comes from **SmartBuy** (`smartbuy-me.com`) via the Shopify
-storefront feed at `/products.json` — the same catalogue the site renders, as
-structured data. Parsing HTML instead would mean guessing CSS selectors that
-break whenever the merchant edits their theme, per store. The JSON shape is
-Shopify's, so one adapter covers every store on the platform. It also carries
-the barcode as the variant SKU, which is what makes Layer 1 of the matching
-engine — exact SKU match — work on real identifiers.
-
-```bash
-cd backend && python -m app.services.ingest
-```
-
-In production the worker (`python -m app.services.worker --loop`) queues a
-full scrape of every store every six hours by itself (`SCRAPE_INTERVAL_HOURS`,
-off by default, `6` on the production worker), then refreshes cached pages and
-sends price alerts. `POST /admin/scrape` queues one on demand.
-
-Money is stored as `Numeric(10,3)`, not `Float`. JOD has three decimal places,
-the feeds return `"136.000"`, and these values are summed and then *compared* —
-to pick the cheapest store and to decide whether a price alert has been met.
-Binary floating point cannot represent most decimal fractions, so two stores a
-thousandth of a dinar apart could be ordered wrongly.
-
-### SSRF defences (OWASP A10)
-
-A scraper is a server-side URL fetcher, which is the exact shape of an SSRF
-vulnerability. Point it at `169.254.169.254` and it reads cloud instance
-metadata; at `localhost:6379` and it reads this app's own Redis. Five controls,
-in `app/services/scrapers/http.py`:
-
-1. **Scheme allowlist** — https only; `file://`, `gopher://` and friends refused
-2. **Host allowlist** — derived from the store registry, so a host cannot be
-   fetched without first being declared as a store
-3. **DNS resolution before connecting**, with every returned address checked
-   against private, loopback, link-local and reserved ranges. An allowlisted
-   host that resolves to `127.0.0.1` is still refused, and one private answer
-   among several is enough to refuse
-4. **No redirect following** — a redirect is a URL chosen by the remote server,
-   exactly the input we are not trusting. Each hop is re-validated explicitly
-5. **Bounded time and response size**, so a slow or enormous response cannot
-   exhaust the worker
-
-Not solved: DNS rebinding, which needs the connection pinned to the validated
-IP. The host allowlist is what makes that gap acceptable.
-
-`robots.txt` is honoured, requests are spaced (and a site's `Crawl-delay`
-raises that spacing, never lowers it), and the client identifies itself
-honestly rather than impersonating a browser.
-
-> **Note on untrusted content.** A store's `robots.txt` was found to contain
-> prose addressed to AI agents, asking the reader to install a shopping skill
-> and make purchases on the user's behalf. The parser reads only
-> `Allow` / `Disallow` / `Crawl-delay`; everything else in a fetched document
-> is data, never instruction. There is a test asserting exactly that.
-
-### What real data broke
-
-The mock catalogue was clean. Real titles are not, and two things failed on
-first contact:
-
-| Real listing | Problem |
-|---|---|
-| `Hp Intel I7 -8550U, 16GB DDR4 & 512GB SSD, 15.6Inch` | No word identifies it as a laptop — the store files that under `product_type: Notebook`. Every such listing was uncategorised. |
-| `Xiaomi Redmi 17 4G, 4GB & 128GB, 6.9Inch` | Storage took **4GB** — the memory. Real titles never say "RAM", so a keyword lookahead finds nothing. |
-
-Fixed by passing the store's own category as a parse hint, and by splitting
-capacities on size rather than keyword: between two figures on one device the
-larger is storage and the smaller is memory. Both are regression-tested against
-the exact strings that broke them.
-
-## Limitations
-
-**Only one store is scraped for real, and that limits the whole premise.**
-SmartBuy supplies 158 real listings; DNA, Carrefour Jordan and City Center are
-mock data — real retailer names, invented prices. A comparison site with one
-real source cannot really compare.
-
-This is not for want of trying. Around fifty Jordanian and regional domains
-were probed for a structured feed. `smartbuy.jo` turned out to be SmartBuy's
-own second domain (identical SKUs and prices, so adding it would be fake
-competition). `leaders.jo` returns 403 to an identified bot, and working around
-that by impersonating a browser would contradict the rest of the scraping
-design. DNA and `cozmo.jo` serve JS-rendered pages with no feed behind them.
-
-Reaching those needs a headless browser (Playwright), which is a real option
-but a substantial one: a browser in CI, much more memory, and far more
-flakiness than an HTTP call.
-
-**Each retailer's terms of service govern what is actually permitted.** Reading
-public catalogue endpoints politely is the courteous baseline, not a legal
-opinion.
-
-**Also outstanding:**
-
-- The matching rules cover phones and laptops only
-
----
-
-## Deployment
-
-```bash
-docker build -t pricecompare-api ./backend
-docker build -t pricecompare-web ./frontend --build-arg VITE_API_URL=https://your-api-domain
-```
-
-The API image is multi-stage — wheels are built where a compiler exists and
-installed into a runtime image that has none — and runs as a non-root user.
-`VITE_API_URL` is a **build** argument, not a runtime one: Vite inlines
-`VITE_*` variables into the bundle, so the API address is baked in at build
-time.
-
-Production differs from development in ways worth knowing:
-
-| Setting | Why |
-|---|---|
-| `ENVIRONMENT=production` | Disables `/docs` **and** `/openapi.json`, drops the `/mock/*` routes, forces `Secure` on the refresh cookie, and stops `create_all()` — the schema belongs to Alembic |
-| `TRUSTED_HOSTS` | Real hostnames. Left as `*`, Host-header injection is open |
-| `TRUSTED_PROXY_COUNT` | The actual number of proxies. `0` ignores `X-Forwarded-For`; a wrong value either collapses every user into one rate-limit bucket or lets callers forge their address |
-| `COOKIE_SAMESITE=none` | Only if the API and app are on different sites. Browsers require `Secure` alongside it |
-| `EMAIL_BACKEND=smtp` | The app refuses to start with `console` in production rather than pretending to send |
-
-Verified by running the image with `ENVIRONMENT=production`: `/docs`,
-`/openapi.json` and `/mock/stores` all return 404, HSTS and the strict CSP are
-present, and the `Server` header is absent.
-
-## Project structure
-
-```
-backend/
-  app/
-    matching/        parse names into attributes, score them
-      rules.py       CATEGORY RULES AS DATA -- the extension point
-      extractors.py  the only place regexes live
-      parser.py      generic, rules-driven
-      scorer.py      weighted scoring, gates, tiers, explanations
-    services/
-      search.py      candidate generation + reranking
-      deduplication.py  entity resolution at ingest
-      tokens.py      refresh rotation, revocation, replay detection
-      verification.py   email verification: issue, send, redeem
-      notifications.py  price alert emails
-      email/         sender interface; console (free) and SMTP backends
-      ingest.py      scrape -> canonical products -> prices
-      scraper.py     mock store feeds (the three unscraped stores)
-      scrapers/      REAL scraping
-        http.py      SSRF-hardened fetch -- the security boundary
-        robots.py    robots.txt parsing and compliance
-        shopify.py   Shopify storefront adapter
-        registry.py  store configs; the host allowlist derives from these
-    security/        JWT, password hashing, cookies, rate limiting
-    routers/         auth, products, prices, admin, mock stores
-    models/          SQLAlchemy models
-  alembic/versions/  5 migrations
-  tests/             258 tests
-  scripts/           smoke test + maintenance tooling
-frontend/src/
-  components/search/ tiered results, match badges, query interpretation
-  components/prices/ per-store price table
-  pages/             Home, Results, ProductDetail, Login, Register
-  api/               axios instance with token refresh
-```
+[`HANDOFF.md`](HANDOFF.md) is the detailed running record of the project: the
+current state, how production is operated, each design decision with its
+reasons, what was tried and rejected (scraping from GitHub Actions, a Celery
+queue, a native app, a load balancer), the traps met along the way, and the
+next steps.

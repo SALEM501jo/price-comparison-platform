@@ -1,11 +1,14 @@
-# Project handoff — احسن سعر (Ahsan Se3r)
+# Engineering log — احسن سعر (Ahsan Se3r)
 
-Paste this into a new session to continue without losing context. It replaces
-the earlier handoffs and folds in everything since.
+The project's engineering log: the detailed running record of its current
+state, how the live site is operated, the decisions taken and why, what was
+tried and rejected, and what comes next. It is updated as the work happens,
+and it replaces the earlier session handoffs, folding in everything since.
 
-**Repo:** `G:\Downloads\price-comparison-platform` · **Branches:** `main` and
-`frontend` point at the same commit (fast-forwarded 2026-09-14, after a full
-history secret scan came back clean). **Work on `main` from now on.**
+**Repo:** https://github.com/SALEM501jo/price-comparison-platform (local
+checkout `G:\Downloads\price-comparison-platform`) · **Branch:** all work is on
+`main`, which the server tracks. A full-history secret scan came back clean on
+2026-09-14. The old `frontend` branch is unused (see Next steps).
 
 **Live at https://ahsanse3r.com** — see [Production](#production) below.
 
@@ -14,9 +17,9 @@ history secret scan came back clean). **Work on `main` from now on.**
 > public by other means (the domain resolves to the server IP; the operator's
 > contact address is on `/privacy`).
 
-Read `README.md` for the architecture as written. This file carries what a
-README should not: what was tried and rejected, the traps in this environment,
-and where to go next.
+`README.md` is the short overview. This file carries what a README should not:
+what was tried and rejected, the traps in this environment, and where to go
+next.
 
 ---
 
@@ -50,13 +53,13 @@ there is no checkout anywhere.
 
 | | |
 |---|---|
-| Backend tests | **822** — `cd backend && pytest -q` |
-| Frontend tests | **162** — `cd frontend && npm test` |
+| Backend tests | **1,079** — `cd backend && pytest -q` |
+| Frontend tests | **197** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
 | Smoke checks | **57/57** — `python scripts/smoke_test.py` |
 | Known CVEs | **0** — `pip-audit -r requirements.txt` |
-| Migrations | **14**, head `4a1e9c07b3d2`, run from empty to head on production |
+| Migrations | **17**, head `c1e8a4b6d207`, run from empty to head on production |
 | Working tree | clean |
 
 **Data — the LOCAL database.** All test data was deleted before deploy. 4
@@ -303,8 +306,15 @@ cd backend && .venv/Scripts/python.exe -m app.services.worker --loop
 
 App at http://localhost:5173, API docs at http://localhost:8000/docs.
 
-**Account:** `salem-demo@example.com` / `DemoPass123` — **admin**, deliberately
-unverified so the email banner shows. There is no merchant account any more;
+**Account:** a local demo account, `salem-demo@example.com` — **admin**,
+deliberately unverified so the email banner shows. Its password is not written
+here (this file is public). `scripts/e2e_test.py` signs in as this admin, so
+its password must match the one that script uses. To set a new one locally, use
+**Forgot password**: with `EMAIL_BACKEND=console` the reset link prints in the
+backend terminal (redeeming it also marks the address verified). To make any
+other local account an admin, register it and run
+`docker exec postgres-local psql -U postgres -d price_comparison -c "update users set role='admin' where email='<EMAIL>';"`.
+There is no merchant account any more;
 register one through the UI to exercise that side, then delete it with
 `scripts/cleanup_test_data.py --apply`.
 
