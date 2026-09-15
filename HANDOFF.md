@@ -585,7 +585,17 @@ page shows it for scraped stores. Without it the first production scrape left
 
 **First production run, 2026-09-15 00:12 UTC:** succeeded in 7m22s --
 SmartBuy 150 listings (18 price changes), iGeek 282 (10), AmmanCart 100 (1);
-catalogue 423 -> 532 products, 455 -> 567 prices. Before this, production
+catalogue 423 -> 532 products, 455 -> 567 prices. Second run after
+`checked_at` shipped: 0 price changes, **512 of 567 prices re-read**.
+
+**The 55 not re-read are the next trust problem.** A listing the scraper no
+longer sees -- delisted, or beyond a store's `max_products` cap (SmartBuy 150,
+AmmanCart 100 in `scrapers/registry.py`) -- keeps its last price forever and
+can still win "best price". Live example 2026-09-15: iPhone 16 128GB, SmartBuy
+689 JOD "updated 18 days ago" marked best price beside AmmanCart checked today.
+Fix before inviting shops: raise the caps or scrape by collection so every
+listed product is re-read, and treat a scraped price not re-read for N runs as
+unavailable (out of the comparison) rather than current. Before this, production
 prices were 19 days old because nothing had scraped since launch.
 
 ### Scraping — `app/services/scrapers/`
