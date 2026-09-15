@@ -648,7 +648,11 @@ per page, about 5 minutes.
   0 RENAMED, 479 OK, 47 UNKNOWN -- all 47 answered 200 and were UNKNOWN only
   because their handles contain (R)/(TM) symbols the old handle check refused;
   fixed (deny-list of path-changing characters, and a confirmed existing handle
-  needs no check).
+  needs no check). **Re-run after deploying that fix (13:04 UTC): 526 listings /
+  501 links, every one OK** -- 0 GONE, 0 RENAMED, 0 VARIANT_GONE, 0 UNKNOWN.
+- Trap met while running it: in an ssh heredoc script, `docker compose exec -T`
+  reads the script's stdin and swallows every command after it -- append
+  `</dev/null` to each `exec` that is not the last line.
 
 ### Scraping — `app/services/scrapers/`
 
