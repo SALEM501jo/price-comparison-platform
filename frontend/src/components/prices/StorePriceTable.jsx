@@ -190,7 +190,15 @@ export default function StorePriceTable({ prices, emptyMessage, productId }) {
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {rows.map((row) => {
             const isBest = row === cheapest;
-            const age = formatAge(row.last_updated, t);
+            // A scraped price is as fresh as the last time the scraper READ
+            // it, changed or not. last_updated only moves when the figure
+            // changes, so a price confirmed every six hours used to read
+            // "updated 19 days ago". A merchant's price is as fresh as the
+            // last time the shop typed it, which is last_updated.
+            const seen = row.is_merchant
+              ? row.last_updated
+              : (row.checked_at ?? row.last_updated);
+            const age = formatAge(seen, t);
             const stale = row.is_merchant && isPriceStale(row.last_updated);
 
             return (

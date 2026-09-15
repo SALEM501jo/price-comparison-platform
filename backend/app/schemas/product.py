@@ -17,6 +17,10 @@ class StorePriceResponse(BaseModel):
     delivery_cost: float
     total_cost: float
     last_updated: datetime
+    # When a scraper last re-read this price, changed or not (Price.checked_at).
+    # The freshness a shopper cares about for a scraped store; null for
+    # merchant prices, whose freshness is last_updated.
+    checked_at: Optional[datetime] = None
     store_product_url: Optional[str]
     match_confidence: float
 

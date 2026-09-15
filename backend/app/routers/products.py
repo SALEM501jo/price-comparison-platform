@@ -298,6 +298,7 @@ async def get_product(
             delivery_cost=price.delivery_cost,
             total_cost=price.price + price.delivery_cost,
             last_updated=price.last_updated,
+            checked_at=price.checked_at,
             store_product_url=alias.store_product_url,
             match_confidence=alias.match_confidence,
             phone=store.phone,

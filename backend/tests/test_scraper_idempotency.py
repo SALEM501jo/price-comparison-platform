@@ -155,3 +155,61 @@ class TestTheStoreKeepsItsOwnNaming:
         run(db, store, [listing("SB-1", "iPhone 15 128GB (Black) 5G", 899.0)])
 
         assert db.query(ProductAlias).count() == 1
+
+
+class TestWhenAPriceWasLastChecked:
+    """
+    The product page tells shoppers how fresh a price is. A price re-read
+    unchanged every six hours used to keep the timestamp of its last CHANGE,
+    so a figure checked minutes ago read "updated 19 days ago".
+    """
+
+    def _row(self, db, sku="SB-1"):
+        return (
+            db.query(Price)
+            .join(ProductAlias, Price.alias_id == ProductAlias.id)
+            .filter(ProductAlias.store_product_id == sku)
+            .one()
+        )
+
+    def _age(self, db, **stamps):
+        from datetime import datetime, timezone
+
+        old = datetime(2026, 8, 27, 19, 13, tzinfo=timezone.utc)
+        row = self._row(db)
+        for name in stamps or ("last_updated", "checked_at"):
+            setattr(row, name, old)
+        db.commit()
+        return old
+
+    @staticmethod
+    def _aware(moment):
+        from datetime import timezone
+
+        return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+    def test_a_new_price_is_checked_now(self, db, store):
+        run(db, store)
+        assert self._row(db).checked_at is not None
+
+    def test_an_unchanged_price_is_checked_but_not_changed(self, db, store):
+        run(db, store)
+        old = self._age(db)
+
+        run(db, store)
+        row = self._row(db)
+        db.refresh(row)
+
+        assert self._aware(row.checked_at) > old, "the re-read was not recorded"
+        assert self._aware(row.last_updated) == old, "an unchanged price was marked changed"
+
+    def test_a_changed_price_moves_both(self, db, store):
+        run(db, store)
+        old = self._age(db)
+
+        run(db, store, [listing("SB-1", FEED[0].name, 849.0)] + FEED[1:])
+        row = self._row(db)
+        db.refresh(row)
+
+        assert self._aware(row.checked_at) > old
+        assert self._aware(row.last_updated) > old

@@ -38,6 +38,17 @@ class Price(Base):
     delivery_cost = Column(MONEY, default=0)
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    # When a scraper last READ this price from the store, changed or not.
+    # last_updated cannot say that: onupdate only fires when a column actually
+    # changes, so a price confirmed unchanged every six hours kept a
+    # three-week-old timestamp, and the product page told shoppers "updated 19
+    # days ago" beside a figure checked minutes earlier. Kept separate rather
+    # than bumping last_updated, which still means "the price changed" -- the
+    # sitemap's lastmod and the merchant staleness warning depend on that.
+    # Null for merchant prices (a person types those; nothing re-reads them)
+    # and for scraped rows not seen since this column was added.
+    checked_at = Column(DateTime(timezone=True))
+
     alias = relationship("ProductAlias", back_populates="prices")
 
     __table_args__ = (

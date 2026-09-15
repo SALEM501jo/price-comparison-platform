@@ -87,4 +87,45 @@ describe('StorePriceTable', () => {
     render(<StorePriceTable prices={[]} />);
     expect(screen.getByText(/No stores are currently listing/)).toBeInTheDocument();
   });
+
+  describe('how fresh a price is', () => {
+    const daysAgo = (n) => new Date(Date.now() - n * 86_400_000).toISOString();
+    const rowFor = (container, name) =>
+      [...container.querySelectorAll('tbody tr')].find((r) => r.textContent.includes(name));
+
+    it('shows when a scraped price was last CHECKED, not last changed', () => {
+      // The scrape re-reads every price every six hours; one that did not
+      // move used to read "Updated 19 days ago" beside a figure checked
+      // minutes earlier.
+      const scraped = [
+        { ...prices[1], last_updated: daysAgo(19), checked_at: daysAgo(0) },
+      ];
+      const { container } = render(<StorePriceTable prices={scraped} />);
+      expect(rowFor(container, 'SmartBuy').textContent).toMatch(/Updated today/);
+    });
+
+    it('falls back to the last change for a price not re-read yet', () => {
+      const scraped = [{ ...prices[1], last_updated: daysAgo(3), checked_at: null }];
+      const { container } = render(<StorePriceTable prices={scraped} />);
+      expect(rowFor(container, 'SmartBuy').textContent).toMatch(/Updated 3 days ago/);
+    });
+
+    it("judges a shop's own price by when the shop last set it", () => {
+      // Nothing re-reads a merchant price; a checked_at there must not hide
+      // the staleness warning.
+      const merchant = [
+        {
+          ...prices[2],
+          store_name: 'Jado Mobile',
+          is_merchant: true,
+          last_updated: daysAgo(45),
+          checked_at: daysAgo(0),
+        },
+      ];
+      const { container } = render(<StorePriceTable prices={merchant} />);
+      const text = rowFor(container, 'Jado Mobile').textContent;
+      expect(text).toMatch(/check before buying/);
+      expect(text).not.toMatch(/today/);
+    });
+  });
 });

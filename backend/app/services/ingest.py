@@ -11,9 +11,12 @@ any scraper.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.matching import parse
 from app.models.price import Price, PriceHistory
@@ -67,6 +70,9 @@ class IngestService:
         # strings, so this round-trips the value the store actually quoted.
         price = Decimal(str(item.price))
         delivery = Decimal(str(item.delivery_cost))
+        # Stamped on every read, unchanged prices included -- see
+        # Price.checked_at for why last_updated cannot carry this.
+        checked = datetime.now(timezone.utc)
 
         if existing:
             if existing.price != price:
@@ -77,6 +83,20 @@ class IngestService:
             existing.price = price
             existing.availability = item.availability
             existing.delivery_cost = delivery
+
+            # Stamping checked_at makes the row dirty, and an UPDATE fills
+            # last_updated from its onupdate=now() -- which would mark every
+            # price "changed" every run. When nothing the shopper sees has
+            # changed, last_updated is put in the UPDATE with its own value;
+            # onupdate only fills columns the statement leaves out.
+            state = inspect(existing)
+            moved = any(
+                state.attrs[name].history.has_changes()
+                for name in ("price", "availability", "delivery_cost")
+            )
+            if not moved:
+                flag_modified(existing, "last_updated")
+            existing.checked_at = checked
         else:
             self.db.add(
                 Price(
@@ -85,6 +105,7 @@ class IngestService:
                     currency=item.currency,
                     availability=item.availability,
                     delivery_cost=delivery,
+                    checked_at=checked,
                 )
             )
 

@@ -572,7 +572,20 @@ may be pending at a time**, enforced by a partial unique index (migration
 `7d3b9e21c5a8`); a second admin "scrape all" gets 409. An admin's "scrape all"
 is stored as empty `store_codes`, the same as a scheduled run, so it resets
 the six-hour clock. Seeding a fresh database: stop the worker first
-(`deploy/README.md`). Before this, production
+(`deploy/README.md`).
+
+**Two timestamps on a price, on purpose.** `last_updated` = the price last
+*changed* (sitemap lastmod, merchant staleness warning). `checked_at` = a
+scraper last *read* it, changed or not (migration `9b4c2f7e1d63`); the product
+page shows it for scraped stores. Without it the first production scrape left
+"updated 19 days ago" beside prices it had just confirmed. Trap: setting
+`checked_at` makes the row dirty and `onupdate=now()` would bump
+`last_updated` too, so ingest re-sends `last_updated` unchanged
+(`flag_modified`) when nothing visible changed.
+
+**First production run, 2026-09-15 00:12 UTC:** succeeded in 7m22s --
+SmartBuy 150 listings (18 price changes), iGeek 282 (10), AmmanCart 100 (1);
+catalogue 423 -> 532 products, 455 -> 567 prices. Before this, production
 prices were 19 days old because nothing had scraped since launch.
 
 ### Scraping — `app/services/scrapers/`
