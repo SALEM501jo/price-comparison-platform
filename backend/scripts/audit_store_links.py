@@ -149,11 +149,17 @@ _JS_PATH = re.compile(r"^/products/([^/]+)\.js$")
 
 # What a handle from the store's JSON must look like before it is written into
 # a link the site shows. The JSON is remote, untrusted text: without this a
-# handle of "../account" or "x?y=z" would become a shopper-facing URL. Shopify
-# handles are letters, digits and hyphens; \w also admits non-Latin letters,
-# which a store with Arabic handles would use, and those are percent-encoded
-# when the URL is built.
-_HANDLE = re.compile(r"^[\w-]{1,255}$")
+# handle of "../account" or "x?y=z" would become a shopper-facing URL.
+#
+# A DENY-LIST OF WHAT BREAKS A PATH, not an allow-list of letters. The first
+# production audit (2026-09-15) had 47 of 526 listings come back UNKNOWN with
+# every one answering 200: iGeek and AmmanCart keep the product title's
+# trademark symbols in the handle ("...-intel®-core™-ultra-9..."), and the
+# old pattern of word characters and hyphens refused them. Only a separator,
+# whitespace, a control character, a percent sign, a backslash or ".." can
+# change where a path points; anything else is percent-encoded when the URL
+# is built.
+_HANDLE = re.compile(r"^(?!.*\.\.)[^\s/\\?#%\x00-\x1f\x7f]{1,255}$")
 
 _CODE_BY_NAME = {config.name: config.code for config in STORES}
 
@@ -541,7 +547,13 @@ class LinkAuditor:
             return
         handle = payload.get("handle") if isinstance(payload, dict) else None
         variants = payload.get("variants") if isinstance(payload, dict) else None
-        if not isinstance(handle, str) or not _HANDLE.match(handle):
+        if not isinstance(handle, str):
+            self._unknown(link, "HTTP 200, but no handle in the JSON")
+            return
+        # The handle we already link to, confirmed by the store, needs no
+        # safety check: it is the one on the site now. Only a DIFFERENT handle
+        # -- one this audit would write -- must pass _HANDLE.
+        if handle != link.handle and not _HANDLE.match(handle):
             self._unknown(link, "HTTP 200, but no usable handle in the JSON")
             return
         if not isinstance(variants, list):

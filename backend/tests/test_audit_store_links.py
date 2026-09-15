@@ -723,3 +723,37 @@ class TestGuards:
         report = run_main(db, auditor, tmp_path, "--apply")
 
         assert sum(1 for c in report["changes"] if c["action"] == "delisted") == 3
+
+
+class TestHandlesWithSymbols:
+    """
+    The first production audit reported 47 of 526 listings UNKNOWN, every one
+    answering 200: iGeek and AmmanCart keep trademark symbols in handles, and
+    the handle check allowed only word characters and hyphens.
+    """
+
+    HANDLE = "asus-zenbook-intel\u00ae-core\u2122-ultra-9"
+
+    def test_a_confirmed_handle_with_symbols_is_ok(self, auditor, stores):
+        url = f"https://{SB}/products/{self.HANDLE}"
+        stores.page(url + ".js", product_json(url + ".js", self.HANDLE,
+                                              [{"id": 1, "sku": "SKU-1"}]))
+        (checked,) = audited(auditor, link(url, "SKU-1"))
+        assert checked.verdict == audit.OK
+
+    def test_a_rename_to_a_handle_with_symbols_is_relinked_encoded(self, auditor, stores):
+        url = f"https://{SB}/products/old-name"
+        stores.page(url + ".js", product_json(url + ".js", self.HANDLE,
+                                              [{"id": 1, "sku": "SKU-1"}]))
+        (checked,) = audited(auditor, link(url, "SKU-1"))
+        assert checked.verdict == audit.RENAMED
+        assert checked.new_url == f"https://{SB}/products/asus-zenbook-intel%C2%AE-core%E2%84%A2-ultra-9"
+
+    @pytest.mark.parametrize("handle", ["a%2Fb", "a\\b", "a#b", "a..b"])
+    def test_what_could_change_the_path_is_still_refused(self, auditor, stores, handle):
+        url = f"https://{SB}/products/iphone-16"
+        stores.page(url + ".js", product_json(url + ".js", handle,
+                                              [{"id": 1, "sku": "SKU-1"}]))
+        (checked,) = audited(auditor, link(url, "SKU-1"))
+        assert checked.verdict == audit.UNKNOWN
+        assert checked.new_url is None

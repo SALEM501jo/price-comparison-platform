@@ -639,6 +639,16 @@ per page, about 5 minutes.
   worker dies or every store fails, the whole catalogue leaves the site at once
   48 hours later. `GET /health/catalogue` answers 503 once the newest scraped
   read is over 14 hours old -- the Better Stack database monitor points there.
+- **First production run with this (2026-09-15, job 4, 4m44s):** all three
+  reads complete -- SmartBuy 156 seen / **56 delisted**, iGeek 282 / 0, AmmanCart
+  112 / **1**; sitemap 468 -> 448 products; product 483 now shows only AmmanCart.
+  Re-checking the 57 delisted links: 56 answer 404 at the store; 1 (an Infinix
+  tablet) still exists but is no longer kept by the category filter, so it is
+  correctly not an offer. **First link audit:** 526 listings / 501 links, 0 GONE,
+  0 RENAMED, 479 OK, 47 UNKNOWN -- all 47 answered 200 and were UNKNOWN only
+  because their handles contain (R)/(TM) symbols the old handle check refused;
+  fixed (deny-list of path-changing characters, and a confirmed existing handle
+  needs no check).
 
 ### Scraping — `app/services/scrapers/`
 
