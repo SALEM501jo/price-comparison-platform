@@ -4,6 +4,7 @@ import { LocaleProvider } from './context/LocaleContext';
 import { ThemeProvider } from './context/ThemeContext';
 import RequireAuth from './components/auth/RequireAuth';
 import Navbar from './components/layout/Navbar';
+import ScrollToTop from './components/layout/ScrollToTop';
 import Footer from './components/layout/Footer';
 import VerifyBanner from './components/auth/VerifyBanner';
 import NotFound from './pages/NotFound';
@@ -38,6 +39,7 @@ function App() {
                 at the bottom of the viewport on a short page -- a 404, an
                 empty wishlist -- instead of floating halfway up it. */}
             <div className="flex min-h-screen flex-col bg-gray-50 transition-colors dark:bg-gray-950">
+              <ScrollToTop />
               <Navbar />
               <VerifyBanner />
               <main className="flex-1">

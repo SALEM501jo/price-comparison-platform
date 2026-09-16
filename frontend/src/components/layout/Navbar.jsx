@@ -48,7 +48,12 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="border-b border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    // STICKY, because on a phone this bar is the only way back. It used to
+    // scroll away with the page: on a long results or product page the logo,
+    // the language switch and the menu were hundreds of pixels above, and
+    // getting back meant scrolling up through everything. z-40 keeps it over
+    // the page content and under any dialog.
+    <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <div className="flex items-center gap-6">
           <Logo />
