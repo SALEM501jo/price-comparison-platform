@@ -181,7 +181,14 @@ class CategoryRules:
 # Measured against the real feeds before adding it: of 487 listings in the
 # three supported categories, ZERO mention a television. The false-negative
 # cost is nil.
-UNSUPPORTED_CATEGORIES: tuple[str, ...] = ("tv", "television", "televisions")
+# Desktops joined it for the same reason: "Dell Inspiron 5420 All-in-One
+# 24'' IPS FHD, Core i5, 8GB, 512GB SSD" carries every laptop attribute
+# this engine scores -- CPU, memory, storage, screen size -- and none of
+# them tell it apart from a notebook. It was sitting in the laptops
+# listing. normalize() turns "all-in-one" into "all in one".
+UNSUPPORTED_CATEGORIES: tuple[str, ...] = (
+    "tv", "television", "televisions", "all in one", "desktop",
+)
 
 
 # --- Categories -------------------------------------------------------------
@@ -210,7 +217,11 @@ PHONES = CategoryRules(
             "model", "model", 33,
             Regex(patterns=(
                 r"\b(?P<line>iphone)\s*(?P<num>\d{1,2})",
-                r"\b(?P<line>galaxy)\s+(?P<series>note|[sazm])?\s*(?P<num>\d{1,3})",
+                # THE SERIES LETTER IS REQUIRED. Samsung phones are Galaxy
+                # S24, A15, M14, Z Flip, Note 20 -- never a bare "Galaxy 2".
+                # Optional, it matched "Super Mario Galaxy 2" and filed a
+                # Nintendo figurine under phones, complete with a model.
+                r"\b(?P<line>galaxy)\s+(?P<series>note|[sazmfj])\s*(?P<num>\d{1,3})",
                 # Two-word sub-lines MUST precede the single-word rule below.
                 # Regex returns the first pattern that matches, so a bare
                 # "redmi" rule placed first would swallow "Redmi Note 15" and
@@ -258,7 +269,13 @@ PHONES = CategoryRules(
         ),
         Attribute(
             "variant", "variant", 28,
-            Keyword(values=("pro max", "pro", "plus", "ultra", "mini", "fe", "max")),
+            Keyword(
+                # "pro plus" before "pro": Keyword takes the longest match,
+                # so both orders work, but the pair is what makes a Pro+
+                # distinct from a Pro. normalize() turns "Pro+" into
+                # "pro plus", which is also how stores spell it in words.
+                values=("pro plus", "pro max", "pro", "plus", "ultra", "mini", "fe", "max"),
+            ),
             default="base",  # a plain "iPhone 11" IS a variant, not a blank
         ),
         Attribute("storage", "storage", 24, STORAGE),

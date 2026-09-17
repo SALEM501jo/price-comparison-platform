@@ -46,8 +46,13 @@ class TestTelevisionsAreExcluded:
         One word per category we have decided not to carry -- a closed set that
         changes when the product scope does. Accessories are kept out by
         requires_any instead, which does not need extending forever.
+
+        It grew once, for desktops: an all-in-one carries every attribute this
+        engine scores on a laptop, so nothing but the words tells them apart.
         """
-        assert set(UNSUPPORTED_CATEGORIES) <= {"tv", "television", "televisions"}
+        assert set(UNSUPPORTED_CATEGORIES) <= {
+            "tv", "television", "televisions", "all in one", "desktop",
+        }
 
     def test_a_resolution_is_not_a_phone_model(self):
         """"Xiaomi 4K TV Stick" became phone model "xiaomi 4k" before this."""

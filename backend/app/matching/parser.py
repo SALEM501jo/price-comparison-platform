@@ -39,6 +39,12 @@ def normalize(text: str) -> str:
     with a space and split one word into three.
     """
     text = arabic.prepare(text.lower())
+    # "+" IS A WORD, not punctuation: it is the whole difference between a
+    # Redmi Note 15 Pro and a Redmi Note 15 Pro+, and between a Galaxy
+    # A56 and an A56+. Dropped with the rest of the punctuation, the two
+    # models parsed identically and a search for one offered the other as
+    # a match whose only stated difference was storage.
+    text = text.replace("+", " plus ")
     text = re.sub(r"[^\w\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 

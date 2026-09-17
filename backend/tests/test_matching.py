@@ -449,3 +449,62 @@ class TestJordanianCatalogueBrands:
     def test_phone_storage_keeps_no_floor(self):
         """32GB and 64GB handsets are real; the floor is a laptop rule only."""
         assert parse("Samsung A57 5G 64GB").get("storage") == "64gb"
+
+
+class TestThingsThatLookLikeProductsButAreNot:
+    """
+    All three were live on the site on 2026-09-18, found by the owner on his
+    phone rather than by a test.
+    """
+
+    def test_a_nintendo_figurine_is_not_a_phone(self):
+        """
+        "Amiibo Super Mario Galaxy + Super Mario Galaxy 2" was filed under
+        phones: "Galaxy 2" satisfied the Samsung model pattern, whose series
+        letter was optional. No Samsung phone is a bare "Galaxy <number>".
+        """
+        assert parse("Amiibo Super Mario Galaxy + Super Mario Galaxy 2 Mario & Luma").category is None
+
+    @pytest.mark.parametrize(
+        "title, model",
+        [
+            ("Samsung Galaxy S24 128GB Black", "galaxy s 24"),
+            ("Samsung Galaxy A15 5G 128GB Blue", "galaxy a 15"),
+            ("Samsung Galaxy Note 20 Ultra 256GB", "galaxy note 20"),
+        ],
+    )
+    def test_real_samsung_models_still_parse(self, title, model):
+        result = parse(title)
+        assert result.category == "phones"
+        assert result.attributes["model"] == model
+
+    def test_an_all_in_one_desktop_is_not_a_laptop(self):
+        """It carries every laptop attribute the engine scores: CPU, memory,
+        storage, screen size. It was sitting in the laptops listing."""
+        assert parse(
+            "Dell Inspiron 5420 All-in-One Pearl White 24'' IPS FHD, Core i5, 8GB, 512GB SSD"
+        ).category is None
+
+    def test_a_real_laptop_is_still_a_laptop(self):
+        assert parse("Lenovo V15 Intel Core I3-1315U, 8GB DDR5 & 512GB SSD, 15.6Inch").category == "laptops"
+
+
+class TestPlusIsPartOfTheName:
+    """
+    A search for the Redmi Note 15 Pro offered the Pro+ as a near match whose
+    only stated difference was storage: "+" was stripped as punctuation, so
+    both parsed as variant "pro".
+    """
+
+    def test_pro_plus_is_its_own_variant(self):
+        assert parse("Xiaomi Redmi Note 15 Pro+ 5G, 12GB & 512GB, 6.8Inch, Black").attributes[
+            "variant"
+        ] == "pro plus"
+
+    def test_the_plain_pro_is_unchanged(self):
+        assert parse("Redmi Note 15 Pro 5G 128GB Black").attributes["variant"] == "pro"
+
+    def test_the_two_are_not_the_same_product(self):
+        query = parse("Redmi Note 15 Pro 5G 128GB Black")
+        listing = parse("Xiaomi Redmi Note 15 Pro+ 5G, 12GB & 512GB, 6.8Inch, Black")
+        assert query.attributes["variant"] != listing.attributes["variant"]
