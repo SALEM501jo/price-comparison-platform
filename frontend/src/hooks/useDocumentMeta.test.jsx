@@ -202,6 +202,22 @@ describe('index.html', () => {
     }
   });
 
+  it('describes the organization as the About page does, and names its country', () => {
+    // How this site is told apart from the others that share its name --
+    // Google's AI summary once described a watch shop in Erbil instead. The
+    // structured data is read by crawlers that never run the app, so the
+    // sentence they get must be the one the About page shows.
+    const block = head.querySelector('script[type="application/ld+json"]');
+    const graph = JSON.parse(block.textContent)['@graph'];
+    const organization = graph.find((node) => node['@type'] === 'Organization');
+
+    expect(organization.description).toBe(
+      `${translations.ar['about.lead']} ${translations.en['about.lead']}`,
+    );
+    expect(organization.address).toEqual({ '@type': 'PostalAddress', addressCountry: 'JO' });
+    expect(organization.areaServed).toEqual({ '@type': 'Country', name: 'Jordan' });
+  });
+
   it('names the site in structured data in every spelling people type', () => {
     const block = head.querySelector('script[type="application/ld+json"]');
     const graph = JSON.parse(block.textContent)['@graph'];

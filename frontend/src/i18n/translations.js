@@ -626,9 +626,41 @@ const translations = {
     'footer.nav': 'روابط الموقع',
     'footer.notAShop':
       'نحن نقارن الأسعار فقط. لا نبيع شيئاً، ولا يتم أي شراء أو دفع على هذا الموقع.',
+    'footer.about': 'من نحن',
     'footer.privacy': 'الخصوصية',
     'footer.terms': 'الشروط',
     'footer.copyright': '© {year} احسن سعر',
+
+    // --- About (pages/About.jsx)
+    //
+    // THE PAGE AN AI ASSISTANT QUOTES when someone asks what this site is, so
+    // every sentence is a claim about the code, checked against it -- the
+    // standard the privacy policy sets. "Several times a day", not "every six
+    // hours": the interval is SCRAPE_INTERVAL_HOURS in deploy/.env, and a
+    // number here would quietly become false the day it is changed.
+    //
+    // about.lead is also the Organization description in index.html's
+    // structured data, and a test holds the two together.
+    'about.metaTitle': 'من نحن',
+    'about.title': 'عن احسن سعر',
+    'about.lead':
+      '«احسن سعر» (Ahsan Se3r) موقع أردني مجاني لمقارنة أسعار الهواتف واللابتوبات والشاشات بين المتاجر في الأردن.',
+    'about.how.title': 'كيف يعمل',
+    'about.how.sources':
+      'نقرأ الأسعار من المتاجر الإلكترونية في الأردن عدة مرات في اليوم، وتضيف المحلات التي لا تملك موقعاً أسعارها بنفسها. لا تظهر أسعار أي محل قبل أن نتأكد أنه محل حقيقي.',
+    'about.how.matching':
+      'اكتب المنتج كما تريده بالضبط، مثل «iPhone 15 128GB Black». تظهر أولاً المطابقة التامة، ثم المنتجات القريبة والمشابهة، ولكل منها سبب اختلافه عمّا طلبت.',
+    'about.how.used':
+      'تُعرض الأجهزة المستعملة منفصلة، ولا تُقارن أبداً على أنها نسخة أرخص من الجديدة.',
+    'about.buying.title': 'لا نبيع شيئاً',
+    'about.buying.p1':
+      'لا يتم أي شراء أو دفع على هذا الموقع. عندما تجد السعر المناسب، تشتري مباشرة من المتجر: من موقعه، أو بالاتصال به أو مراسلته على واتساب.',
+    'about.buying.p2': 'البحث والمقارنة لا يحتاجان إلى حساب.',
+    'about.shops.title': 'هل لديك محل؟',
+    'about.shops.p1':
+      'إذا كان لديك محل في الأردن يبيع هذه الأجهزة، يمكنك إنشاء حساب متجر وإضافة أسعارك، ليصل إليك الزبائن مباشرة بالاتصال أو على واتساب.',
+    'about.shops.link': 'إنشاء حساب متجر',
+    'about.contact': 'لديك سؤال أو ملاحظة؟ راسلنا.',
 
     // --- Legal pages: the furniture both of them share
     // The two blanks are deliberately loud. A privacy policy that ships with
@@ -1461,9 +1493,32 @@ const translations = {
     'footer.nav': 'Site links',
     'footer.notAShop':
       'We only compare prices. We sell nothing, and no purchase or payment happens on this site.',
+    'footer.about': 'About',
     'footer.privacy': 'Privacy',
     'footer.terms': 'Terms',
     'footer.copyright': '© {year} Ahsan Se3r',
+
+    // --- About (pages/About.jsx). See the note on the Arabic table.
+    'about.metaTitle': 'About us',
+    'about.title': 'About Ahsan Se3r',
+    'about.lead':
+      'Ahsan Se3r (احسن سعر) is a free Jordanian website that compares the prices of phones, laptops and monitors across shops in Jordan.',
+    'about.how.title': 'How it works',
+    'about.how.sources':
+      "We read prices from online shops in Jordan several times a day, and shops without a website add their own. No shop's prices appear until we have confirmed it is a real shop.",
+    'about.how.matching':
+      'Type the product exactly as you want it, such as “iPhone 15 128GB Black”. Exact matches come first, then close and similar products, each labelled with how it differs from what you asked for.',
+    'about.how.used':
+      'Used devices are listed separately and are never compared as a cheaper version of a new one.',
+    'about.buying.title': 'We sell nothing',
+    'about.buying.p1':
+      'No purchase or payment happens on this site. When you find the right price, you buy directly from the shop: on its website, or by calling it or messaging it on WhatsApp.',
+    'about.buying.p2': 'You do not need an account to search and compare.',
+    'about.shops.title': 'Do you have a shop?',
+    'about.shops.p1':
+      'If you run a shop in Jordan that sells these devices, you can create a shop account and add your prices, so customers reach you directly by phone or on WhatsApp.',
+    'about.shops.link': 'Create a shop account',
+    'about.contact': 'A question or a correction? Write to us.',
 
     // --- Legal pages: the furniture both of them share. The two blanks get a
     // panel of their own rather than a marker inside a sentence; see the

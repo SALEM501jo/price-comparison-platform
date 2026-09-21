@@ -27,6 +27,9 @@ describe('<Footer>', () => {
   it('points each link at the page it names', () => {
     show(<Footer />);
 
+    // The only link to the About page, which is the page an AI assistant
+    // quotes when asked what this site is.
+    expect(screen.getByRole('link', { name: 'About' })).toHaveAttribute('href', '/about');
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',
       '/privacy',
@@ -53,13 +56,13 @@ describe('<Footer>', () => {
     const { container } = show(<Footer />, { locale: 'ar' });
 
     expect(container.textContent).not.toMatch(/[A-Za-z]/);
-    expect(container.querySelectorAll('a')).toHaveLength(3);
+    expect(container.querySelectorAll('a')).toHaveLength(4);
   });
 
   it('keeps the same destinations in either language', () => {
     const { container } = show(<Footer />, { locale: 'ar' });
     const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/privacy', '/terms', '/contact']);
+    expect(hrefs).toEqual(['/about', '/privacy', '/terms', '/contact']);
   });
 });
 

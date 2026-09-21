@@ -185,6 +185,7 @@ class TestRobots:
             "/results?q=iphone+15",
             "/browse/phones",
             "/product/123",
+            "/about",
             "/privacy",
             "/terms",
             "/contact",
@@ -441,7 +442,7 @@ class TestSitemapDocument:
 
     def test_lists_the_fixed_pages_without_inventing_dates(self, client):
         found = urls(client.get("/sitemap.xml"))
-        for page in ("/", "/privacy", "/terms", "/contact"):
+        for page in ("/", "/about", "/privacy", "/terms", "/contact"):
             assert f"{BASE}{page}" in found
             assert found[f"{BASE}{page}"] is None, f"{page} has an invented lastmod"
 
@@ -569,12 +570,15 @@ class TestSitemapProducts:
             offer(db_session, shop, product)
         db_session.commit()
 
-        # 4 fixed pages + the phones category + room for two products.
-        monkeypatch.setattr(seo, "MAX_URLS", 7)
+        # The fixed pages + the phones category + room for two products.
+        # Counted from STATIC_PAGES rather than written as a number, so adding
+        # a fixed page does not silently change what this test measures.
+        cap = len(seo.STATIC_PAGES) + 1 + 2
+        monkeypatch.setattr(seo, "MAX_URLS", cap)
         with caplog.at_level("WARNING", logger="app.routers.seo"):
             found = urls(client.get("/sitemap.xml"))
 
-        assert len(found) == 7
+        assert len(found) == cap
         assert f"{BASE}/privacy" in found
         assert f"{BASE}/product/{products[0].id}" in found
         assert f"{BASE}/product/{products[1].id}" in found

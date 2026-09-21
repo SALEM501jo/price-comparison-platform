@@ -21,6 +21,7 @@ import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Contact from './pages/Contact';
+import About from './pages/About';
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import VerifyEmail from './pages/VerifyEmail';
@@ -64,6 +65,7 @@ function App() {
                   {/* Open to anyone: the people who most need support are the
                       ones who cannot sign in. */}
                   <Route path="/contact" element={<Contact />} />
+                  <Route path="/about" element={<About />} />
                   {/* Reachable without an account and without JavaScript
                       state: someone deciding whether to sign up at all is
                       exactly who reads these. */}

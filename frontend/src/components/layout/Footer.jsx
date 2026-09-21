@@ -21,7 +21,8 @@ import { useLocale } from '../../hooks/useLocale';
  *
  * QUIET ON PURPOSE. The navbar is where someone goes; this is where they look
  * when they want to know who is behind the site and whether it is selling
- * them something. Three links, one sentence, no calls to action.
+ * them something. Four links, one sentence, no calls to action. About comes
+ * first because it answers the first of those questions.
  */
 export default function Footer() {
   const { t } = useLocale();
@@ -45,6 +46,12 @@ export default function Footer() {
             aria-label={t('footer.nav')}
             className="flex flex-wrap items-center gap-x-6 gap-y-1"
           >
+            <Link
+              to="/about"
+              className="inline-flex min-h-11 items-center text-sm text-gray-600 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            >
+              {t('footer.about')}
+            </Link>
             <Link
               to="/privacy"
               className="inline-flex min-h-11 items-center text-sm text-gray-600 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"

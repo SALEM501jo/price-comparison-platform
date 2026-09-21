@@ -135,7 +135,20 @@
          The WebSite and the Organization point at each other by @id, so
          Google reads them as one entity rather than two that happen to share
          a name. No SearchAction: Google has retired the sitelinks search box
-         it used to feed. -->
+         it used to feed.
+
+         THE DESCRIPTION, ADDRESS AND AREA SERVED ARE FOR TELLING THIS SITE
+         APART FROM THE OTHERS WITH THE NAME. Asked about "Ahsan Se3r",
+         Google's AI summary described a watch shop in Erbil that shares it.
+         A country code and a sentence naming the job are what separate them,
+         and this block is read by every crawler, JavaScript or not. The
+         description is about.lead from translations.js in both languages,
+         and a test holds them together. Only the country is claimed: the
+         operator's identity is on /privacy, and a street address is not
+         something this site has to give.
+
+         sameAs belongs here too, once the site has its own social profiles:
+         it is how a search engine is told that those accounts are this site. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -155,7 +168,10 @@
             "name": "احسن سعر",
             "alternateName": ["أحسن سعر", "Ahsan Se3r", "AhsanSe3r"],
             "url": "https://ahsanse3r.com/",
-            "logo": "https://ahsanse3r.com/icon-512.png"
+            "logo": "https://ahsanse3r.com/icon-512.png",
+            "description": "«احسن سعر» (Ahsan Se3r) موقع أردني مجاني لمقارنة أسعار الهواتف واللابتوبات والشاشات بين المتاجر في الأردن. Ahsan Se3r (احسن سعر) is a free Jordanian website that compares the prices of phones, laptops and monitors across shops in Jordan.",
+            "address": { "@type": "PostalAddress", "addressCountry": "JO" },
+            "areaServed": { "@type": "Country", "name": "Jordan" }
           }
         ]
       }

@@ -68,7 +68,7 @@ MAX_URLS = 50_000
 # No lastmod: nothing records when their content last changed, and a date
 # made up here -- the deploy time, today -- would teach a crawler to stop
 # trusting the dates on the pages where it is real.
-STATIC_PAGES = ("/", "/privacy", "/terms", "/contact")
+STATIC_PAGES = ("/", "/about", "/privacy", "/terms", "/contact")
 
 # Pages a crawler has no business fetching.
 #
