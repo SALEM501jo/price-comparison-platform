@@ -351,6 +351,64 @@ class TestPaging:
                                 limit=10, offset=500) == []
 
 
+class TestSeededShuffle:
+    """
+    The front page shuffles by a per-visit seed so a returning visitor does
+    not meet the same twelve cheapest products every time -- while staying
+    STABLE within a visit so "show more" can page through it.
+    """
+
+    def test_no_seed_is_still_cheapest_first(self, catalogue_db):
+        """The default path is untouched: no seed means the old order."""
+        plain = catalogue.browse(catalogue_db, category="phones", limit=4)
+        prices = [row["lowest_total_cost"] for row in plain]
+        assert prices == sorted(prices)
+
+    def test_the_same_seed_gives_the_same_order(self, catalogue_db):
+        """Otherwise paging would re-roll and repeat or skip products."""
+        first = catalogue.browse(catalogue_db, limit=12, seed=42)
+        again = catalogue.browse(catalogue_db, limit=12, seed=42)
+        assert [r["id"] for r in first] == [r["id"] for r in again]
+
+    def test_a_seed_still_returns_the_whole_catalogue(self, catalogue_db):
+        """A shuffle reorders; it must not drop or invent products."""
+        plain = catalogue.browse(catalogue_db, limit=12)
+        shuffled = catalogue.browse(catalogue_db, limit=12, seed=7)
+        assert {r["id"] for r in plain} == {r["id"] for r in shuffled}
+
+    def test_some_seed_reorders_the_page(self, catalogue_db):
+        """At least one seed differs from cheapest-first, or it is not a shuffle."""
+        plain = [r["id"] for r in catalogue.browse(catalogue_db, limit=12)]
+        assert any(
+            [r["id"] for r in catalogue.browse(catalogue_db, limit=12, seed=s)] != plain
+            for s in range(20)
+        )
+
+    def test_the_mix_across_categories_survives_the_shuffle(self, catalogue_db):
+        """Shuffling within a category must not undo the round-robin."""
+        rows = catalogue.browse(catalogue_db, limit=9, seed=3)
+        assert {r["category"] for r in rows} == {"phones", "laptops", "monitors"}
+
+    def test_a_pictureless_product_still_sorts_last_when_seeded(self, catalogue_db):
+        shop = catalogue_db.query(Store).first()
+        blind = stock(catalogue_db, shop, name="Phone No Photo",
+                      category="phones", price=1, image=False)
+        catalogue_db.commit()
+
+        # Pulled across several seeds: the placeholder must never lead its
+        # category on any of them.
+        for s in range(10):
+            rows = catalogue.browse(catalogue_db, limit=12, seed=s)
+            phones = [r["id"] for r in rows if r["category"] == "phones"]
+            if blind.id in phones:
+                assert phones[-1] == blind.id
+
+    def test_seeded_pages_do_not_overlap(self, catalogue_db):
+        first = catalogue.browse(catalogue_db, limit=3, offset=0, seed=99)
+        second = catalogue.browse(catalogue_db, limit=3, offset=3, seed=99)
+        assert not {r["id"] for r in first} & {r["id"] for r in second}
+
+
 class TestPagingEndpoint:
     def test_it_reports_the_total_and_whether_more_remain(self, client, catalogue_db):
         body = client.get("/products/browse",

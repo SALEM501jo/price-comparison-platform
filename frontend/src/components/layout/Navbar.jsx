@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale } from '../../hooks/useLocale';
@@ -9,6 +10,15 @@ const linkClass = ({ isActive }) =>
     isActive
       ? 'font-semibold text-brand-700 dark:text-brand-400'
       : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+  }`;
+
+// The same links, laid out for the mobile drawer: full-width rows big enough
+// to tap, not the inline row the desktop bar uses.
+const mobileLinkClass = ({ isActive }) =>
+  `flex min-h-12 items-center rounded-lg px-3 text-base transition ${
+    isActive
+      ? 'bg-brand-50 font-semibold text-brand-700 dark:bg-gray-800 dark:text-brand-400'
+      : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'
   }`;
 
 const iconButton =
@@ -34,13 +44,34 @@ function MoonIcon() {
   );
 }
 
+function MenuIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path strokeLinecap="round" d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
 export default function Navbar() {
   const { user, isAuthenticated, isAdmin, isMerchant, logout, loading } = useAuth();
   const { t, locale, toggleLocale } = useLocale();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  // The mobile drawer. Below the `sm` breakpoint the links have no room in the
+  // bar, so they live here behind a toggle instead of vanishing.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
 
   const handleLogout = async () => {
+    closeMenu();
     await logout();
     // navigate() keeps this a single-page transition. window.location.href
     // reloads the whole app and throws away every bit of client state.
@@ -117,6 +148,19 @@ export default function Navbar() {
             {isDark ? <SunIcon /> : <MoonIcon />}
           </button>
 
+          {/* The hamburger — mobile only. It carries the links the bar hides
+              below `sm`: the account, the shop, admin, alerts, favourites and
+              contact. Without it those routes are unreachable on a phone. */}
+          <button
+            onClick={() => setMenuOpen((open) => !open)}
+            className={`${iconButton} sm:hidden`}
+            aria-label={menuOpen ? t('nav.closeMenu') : t('nav.menu')}
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+          >
+            {menuOpen ? <CloseIcon /> : <MenuIcon />}
+          </button>
+
           {/* While the refresh cookie is being exchanged, render neither
               state. Showing "Login" first makes the navbar flicker on every
               page load for users who are in fact signed in. */}
@@ -144,6 +188,52 @@ export default function Navbar() {
           )}
         </div>
       </div>
+
+      {/* The mobile drawer. `sm:hidden` so it never shows on desktop, where the
+          same links already sit in the bar. Every row closes it, so a tap both
+          navigates and dismisses. */}
+      {menuOpen && (
+        <div
+          id="mobile-menu"
+          className="space-y-1 border-t border-gray-200 px-3 py-2 sm:hidden dark:border-gray-800"
+        >
+          {isAuthenticated && (
+            <>
+              {/* The signed-in email, so it is clear whose account these
+                  links belong to — it is hidden in the bar until `lg`. */}
+              {user?.email && (
+                <p className="px-3 py-1 text-xs text-gray-500 dark:text-gray-400">
+                  {user.email}
+                </p>
+              )}
+              <NavLink to="/wishlist" className={mobileLinkClass} onClick={closeMenu}>
+                {t('nav.wishlist')}
+              </NavLink>
+              <NavLink to="/alerts" className={mobileLinkClass} onClick={closeMenu}>
+                {t('nav.alerts')}
+              </NavLink>
+              {isMerchant && (
+                <NavLink to="/merchant" className={mobileLinkClass} onClick={closeMenu}>
+                  {t('nav.myShop')}
+                </NavLink>
+              )}
+              {isAdmin && (
+                <NavLink to="/admin" className={mobileLinkClass} onClick={closeMenu}>
+                  {t('nav.admin')}
+                </NavLink>
+              )}
+              <NavLink to="/account" className={mobileLinkClass} onClick={closeMenu}>
+                {t('nav.account')}
+              </NavLink>
+            </>
+          )}
+          {/* Contact is here for everyone, signed in or not: on a phone the
+              bar hides it too, and someone locked out needs to reach us. */}
+          <NavLink to="/contact" className={mobileLinkClass} onClick={closeMenu}>
+            {t('nav.contact')}
+          </NavLink>
+        </div>
+      )}
     </nav>
   );
 }

@@ -21,6 +21,7 @@ is claimed.
 
 from __future__ import annotations
 
+import random
 import re
 
 from sqlalchemy import distinct, func
@@ -249,12 +250,35 @@ def _ranked(db: Session, category: str | None, limit: int, offset: int = 0):
     )
 
 
+def _shuffled(families: list[dict], seed: int, salt: int) -> list[dict]:
+    """
+    A per-visit ordering of one category's families.
+
+    Photographed products are shuffled by the seed; products WITHOUT a photo
+    are shuffled among themselves and kept LAST, so the front page never leads
+    with a placeholder tile -- the same rule `_ranked` enforces with its sort,
+    preserved here because a shuffle would otherwise scatter the five imageless
+    products into the first page.
+
+    `salt` offsets the seed per category so the three categories do not shuffle
+    in lockstep (which would pair the same phone, laptop and monitor together
+    on every visit that shared a seed).
+    """
+    rng = random.Random(seed + salt)
+    with_photo = [f for f in families if f["product"].image_url]
+    without = [f for f in families if not f["product"].image_url]
+    rng.shuffle(with_photo)
+    rng.shuffle(without)
+    return with_photo + without
+
+
 def browse(
     db: Session,
     *,
     category: str | None = None,
     limit: int = 12,
     offset: int = 0,
+    seed: int | None = None,
 ) -> list[dict]:
     """
     A sample of the catalogue: real products, with prices and pictures.
@@ -269,6 +293,13 @@ def browse(
 
     With a category named, plain cheapest-first is right -- somebody who asked
     for phones wants phones, in an order that means something.
+
+    WITH A `seed` AND NO CATEGORY, each category is shuffled by that seed
+    before interleaving, so the front page is a different sample every visit
+    instead of the same cheapest twelve. The order is STABLE for a given seed,
+    which is what lets "show more" page through it without repeating or
+    skipping -- the caller sends one seed per visit and reuses it across pages.
+    Cheapest-first is unchanged when no seed is passed.
 
     Bounded either way: at most one ranking query per category plus two
     lookups, and every one of them carries a LIMIT. Cost is a function of
@@ -291,6 +322,11 @@ def browse(
         # page 2. Each category is asked for enough rows to cover the window,
         # which stays bounded because the route caps limit and page.
         per_category = [_families(db, name) for name in BROWSABLE]
+        if seed is not None:
+            per_category = [
+                _shuffled(rows, seed, salt)
+                for salt, rows in enumerate(per_category)
+            ]
         longest = max((len(rows) for rows in per_category), default=0)
         families = [
             rows[i]

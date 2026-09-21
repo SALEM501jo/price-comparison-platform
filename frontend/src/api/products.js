@@ -69,7 +69,7 @@ export const getDeals = async (limit = 8, config = {}) => {
  * and monitors -- a single global sort by price returns nothing but monitors.
  */
 export const browseCatalogue = async (
-  { category, limit = 12, page } = {},
+  { category, limit = 12, page, seed } = {},
   config = {},
 ) => {
   const { data } = await api.get('/products/browse', {
@@ -77,6 +77,10 @@ export const browseCatalogue = async (
     params: {
       ...(category ? { category } : {}),
       ...(page && page > 1 ? { page } : {}),
+      // A per-visit seed: the home page sends one so the catalogue strip is
+      // shuffled differently each visit, and reuses it across "show more" so
+      // paging stays consistent. Omitted (deterministic, cached) otherwise.
+      ...(seed != null ? { seed } : {}),
       limit,
     },
   });

@@ -48,6 +48,12 @@ export default function Home() {
   const [browsePage, setBrowsePage] = useState(1);
   const [browseMore, setBrowseMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // A per-visit seed for the catalogue strip, so it is a different sample of
+  // the stock every time the page is opened or refreshed rather than the same
+  // twelve cheapest products. Fixed for the life of THIS mount, so "show more"
+  // pages through one consistent shuffle instead of re-rolling it. A fresh
+  // visit remounts Home and draws a new seed.
+  const [browseSeed] = useState(() => Math.floor(Math.random() * 2_000_000_000));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -58,7 +64,7 @@ export default function Home() {
     const load = async () => {
       const [dealsResult, browseResult] = await Promise.allSettled([
         getDeals(8, { signal: controller.signal }),
-        browseCatalogue({ limit: 12 }, { signal: controller.signal }),
+        browseCatalogue({ limit: 12, seed: browseSeed }, { signal: controller.signal }),
       ]);
 
       if (controller.signal.aborted) return;
@@ -78,13 +84,16 @@ export default function Home() {
 
     load();
     return () => controller.abort();
-  }, []);
+    // browseSeed is drawn once per mount and never changes, so this still
+    // runs exactly once -- it is listed only to satisfy the exhaustive-deps
+    // rule.
+  }, [browseSeed]);
 
   const showMore = async () => {
     const next = browsePage + 1;
     setLoadingMore(true);
     try {
-      const more = await browseCatalogue({ limit: 12, page: next });
+      const more = await browseCatalogue({ limit: 12, page: next, seed: browseSeed });
       setCatalogue((current) => ({
         ...current,
         products: [...current.products, ...more.products],

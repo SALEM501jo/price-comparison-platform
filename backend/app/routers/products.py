@@ -127,6 +127,7 @@ async def browse(
     category: Optional[str] = Query(None, max_length=50),
     limit: int = Query(12, ge=1, le=48),
     page: int = Query(1, ge=1, le=100),
+    seed: Optional[int] = Query(None, ge=0, le=2_000_000_000),
     db: Session = Depends(get_db),
     _: None = Depends(get_rate_limited),
 ):
@@ -147,15 +148,24 @@ async def browse(
     merchant edit invalidates it and nothing else has to.
     """
     version = await catalogue_version()
-    cache_key = f"browse:v2:{version}:{category or 'all'}:{limit}:{page}"
 
-    cached = await cached_json(cache_key)
-    if cached is not None:
-        return cached
+    # A seeded request is a per-VISIT shuffle of the front page (see
+    # catalogue.browse). It must NOT be cached: the cache is shared across
+    # every visitor and keyed on the catalogue version, so caching it would
+    # freeze one shuffle for everyone until the next scrape -- the opposite of
+    # what the seed is for. The un-seeded path (a named category, the SEO
+    # crawler, any deterministic caller) caches exactly as before.
+    cache_key = f"browse:v2:{version}:{category or 'all'}:{limit}:{page}"
+    if seed is None:
+        cached = await cached_json(cache_key)
+        if cached is not None:
+            return cached
 
     offset = (page - 1) * limit
     total = catalogue.total_in(db, category)
-    products = catalogue.browse(db, category=category, limit=limit, offset=offset)
+    products = catalogue.browse(
+        db, category=category, limit=limit, offset=offset, seed=seed
+    )
 
     payload = {
         "categories": catalogue.category_counts(db),
@@ -167,7 +177,8 @@ async def browse(
         # final page is not the same fact as "there is nothing after this".
         "has_more": offset + len(products) < total,
     }
-    await store_json(cache_key, payload)
+    if seed is None:
+        await store_json(cache_key, payload)
     return payload
 
 

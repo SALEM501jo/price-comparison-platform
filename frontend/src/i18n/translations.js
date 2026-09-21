@@ -37,6 +37,8 @@ const translations = {
     'nav.toggleLanguage': 'English',
     'nav.toggleTheme': 'الوضع الليلي',
     'nav.toggleThemeLight': 'الوضع النهاري',
+    'nav.menu': 'القائمة',
+    'nav.closeMenu': 'إغلاق القائمة',
 
     // --- What a browser tab and a search engine read (hooks/useDocumentMeta)
     //
@@ -923,6 +925,8 @@ const translations = {
     'nav.toggleLanguage': 'العربية',
     'nav.toggleTheme': 'Dark mode',
     'nav.toggleThemeLight': 'Light mode',
+    'nav.menu': 'Menu',
+    'nav.closeMenu': 'Close menu',
 
     // The Arabic name stays in the English site title: it is the name on the
     // logo, and the one a shopper who switched language will still recognise.
