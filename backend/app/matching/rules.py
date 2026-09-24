@@ -222,6 +222,24 @@ PHONES = CategoryRules(
                 # Optional, it matched "Super Mario Galaxy 2" and filed a
                 # Nintendo figurine under phones, complete with a model.
                 r"\b(?P<line>galaxy)\s+(?P<series>note|[sazmfj])\s*(?P<num>\d{1,3})",
+                # The SAME phones, written with the marque instead of the
+                # line: SmartBuy says "Samsung A57", others "Samsung Galaxy
+                # A57". Left to the brand-adjacent code rule below, this
+                # spelling came out as "samsung a57" against the Galaxy rule's
+                # "galaxy a 57" -- two models for one handset. A shopper
+                # typing "Samsung S24 Ultra" scored 67 against every Galaxy
+                # S24 Ultra, and two stores selling one phone never merged
+                # into one product. Same series letters and number as the
+                # Galaxy rule, with `rename` below writing the line as
+                # "galaxy", so both spellings reach one value -- the one
+                # Galaxy-named products already carry.
+                #
+                # Filler words are tolerated for the same reason as the code
+                # rule below ("Samsung Smart Phone A15"). "galaxy" is not
+                # among them: "Samsung Galaxy S24" is the Galaxy rule's, and
+                # "Samsung Galaxy Buds 3" must reach nobody's.
+                r"\b(?P<line>samsung)(?:\s+(?:smart|smartphones?|mobile|phones?)){0,3}"
+                r"\s+(?P<series>note|[sazmfj])\s*(?P<num>\d{1,3})",
                 # Two-word sub-lines MUST precede the single-word rule below.
                 # Regex returns the first pattern that matches, so a bare
                 # "redmi" rule placed first would swallow "Redmi Note 15" and
@@ -238,8 +256,8 @@ PHONES = CategoryRules(
                 # to nothing before this pattern existed.
                 r"\b(?P<line>spark|camon|pova|phantom|reno|blade|edge|narzo|nord"
                 r"|razr)\s*(?P<num>\d{1,3}[a-z]?)\b",
-                # Bare model codes after a brand: "Samsung A57", "Xiaomi 15T",
-                # "Honor X7e". Without this a large part of the real catalogue
+                # Bare model codes after a brand: "Xiaomi 15T", "Honor X7e",
+                # and any Samsung code the Galaxy series rules above miss. Without this a large part of the real catalogue
                 # has no model at all -- 90 genuine handsets went uncategorised
                 # the moment a model became a requirement.
                 #
@@ -265,7 +283,11 @@ PHONES = CategoryRules(
                 # both "5G" and "4K" fit the bare code shape, and without this
                 # "Xiaomi 4K TV Stick" became phone model "xiaomi 4k".
                 r"(?P<num>(?!\d+[gk]\b)(?:[a-z]{1,2}\d{1,4}[a-z]?|\d{1,4}[a-z]))\b",
-            )),
+            ),
+            # Samsung's phones ARE the Galaxy range; see the "samsung" rule
+            # above. Applies to every rule here, so a Samsung code only the
+            # generic rule reads ("Samsung W25") is filed under the same line.
+            rename={"samsung": "galaxy"}),
         ),
         Attribute(
             "variant", "variant", 28,

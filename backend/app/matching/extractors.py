@@ -50,15 +50,24 @@ class Regex:
     Every populated named group is joined with a single space, so
     r"(?P<line>iphone)\s*(?P<num>\d{1,2})" turns both "iPhone 15" and
     "iphone15" into the canonical value "iphone 15".
+
+    `rename` maps a captured word onto the one the canonical value uses, for
+    the case where two spellings of one product reach this extractor through
+    different words: stores write "Samsung A57" and "Galaxy A57" for the same
+    phone, and without {"samsung": "galaxy"} the two would be two models. It
+    applies to whole captured groups only, never to parts of one.
     """
 
     patterns: tuple[str, ...]
+    rename: dict[str, str] = field(default_factory=dict)
 
     def extract(self, text: str) -> str | None:
         for pattern in self.patterns:
             match = re.search(pattern, text)
             if match:
-                parts = [g for g in match.groupdict().values() if g]
+                parts = [
+                    self.rename.get(g, g) for g in match.groupdict().values() if g
+                ]
                 if parts:
                     return " ".join(parts)
         return None

@@ -189,7 +189,10 @@ class TestModelPatterns:
         "title,expected",
         [
             ("Honor X7e Plus 5G, 8GB & 256GB", "honor x7e"),
-            ("Samsung A57 5G, 8GB &a 256GB", "samsung a57"),
+            # "galaxy a 57", not "samsung a57": the same value a listing that
+            # says "Galaxy A57" gets, or the two are two models of one phone.
+            # See tests/test_samsung_models.py.
+            ("Samsung A57 5G, 8GB &a 256GB", "galaxy a 57"),
             ("Xiaomi 15T Pro 5G, 12GB & 1024GB", "xiaomi 15t"),
             ("Xiaomi Redmi A7 Pro 4G, 4GB & 64GB", "redmi a7"),
             ("Xiaomi Redmi 17 4G, 4GB & 128GB", "redmi 17"),
