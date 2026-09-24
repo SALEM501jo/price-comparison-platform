@@ -248,6 +248,7 @@ const translations = {
     'match.value.pro': 'برو',
     'match.value.pro_max': 'برو ماكس',
     'match.value.plus': 'بلس',
+    'match.value.pro_plus': 'برو بلس',
     'match.value.ultra': 'ألترا',
     'match.value.mini': 'ميني',
     'match.value.max': 'ماكس',
@@ -627,6 +628,7 @@ const translations = {
     'footer.notAShop':
       'نحن نقارن الأسعار فقط. لا نبيع شيئاً، ولا يتم أي شراء أو دفع على هذا الموقع.',
     'footer.about': 'من نحن',
+    'footer.lab': 'كيف نطابق',
     'footer.privacy': 'الخصوصية',
     'footer.terms': 'الشروط',
     'footer.copyright': '© {year} احسن سعر',
@@ -660,7 +662,134 @@ const translations = {
     'about.shops.p1':
       'إذا كان لديك محل في الأردن يبيع هذه الأجهزة، يمكنك إنشاء حساب متجر وإضافة أسعارك، ليصل إليك الزبائن مباشرة بالاتصال أو على واتساب.',
     'about.shops.link': 'إنشاء حساب متجر',
+    'about.how.lab': 'جرّبه بنفسك في مختبر المطابقة',
     'about.contact': 'لديك سؤال أو ملاحظة؟ راسلنا.',
+
+    // --- The Matching Lab (pages/Lab.jsx)
+    //
+    // Brand and product names stay Latin, as everywhere else on the site:
+    // "Pro+" and "Galaxy S24" are how they are written on a Jordanian shelf.
+    'lab.metaTitle': 'مختبر المطابقة',
+    'lab.title': 'مختبر المطابقة',
+    'lab.lead':
+      'اكتب بحثاً وأسماء المنتجات كما تكتبها المتاجر، وشاهد كيف يقرأ الموقع كل اسم — وكيف كان سيرتّبها «تشابه النصوص»، الطريقة المعتادة لمقارنة الأسماء.',
+    'lab.examples': 'أمثلة',
+    'lab.example.storage': 'حرف واحد، هاتف آخر',
+    'lab.example.arabic': 'البحث بالعربية',
+    'lab.example.case': 'الغطاء يحمل اسم الهاتف',
+    'lab.example.plus': 'Pro+ ليس Pro',
+    'lab.example.samsung': 'خطأ إملائي واسمان لهاتف واحد',
+    'lab.example.laptop': 'لابتوبات',
+    'lab.example.monitor': 'شاشات',
+    'lab.exampleNote.storage':
+      'المثال الذي بُني عليه الموقع: بين 128GB و256GB حرف واحد وهما هاتفان مختلفان، أما ترتيب الكلمات فتغيير كبير لا يغيّر شيئاً.',
+    'lab.exampleNote.arabic':
+      'تُوحَّد الإملاءات والأرقام العربية في الكلمات التي يقرؤها المحرك، و«Midnight» عند أبل هو اللون الأسود.',
+    'lab.exampleNote.case':
+      'الغطاء يكرّر اسم الهاتف حرفاً بحرف. تصنيف المتجر نفسه هو ما يقول إنه غطاء.',
+    'lab.exampleNote.plus':
+      'تكتب المتاجر الهاتف نفسه مع الماركة وبدونها، وعلامة «+» واحدة تفصل بين طرازين.',
+    'lab.exampleNote.samsung':
+      'يُصحَّح اسم الماركة المكتوب خطأً — ويُعرض التصحيح. و«Samsung S24» و«Galaxy S24» هاتف واحد.',
+    'lab.exampleNote.laptop':
+      'الفئات بيانات: اللابتوب يُقيَّم بالمعالج والتخزين والذاكرة، بأوزان خاصة به.',
+    'lab.exampleNote.monitor':
+      'حجم الشاشة ومعدل تحديثها أهم من الكلمات المشتركة مع البحث. والماركة شرط لا يُعوَّض.',
+    'lab.exampleNote.custom': 'مثالك الخاص. اضغط «اشرح» لترى كيف يُقرأ.',
+    'lab.form.query': 'البحث',
+    'lab.form.listings': 'المنتجات كما تسمّيها المتاجر',
+    'lab.form.categoryHint':
+      'تصنيف المتجر اختياري، مثل «Mobile» أو «Mobile Case»، ويُقرأ تماماً كما يقرؤه الموقع.',
+    'lab.form.title': 'المنتج {letter}',
+    'lab.form.category': 'تصنيف المتجر',
+    'lab.form.categoryLabel': 'تصنيف المتجر للمنتج {letter}',
+    'lab.form.remove': 'حذف المنتج {letter}',
+    'lab.form.add': 'إضافة منتج',
+    'lab.form.full': 'الحد الأقصى {max} منتجات',
+    'lab.form.submit': 'اشرح',
+    'lab.form.dirty': 'تغيّر المثال — اضغط «اشرح» لتحديث النتيجة.',
+    'lab.form.tooShort': 'اكتب {min} أحرف على الأقل في البحث.',
+    'lab.form.noListings': 'أضف منتجاً واحداً على الأقل.',
+    'lab.loading': 'جارٍ القراءة…',
+    'lab.error': 'تعذّر شرح هذا البحث. حاول بعد قليل.',
+    'lab.reading.title': 'كيف قُرئ البحث',
+    'lab.reading.stage.typed': 'ما كتبته',
+    'lab.reading.stage.spelling': 'بعد تصحيح الإملاء',
+    'lab.reading.stage.arabic': 'العربية بكلمات المحرك',
+    'lab.reading.stage.normalized': 'بعد التنظيف',
+    'lab.reading.correction': 'قُرئت «{typed}» على أنها «{corrected}».',
+    'lab.reading.understood': 'فُهم على أنه',
+    'lab.reading.unread':
+      'لا يذكر هذا البحث شيئاً يستطيع المحرك قراءته، فيبحث الموقع بالاسم فقط ولا يوجد ما يُقيَّم.',
+    'lab.rank.title': 'طريقتان لترتيب المنتجات نفسها',
+    'lab.rank.similarity': 'تشابه النصوص',
+    'lab.rank.similarityHint': 'كم حرفاً تشترك فيه الأسماء',
+    'lab.rank.engine': 'هذا الموقع',
+    'lab.rank.engineHint': 'أيّ المواصفات تتطابق',
+    'lab.rank.headline':
+      'يضع تشابه النصوص {worseLetter} «{worse}» فوق {betterLetter} «{better}»: {worseSimilarity} مقابل {betterSimilarity}. أما هذا الموقع فيعطيهما {worseScore} و{betterScore}، والسبب: {reason}.',
+    'lab.rank.headlineTie':
+      'لا يستطيع تشابه النصوص التمييز بين {worseLetter} «{worse}» و{betterLetter} «{better}»: كلاهما {betterSimilarity}. أما هذا الموقع فيعطيهما {worseScore} و{betterScore}، والسبب: {reason}.',
+    'lab.rank.headlineUnscored':
+      'يضع تشابه النصوص {worseLetter} «{worse}» فوق {betterLetter} «{better}»: {worseSimilarity} مقابل {betterSimilarity}. أما هذا الموقع فيعطي {betterLetter} {betterScore} ولا يقيّم {worseLetter} أصلاً: {reason}.',
+    'lab.rank.headlineTieUnscored':
+      'لا يستطيع تشابه النصوص التمييز بين {worseLetter} «{worse}» و{betterLetter} «{better}»: كلاهما {betterSimilarity}. أما هذا الموقع فيعطي {betterLetter} {betterScore} ولا يقيّم {worseLetter} أصلاً: {reason}.',
+    'lab.rank.agree': 'هنا تتفق الطريقتان على الترتيب، لكن واحدة منهما فقط تستطيع أن تقول لماذا.',
+    'lab.rank.pairs':
+      '{against} من {total} أزواج مرتّبة بعكس ترتيب الموقع، أو متعادلة حيث يرى الموقع فرقاً.',
+    'lab.short.gated': 'ماركة أخرى',
+    'lab.short.other_category': 'نوع آخر',
+    'lab.short.nothing_to_score': 'بلا درجة',
+    'lab.short.refused_by_store': 'مرفوض',
+    'lab.short.unrecognised': 'غير مقروء',
+    'lab.short.query_unread': 'بلا درجة',
+    'lab.reason.refused_by_store': 'المتجر يصنّفه تحت «{category}»، وهي ليست فئة يعرضها الموقع',
+    'lab.reason.other_category': 'إنه نوع آخر من المنتجات',
+    'lab.reason.nothing_to_score': 'البحث يذكر الماركة فقط',
+    'lab.reason.unrecognised': 'ليس هاتفاً أو لابتوب أو شاشة يستطيع المحرك قراءتها',
+    'lab.reason.query_unread': 'البحث لا يذكر شيئاً يستطيع المحرك قراءته',
+    'lab.outcome.gated': 'الماركة شرط: {reason}. يُستبعد مهما تطابق غيرها.',
+    'lab.outcome.refused_by_store':
+      'يصنّفه المتجر تحت «{category}». آخر كلمة في تصنيف المتجر تقول ما هو الشيء، وهذا ليس هاتفاً أو لابتوب أو شاشة — فلا يدخل الكتالوج مهما قال عنوانه.',
+    'lab.outcome.other_category':
+      'قُرئ على أنه من فئة {found} والبحث عن {wanted}. لا يُقارَن نوعان مختلفان من المنتجات أبداً.',
+    'lab.outcome.nothing_to_score':
+      'البحث يذكر الماركة فقط، فلا يوجد ما يُقيَّم. في الموقع تظهر منتجات كهذه دون ترتيب كمطابقة بالاسم.',
+    'lab.outcome.unrecognised':
+      'لم يُتعرَّف عليه كهاتف أو لابتوب أو شاشة، فلن يدخل الكتالوج.',
+    'lab.outcome.query_unread': 'البحث لا يذكر شيئاً يستطيع المحرك قراءته، فلا يُقيَّم هذا المنتج.',
+    'lab.listSeparator': '، ',
+    'lab.tier.exact': 'تطابق تام',
+    'lab.tier.close': 'قريب جداً',
+    'lab.tier.similar': 'مشابه',
+    'lab.tier.excluded': 'لا يظهر',
+    'lab.cards.title': 'الدرجات بالتفصيل',
+    'lab.weights.lead':
+      '{category}: يبدأ كل منتج من 100، ويخسر وزن كل مواصفة طلبها البحث ولم يجدها. المواصفة التي لم يذكرها البحث لا تكلّف شيئاً.',
+    'lab.weights.barLabel': 'أوزان المواصفات، ومجموعها 100',
+    'lab.weights.gate':
+      'لا تُحسب بالنقاط لأنها شرط: {attributes}. إذا اختلفت يُستبعد المنتج مهما تطابق غيرها.',
+    'lab.legend.kept': 'تطابقت — تبقى النقاط',
+    'lab.legend.lost': 'اختلفت — يُخصم وزنها',
+    'lab.legend.unasked': 'ليست في البحث — لا تكلّف شيئاً',
+    'lab.ladder':
+      'الفئات: 100 تطابق تام · من 85 قريب جداً · من 70 مشابه · وما دون 70 لا يظهر في البحث.',
+    'lab.bar.label': 'الدرجة {score} من 100',
+    'lab.bar.keptTitle': '{name}: {value} — تبقى {weight} نقطة',
+    'lab.bar.lostTitle': '{name}: {found} بدل {wanted} — تُخصم {weight} نقطة',
+    'lab.bar.unaskedTitle': '{name}: ليست في البحث، لا تكلّف شيئاً',
+    'lab.bar.notStated': 'غير مذكور',
+    'lab.card.storeCategory': 'تصنيف المتجر:',
+    'lab.card.read': 'قُرئ على أنه',
+    'lab.card.allKept': 'كل ما طلبه البحث موجود.',
+    'lab.card.unasked': 'ليست في البحث، فلا تكلّف شيئاً: {attributes}',
+    'lab.card.ranks':
+      'تشابه النصوص {similarity}، المرتبة {similarityRank} من {total} هناك، و{engineRank} هنا.',
+    'lab.honest':
+      'لا شيء في هذه الصفحة محاكاة: يُرسَل نصك إلى الشيفرة نفسها التي يشغّلها البحث، ولا يُحفظ شيء.',
+    'lab.similarityExplained':
+      'يحصل تشابه النصوص هنا على النص المنظَّف نفسه الذي يقرؤه المحرك — أحرف صغيرة، دون علامات ترقيم، والعربية موحّدة — فالفرق الوحيد بين العمودين هو طريقة الترتيب.',
+    'lab.aboutLink': 'عن احسن سعر',
 
     // --- Legal pages: the furniture both of them share
     // The two blanks are deliberately loud. A privacy policy that ships with
@@ -1136,6 +1265,7 @@ const translations = {
     'match.value.pro': 'Pro',
     'match.value.pro_max': 'Pro Max',
     'match.value.plus': 'Plus',
+    'match.value.pro_plus': 'Pro+',
     'match.value.ultra': 'Ultra',
     'match.value.mini': 'Mini',
     'match.value.max': 'Max',
@@ -1494,6 +1624,7 @@ const translations = {
     'footer.notAShop':
       'We only compare prices. We sell nothing, and no purchase or payment happens on this site.',
     'footer.about': 'About',
+    'footer.lab': 'How matching works',
     'footer.privacy': 'Privacy',
     'footer.terms': 'Terms',
     'footer.copyright': '© {year} Ahsan Se3r',
@@ -1518,7 +1649,131 @@ const translations = {
     'about.shops.p1':
       'If you run a shop in Jordan that sells these devices, you can create a shop account and add your prices, so customers reach you directly by phone or on WhatsApp.',
     'about.shops.link': 'Create a shop account',
+    'about.how.lab': 'Try it yourself in the Matching Lab',
     'about.contact': 'A question or a correction? Write to us.',
+
+    // --- The Matching Lab (pages/Lab.jsx)
+    'lab.metaTitle': 'Matching Lab',
+    'lab.title': 'Matching Lab',
+    'lab.lead':
+      'Type a search and the names stores give their products. See how this site reads each one — and how string similarity, the usual way to compare names, would rank them instead.',
+    'lab.examples': 'Examples',
+    'lab.example.storage': 'One character, another phone',
+    'lab.example.arabic': 'Searching in Arabic',
+    'lab.example.case': 'A case names its phone',
+    'lab.example.plus': 'Pro+ is not Pro',
+    'lab.example.samsung': 'A typo, two spellings',
+    'lab.example.laptop': 'Laptops',
+    'lab.example.monitor': 'Monitors',
+    'lab.exampleNote.storage':
+      'The example this site was built on: 128GB and 256GB are one character apart and are different phones, while word order is a large edit that changes nothing.',
+    'lab.exampleNote.arabic':
+      'Arabic spellings and digits are folded into the words the engine reads, and Apple’s “Midnight” is its black.',
+    'lab.exampleNote.case':
+      'A case repeats its phone’s name word for word. The store’s own category is what says it is a case.',
+    'lab.exampleNote.plus':
+      'Stores write the same phone with and without its brand, and one “+” separates two models.',
+    'lab.exampleNote.samsung':
+      'A misspelt brand is corrected — and the correction is shown. “Samsung S24” and “Galaxy S24” are the same phone.',
+    'lab.exampleNote.laptop':
+      'Categories are data: a laptop is scored on processor, storage and memory, with weights of its own.',
+    'lab.exampleNote.monitor':
+      'A monitor’s size and refresh rate outweigh the words it shares with the search. Brand is a gate.',
+    'lab.exampleNote.custom': 'Your own example. Press Explain to see how it reads.',
+    'lab.form.query': 'Search',
+    'lab.form.listings': 'Listings, as stores name them',
+    'lab.form.categoryHint':
+      'The store category is optional — “Mobile” or “Mobile Case”, say — and is read exactly as the site reads it.',
+    'lab.form.title': 'Listing {letter}',
+    'lab.form.category': 'Store category',
+    'lab.form.categoryLabel': 'Store category for listing {letter}',
+    'lab.form.remove': 'Remove listing {letter}',
+    'lab.form.add': 'Add a listing',
+    'lab.form.full': 'Up to {max} listings',
+    'lab.form.submit': 'Explain',
+    'lab.form.dirty': 'Edited — press Explain to update.',
+    'lab.form.tooShort': 'Type at least {min} characters to search.',
+    'lab.form.noListings': 'Add at least one listing.',
+    'lab.loading': 'Reading…',
+    'lab.error': 'Could not explain this search. Try again in a moment.',
+    'lab.reading.title': 'How the search was read',
+    'lab.reading.stage.typed': 'You typed',
+    'lab.reading.stage.spelling': 'Spelling corrected',
+    'lab.reading.stage.arabic': 'Arabic, in the engine’s words',
+    'lab.reading.stage.normalized': 'Cleaned up',
+    'lab.reading.correction': 'Read “{typed}” as “{corrected}”.',
+    'lab.reading.understood': 'Understood as',
+    'lab.reading.unread':
+      'This search names nothing the engine can read, so the site falls back to searching names and there is nothing to score.',
+    'lab.rank.title': 'Two ways to rank the same listings',
+    'lab.rank.similarity': 'String similarity',
+    'lab.rank.similarityHint': 'How many characters the names share',
+    'lab.rank.engine': 'This site',
+    'lab.rank.engineHint': 'Which attributes agree',
+    'lab.rank.headline':
+      'String similarity ranks {worseLetter} “{worse}” above {betterLetter} “{better}”, {worseSimilarity} to {betterSimilarity}. This site scores them {worseScore} and {betterScore}: {reason}.',
+    'lab.rank.headlineTie':
+      'String similarity cannot tell {worseLetter} “{worse}” from {betterLetter} “{better}”: both score {betterSimilarity}. This site scores them {worseScore} and {betterScore}: {reason}.',
+    'lab.rank.headlineUnscored':
+      'String similarity ranks {worseLetter} “{worse}” above {betterLetter} “{better}”, {worseSimilarity} to {betterSimilarity}. This site gives {betterLetter} {betterScore} and does not score {worseLetter} at all: {reason}.',
+    'lab.rank.headlineTieUnscored':
+      'String similarity cannot tell {worseLetter} “{worse}” from {betterLetter} “{better}”: both score {betterSimilarity}. This site gives {betterLetter} {betterScore} and does not score {worseLetter} at all: {reason}.',
+    'lab.rank.agree': 'Here the two methods agree on the order. Only one of them can say why.',
+    'lab.rank.pairs':
+      '{against} of {total} pairs in the opposite order, or tied where this site sees a difference.',
+    'lab.short.gated': 'other brand',
+    'lab.short.other_category': 'other kind',
+    'lab.short.nothing_to_score': 'unscored',
+    'lab.short.refused_by_store': 'turned away',
+    'lab.short.unrecognised': 'unreadable',
+    'lab.short.query_unread': 'unscored',
+    'lab.reason.refused_by_store': 'the store files it under “{category}”, which this site does not carry',
+    'lab.reason.other_category': 'it is a different kind of product',
+    'lab.reason.nothing_to_score': 'the search names only a brand',
+    'lab.reason.unrecognised': 'it is not a phone, laptop or monitor the engine can read',
+    'lab.reason.query_unread': 'the search names nothing the engine can read',
+    'lab.outcome.gated': 'Brand is a gate: {reason}. Excluded, however much else agrees.',
+    'lab.outcome.refused_by_store':
+      'The store files this under “{category}”. The last word of a store’s label says what the thing is, and this is not a phone, laptop or monitor — so it never enters the catalogue, whatever its title says.',
+    'lab.outcome.other_category':
+      'Read as {found}, and the search is for {wanted}. Different kinds of product are never compared.',
+    'lab.outcome.nothing_to_score':
+      'The search names only a brand, so there is nothing to score. On the site, listings like this appear unranked, as name matches.',
+    'lab.outcome.unrecognised':
+      'Not recognised as a phone, laptop or monitor, so it would never enter the catalogue.',
+    'lab.outcome.query_unread': 'The search names nothing the engine can read, so this is not scored.',
+    'lab.listSeparator': '; ',
+    'lab.tier.exact': 'Exact',
+    'lab.tier.close': 'Close',
+    'lab.tier.similar': 'Similar',
+    'lab.tier.excluded': 'Not shown',
+    'lab.cards.title': 'Score by score',
+    'lab.weights.lead':
+      '{category}: every listing starts at 100 and loses the weight of each attribute the search asked for and did not get. An attribute the search did not mention costs nothing.',
+    'lab.weights.barLabel': 'Attribute weights, adding up to 100',
+    'lab.weights.gate':
+      'Not scored, because it is a gate: {attributes}. If it differs, the listing is excluded however much else agrees.',
+    'lab.legend.kept': 'Matched — points kept',
+    'lab.legend.lost': 'Differs — weight lost',
+    'lab.legend.unasked': 'Not in the search — costs nothing',
+    'lab.ladder':
+      'Tiers: 100 exact · 85 and up close · 70 and up similar · below 70 not shown in search.',
+    'lab.bar.label': 'Score {score} out of 100',
+    'lab.bar.keptTitle': '{name}: {value} — {weight} points kept',
+    'lab.bar.lostTitle': '{name}: {found}, not {wanted} — {weight} points lost',
+    'lab.bar.unaskedTitle': '{name}: not in the search, costs nothing',
+    'lab.bar.notStated': 'not stated',
+    'lab.card.storeCategory': 'Store category:',
+    'lab.card.read': 'Read as',
+    'lab.card.allKept': 'Everything the search asked for is here.',
+    'lab.card.unasked': 'Not in the search, so free: {attributes}',
+    'lab.card.ranks':
+      'String similarity {similarity}, ranked {similarityRank} of {total} there and {engineRank} here.',
+    'lab.honest':
+      'Nothing on this page is a simulation. Your text goes to the same code the search runs, and nothing is saved.',
+    'lab.similarityExplained':
+      'String similarity is given the same cleaned-up text the engine reads — lowercase, punctuation removed, Arabic folded — so the only difference between the two columns is how they rank.',
+    'lab.aboutLink': 'About Ahsan Se3r',
 
     // --- Legal pages: the furniture both of them share. The two blanks get a
     // panel of their own rather than a marker inside a sentence; see the

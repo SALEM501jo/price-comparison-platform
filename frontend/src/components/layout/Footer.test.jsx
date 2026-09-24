@@ -56,13 +56,13 @@ describe('<Footer>', () => {
     const { container } = show(<Footer />, { locale: 'ar' });
 
     expect(container.textContent).not.toMatch(/[A-Za-z]/);
-    expect(container.querySelectorAll('a')).toHaveLength(4);
+    expect(container.querySelectorAll('a')).toHaveLength(5);
   });
 
   it('keeps the same destinations in either language', () => {
     const { container } = show(<Footer />, { locale: 'ar' });
     const hrefs = [...container.querySelectorAll('a')].map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/about', '/privacy', '/terms', '/contact']);
+    expect(hrefs).toEqual(['/about', '/lab', '/privacy', '/terms', '/contact']);
   });
 });
 

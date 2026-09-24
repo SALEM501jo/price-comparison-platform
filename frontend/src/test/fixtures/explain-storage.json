@@ -1,0 +1,431 @@
+{
+  "request": {
+    "query": "iPhone 11 Pro Black 128GB",
+    "listings": [
+      {
+        "title": "Apple iPhone 11 Pro 128GB Black",
+        "store_category": "Mobile"
+      },
+      {
+        "title": "iPhone 11 Pro Black 128GB Smartphone 5G",
+        "store_category": "Mobile"
+      },
+      {
+        "title": "Apple iPhone 11 Pro 128GB Midnight Green",
+        "store_category": "Mobile"
+      },
+      {
+        "title": "Apple iPhone 11 Pro 256GB Black",
+        "store_category": "Mobile"
+      },
+      {
+        "title": "Apple iPhone 11 Pro Max 128GB Black",
+        "store_category": "Mobile"
+      },
+      {
+        "title": "Apple iPhone 12 Pro 128GB Black",
+        "store_category": "Mobile"
+      },
+      {
+        "title": "Samsung Galaxy S24 128GB Black",
+        "store_category": "Mobile"
+      }
+    ]
+  },
+  "response": {
+    "query": {
+      "query": "iPhone 11 Pro Black 128GB",
+      "steps": [
+        {
+          "stage": "typed",
+          "text": "iPhone 11 Pro Black 128GB"
+        },
+        {
+          "stage": "normalized",
+          "text": "iphone 11 pro black 128gb"
+        }
+      ],
+      "corrected_query": null,
+      "corrections": {},
+      "category": "phones",
+      "attributes": {
+        "brand": "apple",
+        "model": "iphone 11",
+        "variant": "pro",
+        "storage": "128gb",
+        "color": "black"
+      },
+      "weights": [
+        {
+          "attribute": "brand",
+          "label": "brand",
+          "weight": 0,
+          "gate": true
+        },
+        {
+          "attribute": "model",
+          "label": "model",
+          "weight": 33,
+          "gate": false
+        },
+        {
+          "attribute": "variant",
+          "label": "variant",
+          "weight": 28,
+          "gate": false
+        },
+        {
+          "attribute": "storage",
+          "label": "storage",
+          "weight": 24,
+          "gate": false
+        },
+        {
+          "attribute": "ram",
+          "label": "memory",
+          "weight": 5,
+          "gate": false
+        },
+        {
+          "attribute": "color",
+          "label": "colour",
+          "weight": 10,
+          "gate": false
+        }
+      ]
+    },
+    "listings": [
+      {
+        "title": "Apple iPhone 11 Pro 128GB Black",
+        "store_category": "Mobile",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 11",
+          "variant": "pro",
+          "storage": "128gb",
+          "color": "black"
+        },
+        "outcome": "scored",
+        "score": 100.0,
+        "tier": "exact",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 11",
+            "candidate_value": "iphone 11",
+            "matched": true
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro",
+            "matched": true
+          },
+          {
+            "attribute": "storage",
+            "label": "storage",
+            "weight": 24,
+            "query_value": "128gb",
+            "candidate_value": "128gb",
+            "matched": true
+          },
+          {
+            "attribute": "color",
+            "label": "colour",
+            "weight": 10,
+            "query_value": "black",
+            "candidate_value": "black",
+            "matched": true
+          }
+        ],
+        "gate": null,
+        "string_similarity": 67.9
+      },
+      {
+        "title": "iPhone 11 Pro Black 128GB Smartphone 5G",
+        "store_category": "Mobile",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 11",
+          "variant": "pro",
+          "storage": "128gb",
+          "color": "black"
+        },
+        "outcome": "scored",
+        "score": 100.0,
+        "tier": "exact",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 11",
+            "candidate_value": "iphone 11",
+            "matched": true
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro",
+            "matched": true
+          },
+          {
+            "attribute": "storage",
+            "label": "storage",
+            "weight": 24,
+            "query_value": "128gb",
+            "candidate_value": "128gb",
+            "matched": true
+          },
+          {
+            "attribute": "color",
+            "label": "colour",
+            "weight": 10,
+            "query_value": "black",
+            "candidate_value": "black",
+            "matched": true
+          }
+        ],
+        "gate": null,
+        "string_similarity": 78.1
+      },
+      {
+        "title": "Apple iPhone 11 Pro 128GB Midnight Green",
+        "store_category": "Mobile",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 11",
+          "variant": "pro",
+          "storage": "128gb",
+          "color": "midnight green"
+        },
+        "outcome": "scored",
+        "score": 90.0,
+        "tier": "close",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 11",
+            "candidate_value": "iphone 11",
+            "matched": true
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro",
+            "matched": true
+          },
+          {
+            "attribute": "storage",
+            "label": "storage",
+            "weight": 24,
+            "query_value": "128gb",
+            "candidate_value": "128gb",
+            "matched": true
+          },
+          {
+            "attribute": "color",
+            "label": "colour",
+            "weight": 10,
+            "query_value": "black",
+            "candidate_value": "midnight green",
+            "matched": false
+          }
+        ],
+        "gate": null,
+        "string_similarity": 58.5
+      },
+      {
+        "title": "Apple iPhone 11 Pro 256GB Black",
+        "store_category": "Mobile",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 11",
+          "variant": "pro",
+          "storage": "256gb",
+          "color": "black"
+        },
+        "outcome": "scored",
+        "score": 76.0,
+        "tier": "similar",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 11",
+            "candidate_value": "iphone 11",
+            "matched": true
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro",
+            "matched": true
+          },
+          {
+            "attribute": "storage",
+            "label": "storage",
+            "weight": 24,
+            "query_value": "128gb",
+            "candidate_value": "256gb",
+            "matched": false
+          },
+          {
+            "attribute": "color",
+            "label": "colour",
+            "weight": 10,
+            "query_value": "black",
+            "candidate_value": "black",
+            "matched": true
+          }
+        ],
+        "gate": null,
+        "string_similarity": 67.9
+      },
+      {
+        "title": "Apple iPhone 11 Pro Max 128GB Black",
+        "store_category": "Mobile",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 11",
+          "variant": "pro max",
+          "storage": "128gb",
+          "color": "black"
+        },
+        "outcome": "scored",
+        "score": 72.0,
+        "tier": "similar",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 11",
+            "candidate_value": "iphone 11",
+            "matched": true
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro max",
+            "matched": false
+          },
+          {
+            "attribute": "storage",
+            "label": "storage",
+            "weight": 24,
+            "query_value": "128gb",
+            "candidate_value": "128gb",
+            "matched": true
+          },
+          {
+            "attribute": "color",
+            "label": "colour",
+            "weight": 10,
+            "query_value": "black",
+            "candidate_value": "black",
+            "matched": true
+          }
+        ],
+        "gate": null,
+        "string_similarity": 70.0
+      },
+      {
+        "title": "Apple iPhone 12 Pro 128GB Black",
+        "store_category": "Mobile",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 12",
+          "variant": "pro",
+          "storage": "128gb",
+          "color": "black"
+        },
+        "outcome": "scored",
+        "score": 67.0,
+        "tier": "excluded",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 11",
+            "candidate_value": "iphone 12",
+            "matched": false
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro",
+            "matched": true
+          },
+          {
+            "attribute": "storage",
+            "label": "storage",
+            "weight": 24,
+            "query_value": "128gb",
+            "candidate_value": "128gb",
+            "matched": true
+          },
+          {
+            "attribute": "color",
+            "label": "colour",
+            "weight": 10,
+            "query_value": "black",
+            "candidate_value": "black",
+            "matched": true
+          }
+        ],
+        "gate": null,
+        "string_similarity": 64.3
+      },
+      {
+        "title": "Samsung Galaxy S24 128GB Black",
+        "store_category": "Mobile",
+        "category": "phones",
+        "attributes": {
+          "brand": "samsung",
+          "model": "galaxy s 24",
+          "variant": "base",
+          "storage": "128gb",
+          "color": "black"
+        },
+        "outcome": "gated",
+        "score": 0.0,
+        "tier": "excluded",
+        "comparisons": [],
+        "gate": {
+          "attribute": "brand",
+          "label": "brand",
+          "weight": 0,
+          "query_value": "apple",
+          "candidate_value": "samsung",
+          "matched": false
+        },
+        "string_similarity": 36.4
+      }
+    ]
+  }
+}

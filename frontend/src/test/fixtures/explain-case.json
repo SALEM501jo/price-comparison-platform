@@ -1,0 +1,180 @@
+{
+  "request": {
+    "query": "iPhone 15 Pro",
+    "listings": [
+      {
+        "title": "IPHONE 15 PRO CASE",
+        "store_category": "Mobile Case"
+      },
+      {
+        "title": "iPhone 15 Pro Tempered Glass Screen Protector",
+        "store_category": "Screen Protectors"
+      },
+      {
+        "title": "Apple iPhone 15 Pro 256GB Natural Titanium",
+        "store_category": "iPhone 15"
+      },
+      {
+        "title": "Apple iPhone 15 Pro Max 256GB Natural Titanium",
+        "store_category": "iPhone 15"
+      }
+    ]
+  },
+  "response": {
+    "query": {
+      "query": "iPhone 15 Pro",
+      "steps": [
+        {
+          "stage": "typed",
+          "text": "iPhone 15 Pro"
+        },
+        {
+          "stage": "normalized",
+          "text": "iphone 15 pro"
+        }
+      ],
+      "corrected_query": null,
+      "corrections": {},
+      "category": "phones",
+      "attributes": {
+        "brand": "apple",
+        "model": "iphone 15",
+        "variant": "pro"
+      },
+      "weights": [
+        {
+          "attribute": "brand",
+          "label": "brand",
+          "weight": 0,
+          "gate": true
+        },
+        {
+          "attribute": "model",
+          "label": "model",
+          "weight": 33,
+          "gate": false
+        },
+        {
+          "attribute": "variant",
+          "label": "variant",
+          "weight": 28,
+          "gate": false
+        },
+        {
+          "attribute": "storage",
+          "label": "storage",
+          "weight": 24,
+          "gate": false
+        },
+        {
+          "attribute": "ram",
+          "label": "memory",
+          "weight": 5,
+          "gate": false
+        },
+        {
+          "attribute": "color",
+          "label": "colour",
+          "weight": 10,
+          "gate": false
+        }
+      ]
+    },
+    "listings": [
+      {
+        "title": "IPHONE 15 PRO CASE",
+        "store_category": "Mobile Case",
+        "category": null,
+        "attributes": {},
+        "outcome": "refused_by_store",
+        "score": 0.0,
+        "tier": "excluded",
+        "comparisons": [],
+        "gate": null,
+        "string_similarity": 83.9
+      },
+      {
+        "title": "iPhone 15 Pro Tempered Glass Screen Protector",
+        "store_category": "Screen Protectors",
+        "category": null,
+        "attributes": {},
+        "outcome": "refused_by_store",
+        "score": 0.0,
+        "tier": "excluded",
+        "comparisons": [],
+        "gate": null,
+        "string_similarity": 44.8
+      },
+      {
+        "title": "Apple iPhone 15 Pro 256GB Natural Titanium",
+        "store_category": "iPhone 15",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 15",
+          "variant": "pro",
+          "storage": "256gb",
+          "color": "natural titanium"
+        },
+        "outcome": "scored",
+        "score": 100.0,
+        "tier": "exact",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 15",
+            "candidate_value": "iphone 15",
+            "matched": true
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro",
+            "matched": true
+          }
+        ],
+        "gate": null,
+        "string_similarity": 47.3
+      },
+      {
+        "title": "Apple iPhone 15 Pro Max 256GB Natural Titanium",
+        "store_category": "iPhone 15",
+        "category": "phones",
+        "attributes": {
+          "brand": "apple",
+          "model": "iphone 15",
+          "variant": "pro max",
+          "storage": "256gb",
+          "color": "natural titanium"
+        },
+        "outcome": "scored",
+        "score": 72.0,
+        "tier": "similar",
+        "comparisons": [
+          {
+            "attribute": "model",
+            "label": "model",
+            "weight": 33,
+            "query_value": "iphone 15",
+            "candidate_value": "iphone 15",
+            "matched": true
+          },
+          {
+            "attribute": "variant",
+            "label": "variant",
+            "weight": 28,
+            "query_value": "pro",
+            "candidate_value": "pro max",
+            "matched": false
+          }
+        ],
+        "gate": null,
+        "string_similarity": 44.1
+      }
+    ]
+  }
+}

@@ -21,8 +21,9 @@ import { useLocale } from '../../hooks/useLocale';
  *
  * QUIET ON PURPOSE. The navbar is where someone goes; this is where they look
  * when they want to know who is behind the site and whether it is selling
- * them something. Four links, one sentence, no calls to action. About comes
- * first because it answers the first of those questions.
+ * them something. Five links, one sentence, no calls to action. About comes
+ * first because it answers the first of those questions; the Matching Lab
+ * follows it because it answers the second -- how.
  */
 export default function Footer() {
   const { t } = useLocale();
@@ -51,6 +52,12 @@ export default function Footer() {
               className="inline-flex min-h-11 items-center text-sm text-gray-600 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
             >
               {t('footer.about')}
+            </Link>
+            <Link
+              to="/lab"
+              className="inline-flex min-h-11 items-center text-sm text-gray-600 transition hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+            >
+              {t('footer.lab')}
             </Link>
             <Link
               to="/privacy"

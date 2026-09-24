@@ -186,6 +186,7 @@ class TestRobots:
             "/browse/phones",
             "/product/123",
             "/about",
+            "/lab",
             "/privacy",
             "/terms",
             "/contact",
@@ -442,7 +443,7 @@ class TestSitemapDocument:
 
     def test_lists_the_fixed_pages_without_inventing_dates(self, client):
         found = urls(client.get("/sitemap.xml"))
-        for page in ("/", "/about", "/privacy", "/terms", "/contact"):
+        for page in ("/", "/about", "/lab", "/privacy", "/terms", "/contact"):
             assert f"{BASE}{page}" in found
             assert found[f"{BASE}{page}"] is None, f"{page} has an invented lastmod"
 

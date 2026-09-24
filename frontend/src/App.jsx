@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { LocaleProvider } from './context/LocaleContext';
@@ -22,6 +23,13 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Contact from './pages/Contact';
 import About from './pages/About';
+import Spinner from './components/ui/Spinner';
+
+// The one page loaded on demand. Its charts, form and worked examples came
+// to 27 KB when it was added, and every other visitor -- most of them,
+// arriving on a product or a search -- would download them for nothing.
+// Chunks come from our own origin, so the CSP's script-src 'self' holds.
+const Lab = lazy(() => import('./pages/Lab'));
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import VerifyEmail from './pages/VerifyEmail';
@@ -66,6 +74,17 @@ function App() {
                       ones who cannot sign in. */}
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/about" element={<About />} />
+                  {/* Public and indexed: the page that shows how search
+                      reads a query, for shoppers, shop owners and anyone
+                      reviewing the matching. */}
+                  <Route
+                    path="/lab"
+                    element={
+                      <Suspense fallback={<Spinner />}>
+                        <Lab />
+                      </Suspense>
+                    }
+                  />
                   {/* Reachable without an account and without JavaScript
                       state: someone deciding whether to sign up at all is
                       exactly who reads these. */}

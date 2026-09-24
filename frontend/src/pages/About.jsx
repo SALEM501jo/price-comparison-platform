@@ -35,6 +35,7 @@ const SECTIONS = [
     id: 'about-how',
     title: 'about.how.title',
     paragraphs: ['about.how.sources', 'about.how.matching', 'about.how.used'],
+    link: { key: 'about.how.lab', to: '/lab' },
   },
   {
     id: 'about-buying',
