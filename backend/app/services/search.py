@@ -20,12 +20,12 @@ that had to import from a module called "search" to reach them.
 
 from __future__ import annotations
 
-
+from dataclasses import dataclass, field
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.matching import CLOSE, EXACT, SIMILAR, parse, score_match
+from app.matching import CLOSE, EXACT, SIMILAR, ParsedProduct, parse, score_match
 from app.matching import spelling
 from app.models.product import Product
 from app.services import photos
@@ -171,6 +171,58 @@ def _to_response(
     )
 
 
+@dataclass(frozen=True)
+class QueryReading:
+    """What a query was understood to mean, and the text that meaning came from."""
+
+    parsed: ParsedProduct
+    text: str  # what was typed, or the accepted correction of it
+    corrected_query: str | None = None
+    corrections: dict[str, str] = field(default_factory=dict)
+
+
+def read_query(raw_query: str, *, allow_correction: bool = True) -> QueryReading:
+    """
+    Parse a shopper's query, correcting its spelling only where that helps.
+
+    ONE DEFINITION, TWO CALLERS: search, and the Matching Lab's explanation of
+    a search (services/explain.py). The Lab exists to show what search does;
+    if it read queries with a copy of this logic, the first change to one
+    copy would make the Lab explain a search the site no longer runs.
+    """
+    # require_evidence=False: the rule exists to keep accessories OUT of the
+    # catalogue at ingest. A query of "MacBook" names no storage or chip and
+    # still means every MacBook.
+    # Neither rule applies to a query: requires_any keeps accessories out of
+    # the CATALOGUE, and defaults describe what a LISTING implies. A shopper
+    # who omits a word has not asserted its absence.
+    parsed = parse(raw_query, require_evidence=False, apply_defaults=False)
+
+    # SPELLING, second. The correction is only accepted when it makes the
+    # query MORE understood than what was typed -- strictly more attributes
+    # extracted. Correcting whenever a word happens to be near a known one
+    # would let "iphone a16" drift to "a15", and the two are different
+    # products; requiring the correction to earn its place means a typo that
+    # changes nothing measurable is left exactly as the shopper wrote it.
+    #
+    # Runs AFTER the first parse, not before, so a query that already works
+    # never pays for it and can never be altered.
+    candidate_text, candidate_fixes = spelling.correct(raw_query)
+    if candidate_fixes and allow_correction:
+        candidate = parse(
+            candidate_text, require_evidence=False, apply_defaults=False
+        )
+        if len(candidate.specified) > len(parsed.specified):
+            return QueryReading(
+                parsed=candidate,
+                text=candidate_text,
+                corrected_query=candidate_text,
+                corrections=candidate_fixes,
+            )
+
+    return QueryReading(parsed=parsed, text=raw_query)
+
+
 def search_products(
     db: Session,
     raw_query: str,
@@ -193,45 +245,17 @@ def search_products(
     page = max(1, page)
     limit = max(1, limit)
 
-    # require_evidence=False: the rule exists to keep accessories OUT of the
-    # catalogue at ingest. A query of "MacBook" names no storage or chip and
-    # still means every MacBook.
-    # Neither rule applies to a query: requires_any keeps accessories out of
-    # the CATALOGUE, and defaults describe what a LISTING implies. A shopper
-    # who omits a word has not asserted its absence.
-    parsed = parse(raw_query, require_evidence=False, apply_defaults=False)
-
-    # SPELLING, second. The correction is only accepted when it makes the
-    # query MORE understood than what was typed -- strictly more attributes
-    # extracted. Correcting whenever a word happens to be near a known one
-    # would let "iphone a16" drift to "a15", and the two are different
-    # products; requiring the correction to earn its place means a typo that
-    # changes nothing measurable is left exactly as the shopper wrote it.
-    #
-    # Runs AFTER the first parse, not before, so a query that already works
-    # never pays for it and can never be altered.
-    search_query = raw_query
-    corrected_query: str | None = None
-    corrections: dict[str, str] = {}
-
-    candidate_text, candidate_fixes = spelling.correct(raw_query)
-    if candidate_fixes and allow_correction:
-        candidate = parse(
-            candidate_text, require_evidence=False, apply_defaults=False
-        )
-        if len(candidate.specified) > len(parsed.specified):
-            parsed = candidate
-            search_query = candidate_text
-            corrected_query = candidate_text
-            corrections = candidate_fixes
+    reading = read_query(raw_query, allow_correction=allow_correction)
+    parsed = reading.parsed
+    search_query = reading.text
 
     interpretation = SearchInterpretation(
         query=raw_query,
         category=parsed.category if parsed.specified else None,
         attributes=parsed.specified,
         structured=bool(parsed.specified),
-        corrected_query=corrected_query,
-        corrections=corrections,
+        corrected_query=reading.corrected_query,
+        corrections=reading.corrections,
     )
 
     empty = TieredSearchResponse(

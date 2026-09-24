@@ -142,6 +142,19 @@ def classify_hint(hint: str) -> str | None:
     return detect_category(tokens[-1])
 
 
+def store_refuses(hint: str | None) -> bool:
+    """
+    Whether a store's product_type says the item is none of our categories.
+
+    The decision parse() takes before it reads a single word of the title,
+    exposed so a caller can say WHY a listing was turned away -- "the store
+    files this under Mobile Case" -- rather than only that it was.
+    """
+    if not hint or not hint.strip() or not _is_a_classification(hint):
+        return False
+    return classify_hint(hint) is None
+
+
 @dataclass(frozen=True)
 class ParsedProduct:
     """A product name reduced to comparable, structured attributes."""

@@ -27,6 +27,7 @@ from app.models.store import Store
 from app.routers import (
     admin,
     auth,
+    lab,
     merchant,
     oauth,
     prices,
@@ -165,6 +166,9 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 # its GET silently returns the app shell.
 app.include_router(oauth.router, prefix="/auth", tags=["auth"])
 app.include_router(products.router, prefix="/products", tags=["products"])
+# The Matching Lab. Under /products, next to the search it explains; see
+# app/routers/lab.py for why not a prefix of its own.
+app.include_router(lab.router, prefix="/products", tags=["lab"])
 app.include_router(prices.router, prefix="/prices", tags=["prices"])
 app.include_router(support.router, prefix="/support", tags=["support"])
 app.include_router(merchant.router, prefix="/merchant", tags=["merchant"])
