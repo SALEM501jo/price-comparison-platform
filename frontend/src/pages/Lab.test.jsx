@@ -1,7 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { render as renderAtRoot, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LocaleProvider } from '../context/LocaleContext';
 import { renderWithProviders as render } from '../test/render';
 import storage from '../test/fixtures/explain-storage.json';
 import caseExample from '../test/fixtures/explain-case.json';
@@ -64,7 +66,9 @@ function answerWith(...fixtures) {
 }
 
 afterEach(() => {
-  vi.clearAllMocks();
+  // reset, not clear: the StrictMode test installs an implementation, and a
+  // cleared mock would keep it for every test after.
+  vi.resetAllMocks();
 });
 
 describe('<Lab>', () => {
@@ -74,6 +78,41 @@ describe('<Lab>', () => {
 
     await waitFor(() => expect(explainSearch).toHaveBeenCalledTimes(1));
     expect(explainSearch.mock.calls[0][0]).toEqual(storage.request);
+    expect(await screen.findByRole('heading', { name: 'How the search was read' })).toBeInTheDocument();
+  });
+
+  it('still explains its first example under StrictMode, as `npm run dev` renders it', async () => {
+    // Found by running the page in the Vite dev server, not by a test: in
+    // development StrictMode mounts, rehearses an unmount, and mounts again.
+    // The rehearsal aborted the opening request and a "run once" guard kept
+    // the second mount from sending it again -- a blank page in development
+    // only. The mock honours the abort signal, as axios does, or this test
+    // could not see that.
+    explainSearch.mockImplementation(
+      (body, { signal } = {}) =>
+        new Promise((resolve, reject) => {
+          const abort = () => reject(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED' }));
+          if (signal?.aborted) return abort();
+          signal?.addEventListener('abort', abort);
+          setTimeout(() => resolve(storage.response), 0);
+        }),
+    );
+    // StrictMode AT THE ROOT, as main.jsx has it. Nested inside the
+    // providers renderWithProviders adds, React does not rehearse the
+    // unmount at all, and this test passed against the broken page.
+    window.localStorage.setItem('locale', 'en');
+    renderAtRoot(
+      <StrictMode>
+        <LocaleProvider>
+          <MemoryRouter initialEntries={['/lab']}>
+            <Routes>
+              <Route path="/lab" element={<Lab />} />
+            </Routes>
+          </MemoryRouter>
+        </LocaleProvider>
+      </StrictMode>,
+    );
+
     expect(await screen.findByRole('heading', { name: 'How the search was read' })).toBeInTheDocument();
   });
 

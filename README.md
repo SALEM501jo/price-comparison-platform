@@ -248,7 +248,7 @@ still `p=none`.
 | Suite | Size | What it covers |
 |---|---|---|
 | `backend/tests` (pytest) | **1,140 tests** | Matching, Arabic, spelling, the Matching Lab's explanations, routes, auth and token rotation, OAuth, SSRF, delisting, link audit, SEO, production config. SQLite, with the rate limiter stubbed. |
-| `frontend/src` (Vitest) | **237 tests** in 21 files | Tier explanations, price table ordering, i18n key parity, page indexing rules, photo picker, sign-in, the Matching Lab |
+| `frontend/src` (Vitest) | **238 tests** in 21 files | Tier explanations, price table ordering, i18n key parity, page indexing rules, photo picker, sign-in, the Matching Lab |
 | `backend/scripts/smoke_test.py` | Critical paths | Real Postgres, Redis and HTTP against a running server |
 | `backend/scripts/e2e_test.py` | User journeys | Register, verify, search, save, alert, sell, moderate. Rate limiter on; cleans up after itself. |
 | `backend/scripts/attack_probes.py` | 41 probes | See Security. Local only. |

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { explainSearch } from '../api/lab';
 import LabForm from '../components/lab/LabForm';
@@ -61,53 +61,59 @@ export default function Lab() {
   const [rows, setRows] = useState(() => toRows(opening.listings));
   const [dirty, setDirty] = useState(false);
   const [result, setResult] = useState(null);
-  const [busy, setBusy] = useState(false);
+  // True from the start: the opening example is sent the moment the page mounts.
+  const [busy, setBusy] = useState(true);
+  // A translation key and its values, not a sentence: the sentence is
+  // written at render time, so an error re-reads in the other language when
+  // the visitor switches.
   const [error, setError] = useState(null);
-  const inFlight = useRef(null);
+  // WHAT TO EXPLAIN IS STATE, AND ONE EFFECT FETCHES IT. The opening example
+  // explains itself on arrival -- a lab that opens on an empty form asks for
+  // work before showing anything -- and an example or the Explain button just
+  // replaces this. Each change aborts the request before it in the effect's
+  // cleanup, so a slow answer can never land on top of a newer one.
+  //
+  // This replaced a "send once" ref guard plus a separate abort-on-unmount
+  // effect, which showed a BLANK PAGE in development: StrictMode mounts,
+  // rehearses an unmount (the abort fired) and mounts again (the guard said
+  // "already sent"). Found by running `npm run dev`, not by a test -- see
+  // the StrictMode test in Lab.test.jsx, which renders it as main.jsx does.
+  const [requested, setRequested] = useState(() => requestBody(opening.query, opening.listings));
 
   useDocumentMeta({ title: t('lab.metaTitle'), description: t('lab.lead') });
 
-  const run = useCallback(
-    async (body) => {
-      inFlight.current?.abort();
-      const controller = new AbortController();
-      inFlight.current = controller;
-      setBusy(true);
-      setError(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
       try {
-        const data = await explainSearch(body, { signal: controller.signal });
+        const data = await explainSearch(requested, { signal: controller.signal });
         setResult(data);
         setDirty(false);
+        setError(null);
       } catch (err) {
         if (controller.signal.aborted) return;
-        setError(err?.code === 'ERR_NETWORK' ? t('common.networkError') : t('lab.error'));
+        setError({ key: err?.code === 'ERR_NETWORK' ? 'common.networkError' : 'lab.error' });
       } finally {
-        if (inFlight.current === controller) {
-          inFlight.current = null;
-          setBusy(false);
-        }
+        // A request replaced by a newer one leaves the page busy for it.
+        if (!controller.signal.aborted) setBusy(false);
       }
-    },
-    [t],
-  );
+    };
+    load();
+    return () => controller.abort();
+  }, [requested]);
 
-  // The opening example explains itself on arrival: a lab that opens on an
-  // empty form asks the visitor to do work before showing them anything.
-  const opened = useRef(false);
-  useEffect(() => {
-    if (opened.current) return;
-    opened.current = true;
-    run(requestBody(opening.query, opening.listings.map((l) => ({ ...l, category: l.category ?? '' }))));
-  }, [run, opening]);
-
-  useEffect(() => () => inFlight.current?.abort(), []);
+  const start = (body) => {
+    setBusy(true);
+    setError(null);
+    setRequested(body);
+  };
 
   const chooseExample = (example) => {
     setActiveExample(example.id);
     setQuery(example.query);
     setRows(toRows(example.listings));
     setSearchParams(example.id === DEFAULT_EXAMPLE ? {} : { example: example.id }, { replace: true });
-    run(requestBody(example.query, toRows(example.listings)));
+    start(requestBody(example.query, toRows(example.listings)));
   };
 
   const edited = () => {
@@ -118,15 +124,15 @@ export default function Lab() {
   const submit = () => {
     const body = requestBody(query, rows);
     if (body.query.length < MIN_QUERY) {
-      setError(t('lab.form.tooShort', { min: MIN_QUERY }));
+      setError({ key: 'lab.form.tooShort', vars: { min: MIN_QUERY } });
       return;
     }
     if (body.listings.length === 0) {
-      setError(t('lab.form.noListings'));
+      setError({ key: 'lab.form.noListings' });
       return;
     }
     if (activeExample === null) setSearchParams({}, { replace: true });
-    run(body);
+    start(body);
   };
 
   const view = useMemo(() => {
@@ -200,7 +206,7 @@ export default function Lab() {
         query={query}
         rows={rows}
         busy={busy}
-        error={error}
+        error={error && t(error.key, error.vars)}
         dirty={dirty}
         onQueryChange={(value) => {
           setQuery(value);

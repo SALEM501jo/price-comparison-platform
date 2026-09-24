@@ -54,7 +54,7 @@ there is no checkout anywhere.
 | | |
 |---|---|
 | Backend tests | **1,140** — `cd backend && pytest -q` |
-| Frontend tests | **237** — `cd frontend && npm test` |
+| Frontend tests | **238** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
 | Smoke checks | **57/57** — `python scripts/smoke_test.py` |
@@ -286,6 +286,19 @@ docker exec ahsan-se3r-postgres-1 psql -U ahsan -d price_comparison -c \
     built bundle called `localhost:8000`. Only opening the page in a browser
     found it. The same outside-in page sweep then found `/merchant` returning
     a JSON 404 on refresh.
+20. **StrictMode rehearses only at the root, and only in development.**
+    `main.jsx` wraps the app in `<StrictMode>`, so under `npm run dev` React
+    mounts each component, unmounts it and mounts it again, to catch effects
+    that do not survive that. The Matching Lab's did not: the rehearsal
+    aborted its opening request and a "send once" guard stopped the remount
+    from sending it again, so the page was **blank in dev and fine in the
+    build**. The tests missed it for two reasons. `renderWithProviders` puts
+    `LocaleProvider` outside whatever a test renders, so a `<StrictMode>`
+    inside a test is nested and React does not rehearse at all. And the mock
+    ignored the AbortSignal that axios honours. To test effect behaviour,
+    render with StrictMode at the root and a mock that honours aborts (the
+    StrictMode test in `pages/Lab.test.jsx`), and open the page under
+    `npm run dev`, not only the build.
 
 ---
 
