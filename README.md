@@ -91,11 +91,41 @@ Four more pieces make this work on real data:
   (`services/deduplication.py`). A wrong merge would show one phone's price
   under another.
 
+### The Matching Lab: test it yourself
+
+`/lab` (مختبر المطابقة) takes a search and up to eight listings as stores name
+them, runs them through the site's own code (`POST /products/explain`), and
+shows three things:
+
+- **How the search was read**, stage by stage: spelling corrected, Arabic
+  folded into the engine's words, cleaned up, then the attributes extracted.
+- **The same listings ranked twice**, by string similarity and by the engine,
+  joined by lines. Every crossing is a disagreement, and the worst one is
+  stated in a sentence.
+- **Every listing's 100 points**, as a bar with one segment per attribute
+  (kept, lost, or not asked for), with each lost point written out.
+
+The string-similarity column is given every advantage: it compares the same
+cleaned text the engine reads. It reproduces the measurement above to the
+decimal, 67.9 for the right phone, tied with the 256GB model, below the Pro
+Max, and a test holds it there. Seven worked examples open it. Among them: an
+Arabic search where the iPhone 16 comes second by similarity and the exact
+match comes last, and a phone case that scores 83.9 against the real phone's
+47.3.
+
+Its first run found a real bug. `Samsung A57` and `Galaxy A57` parsed as two
+different models, so a search for "Samsung S24 Ultra" scored the Galaxy S24
+Ultra 67 (excluded), and two stores selling one phone under the two spellings
+became two products with one price each. Both spellings now resolve to one
+model (`tests/test_samsung_models.py`).
+
 ## Features
 
 **Shoppers**
 - Tiered search in Arabic or English, with suggestions while typing and chips
   showing how the query was understood
+- A Matching Lab (`/lab`) that explains any search against any listings,
+  beside how string similarity would rank them
 - Category browsing (phones, laptops, monitors) with colour variants grouped
   into one tile, and a home page of the biggest savings between stores
 - Prices sorted by total cost including delivery, a price-history chart, and
@@ -217,8 +247,8 @@ still `p=none`.
 
 | Suite | Size | What it covers |
 |---|---|---|
-| `backend/tests` (pytest) | **1,079 tests** | Matching, Arabic, spelling, routes, auth and token rotation, OAuth, SSRF, delisting, link audit, SEO, production config. SQLite, with the rate limiter stubbed. |
-| `frontend/src` (Vitest) | **197 tests** in 18 files | Tier explanations, price table ordering, i18n key parity, page indexing rules, photo picker, sign-in |
+| `backend/tests` (pytest) | **1,140 tests** | Matching, Arabic, spelling, the Matching Lab's explanations, routes, auth and token rotation, OAuth, SSRF, delisting, link audit, SEO, production config. SQLite, with the rate limiter stubbed. |
+| `frontend/src` (Vitest) | **237 tests** in 21 files | Tier explanations, price table ordering, i18n key parity, page indexing rules, photo picker, sign-in, the Matching Lab |
 | `backend/scripts/smoke_test.py` | Critical paths | Real Postgres, Redis and HTTP against a running server |
 | `backend/scripts/e2e_test.py` | User journeys | Register, verify, search, save, alert, sell, moderate. Rate limiter on; cleans up after itself. |
 | `backend/scripts/attack_probes.py` | 41 probes | See Security. Local only. |

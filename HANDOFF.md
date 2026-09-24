@@ -53,8 +53,8 @@ there is no checkout anywhere.
 
 | | |
 |---|---|
-| Backend tests | **1,079** — `cd backend && pytest -q` |
-| Frontend tests | **197** — `cd frontend && npm test` |
+| Backend tests | **1,140** — `cd backend && pytest -q` |
+| Frontend tests | **237** — `cd frontend && npm test` |
 | End-to-end | **124/124** — `python scripts/e2e_test.py` (server must be up) |
 | Attack probes | **41/41** — `python scripts/attack_probes.py` |
 | Smoke checks | **57/57** — `python scripts/smoke_test.py` |
@@ -788,6 +788,92 @@ no untranslated English in the Arabic table.
   home page. Per-product previews need the server to write `og:*` into
   `index.html` per product.
 
+### The Matching Lab — `/lab`, `POST /products/explain` — added 2026-09-24
+
+A public page that takes a search and up to eight listings, as stores name
+them, and shows how the search was read, the same listings ranked by string
+similarity and by the engine (a slope chart), and each listing's 100 points as
+a bar. It exists because the project's central claim, that attributes beat edit
+distance, lived only in a docstring and a README table. The Lab lets anyone
+test that claim with their own words. Its first run found the Samsung split
+below.
+
+- **Nothing is reimplemented.** `read_query()` was extracted from
+  `search_products()`, so search and the Lab read a query with one function,
+  spelling included. Listings are parsed exactly as ingest parses them (store
+  category as the hint, defaults on, evidence required), and scores come from
+  `score_match()`. `services/explain.py` only records what those calls did. If
+  the Lab ever disagrees with search, one of those two statements has stopped
+  being true.
+- **The baseline is given every advantage.** Normalised Indel similarity (what
+  `rapidfuzz.fuzz.ratio` computes) over `normalize()`d text, the same cleaning
+  the engine gets. It reproduces scorer.py's measurement exactly (67.9, tied
+  with 256GB, below the Pro Max at 70.0), and `test_explain.py` pins that. The
+  LCS is bit-parallel and checked against the textbook table. No rapidfuzz
+  dependency.
+- **Why a listing did not score is data, not prose**: `outcome` is one of
+  scored, gated, other_category, nothing_to_score, refused_by_store,
+  unrecognised or query_unread. The client writes the sentence, the same split
+  as match differences. `parser.store_refuses()` was made public for
+  refused_by_store.
+- **Bounded, public, stateless.** Catalogue rate limit; 8 listings of 200
+  characters at most; the same 2-100 character query that search accepts. No
+  database, no network. Mounted under `/products` so the SPA fallback's API
+  prefixes already cover it.
+- **Chart colour was validated, not chosen.** Tier-coloured lines failed the
+  dataviz validator (exact green against close amber is ΔE 4.3 under
+  deuteranopia). Lines are neutral gray, and only the headline disagreement is
+  emphasised, brand teal against red. In light mode that pair sits in the
+  6-8 floor band, which is legal only with a second channel: the sentence
+  names both lines by letter. Bar states differ by fill, outline and track,
+  not hue alone. White on dark-mode brand-600 measured 3.77:1, so labels
+  there are ink.
+- **Directional isolates around quoted names.** A Latin title inside an
+  Arabic sentence let the bidi algorithm move a guillemet past the number
+  beside it. It was found at 375px in Chromium, not by a test. Names and store
+  categories are wrapped in FSI…PDI (`utils/labText.js isolate`), and a test
+  pins it. **Any new sentence that quotes a product name in Arabic needs the
+  same.**
+- **Letters, not titles, identify rows on a phone.** Titles in the rankings are
+  hidden below `sm`, where they cut to "Appl…". Arabic readers get abjad
+  letters (أ ب ج د).
+- **Lazy-loaded.** The page's own 27 KB is a separate chunk. The main bundle
+  carries only its translations (+18 KB, +4.8 KB gzip).
+- **Indexed**, unlike search results: the content on arrival is the same
+  for everyone, and `?example=` only picks one of seven fixed examples. Nothing
+  from the URL reaches the title. The page is in the sitemap and linked from
+  the footer and About.
+
+**Observed while building it, deliberately NOT changed:** a query that names
+no variant ("iPhone 15 128GB Black") scores the iPhone 15 **Plus** 100, exact,
+because a query's silence is not an assertion of "base" (see Listings vs
+queries: the Honor X7e / X7e Plus case). The Lab shows why (variant: not
+asked, costs nothing), but a shopper may still read it as wrong. Whether
+"Plus" and "Pro Max" should count as a different model for a query that
+names none is a product decision, not a bug.
+
+### Samsung A57 is Galaxy A57 — fixed 2026-09-24
+
+Stores write Samsung phones both ways. SmartBuy uses "Samsung A57 5G, 8GB &
+256GB"; other listings use "Samsung Galaxy A15 5G 128GB Blue". The Galaxy rule
+produced `galaxy a 57` and the brand-adjacent code rule produced `samsung a57`,
+so one phone had two models. Search for "Samsung S24 Ultra" scored every Galaxy
+S24 Ultra 67 (excluded), and the same handset from two stores never merged.
+A "samsung" rule beside the Galaxy one, plus `Regex(rename={"samsung":
+"galaxy"})`, gives both spellings `galaxy a 57`. The Galaxy form is canonical,
+so Galaxy-named products keep their stored values. "Samsung Note 20" and
+"Samsung A 57", which parsed to no model at all, now join theirs.
+`tests/test_samsung_models.py` covers it; 10 of its 18 tests failed first,
+including the real-ingest case that produced two products.
+
+- **Search is fixed on deploy**: it re-parses every candidate at query time.
+- **Stored `match_attributes` of "Samsung A57"-style rows go stale**, which
+  matters to browse's colour grouping. Run `backfill_attributes.py --all`
+  after deploying (Next steps 0).
+- **Pairs already split stay split.** Ingest links a listing it has seen before
+  to its existing alias, so two products created before the fix are never
+  revisited. Merging them is a data change on production: see Next steps 0.
+
 ---
 
 ## Decisions already made — don't redo these
@@ -1083,6 +1169,27 @@ no untranslated English in the Arabic table.
 ---
 
 ## Next steps, in the order I would do them
+
+### 0. Deploy the Matching Lab and the Samsung fix (branch `claude/clever-cori-re4jxg`)
+
+Four commits: `412c695` (Samsung), `6b08a89` (explain API), `ac3bc8d`
+(the Lab page), and the docs. Once merged to `main`, deploy as usual and then:
+
+```bash
+docker compose -f deploy/docker-compose.yml exec worker python scripts/backfill_attributes.py --dry-run </dev/null
+docker compose -f deploy/docker-compose.yml exec worker python scripts/backfill_attributes.py --all
+```
+
+Then open `/lab` on the phone and on the laptop. Then find the Samsung
+products that were split before the fix: two `products` rows, one from a store
+that writes "Galaxy" and one that does not, whose names now parse identically.
+Nothing merges them automatically. Moving the aliases of one onto the other is
+a production data change, so it should be a dry-run-first script like
+`audit_store_links.py`, not SQL typed live. **Measure how many there are
+first**: this session could not reach the stores (the cloud sandbox's network
+policy refused smartbuy-me.com, igeekjo.com and www.ammancart.com), so the
+count is unknown. It could be zero, or it could be a large share of the
+"products with more than one price" problem.
 
 ### 1. Make the live site survivable
 
