@@ -97,21 +97,21 @@ from outside the server, not assumed.
 
 | | |
 |---|---|
-| Server | Hetzner **CX23** (2 vCPU x86, 4 GB), Falkenstein, Ubuntu 24.04, `2.28.103.13`, ~$7/mo |
-| Code | `/opt/ahsan-se3r`, a git clone tracking **`main`**. Deployed and rebuilt at `e1ccbb5` on 2026-09-14 (search engines + brand icons), CI green first |
-| Settings | `/opt/ahsan-se3r/deploy/.env` — mode `600`, root only. **Must be named exactly `.env`** (see traps) |
+| Server | Hetzner **CX23** (2 vCPU x86, 4 GB), Falkenstein, Ubuntu 24.04, ~$7/mo |
+| Code | A git clone on the server tracking **`main`**. Deployed and rebuilt at `e1ccbb5` on 2026-09-14 (search engines + brand icons), CI green first |
+| Settings | `deploy/.env` on the server, mode `600`. **Must be named exactly `.env`** (see traps) |
 | Stack | `deploy/docker-compose.yml`: postgres, redis, one-shot `migrate`, api (serves the SPA too), worker, caddy |
 | TLS | Caddy + Let's Encrypt, automatic renewal. `www` 301s to the bare domain |
 | DNS | Cloudflare. `A @` and `A www` → server, **grey cloud / DNS only** |
 | Firewall | Hetzner Cloud Firewall `web`: inbound TCP 22, 80, 443 and UDP 443 only |
-| SSH | root, **key only**. Password auth off, verified refused |
+| SSH | **Key only.** Password auth off, verified refused |
 | Email | Brevo SMTP relay, port 587 + STARTTLS. Domain authenticated: `brevo-code` TXT, two DKIM CNAMEs, DMARC `p=none` |
 | Sign-in | Google, **published "In production"**. Apple not configured (needs a paid developer account) |
 | Monitoring | Better Stack (free), every 3 min, email alerts. `/health` proves the app answers. The second monitor must be **`/health/catalogue`** ("URL becomes unavailable"): it touches Postgres and goes 503 when scraped prices have not been refreshed for 14 h, a day and a half before they would leave the site. It replaced `/products/483` contains `iPhone 16`, which now legitimately 404s whenever that product has no current offer. A deploy's rebuild can trip one alert |
 | Account security | Two-factor login on Hetzner, Cloudflare, Brevo and Google (2026-09-14) |
-| Admin | One admin: the operator's own account. Promoted by SQL, since nothing creates the first admin |
+| Admin | One admin: the operator's own account |
 | Data | Catalogue imported: 3 stores, 423 products, 455 prices. **No accounts copied** |
-| Backups | **OFF.** See Known limitations |
+| Backups | Tracked in the private operations note |
 
 **Verified live:** HSTS with preload, CSP with no third-party origin and no
 `unsafe-inline` scripts, TLS 1.0/1.1 refused, server header hidden, database /
@@ -122,17 +122,13 @@ Brevo landed in the Primary inbox, not spam.
 
 ### Operating it
 
-Log in (the key is passphrase-protected; load it into the agent first):
-
-```powershell
-ssh-add $HOME\.ssh\id_ed25519
-ssh root@2.28.103.13
-```
+Server address, login and account procedures are kept in a private
+operations note, not in this public file.
 
 Deploy a new commit:
 
 ```bash
-cd /opt/ahsan-se3r && git pull && docker compose -f deploy/docker-compose.yml up -d --build
+cd <app-dir> && git pull && docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
 The frontend is baked into the image, so **any change — backend or frontend —
@@ -176,20 +172,12 @@ shell history.** Paste the value at the prompt; `-s` hides it, and the `case`
 refuses a double paste, which is easy to do when nothing appears:
 
 ```bash
-cd /opt/ahsan-se3r/deploy
+cd <app-dir>/deploy
 read -rsp "Secret (paste ONCE, Enter): " S && echo && case "$S" in *PREFIX*PREFIX*) echo "REFUSED: pasted twice" ;; PREFIX*) sed -i "s|^SETTING_NAME=.*|SETTING_NAME=$S|" .env && echo "SAVED: ${#S} chars" ;; *) echo "REFUSED: wrong value" ;; esac; unset S
 ```
 
 Google secrets start `GOCSPX-`; Brevo SMTP keys start `xsmtpsib-` (an
 `xkeysib-` key is an API key and will not authenticate SMTP).
-
-Promote an account to admin (match id **and** email, so it cannot hit the
-wrong row):
-
-```bash
-docker exec ahsan-se3r-postgres-1 psql -U ahsan -d price_comparison -c \
-  "update users set role='admin' where id=<ID> and email='<EMAIL>' and role='user';"
-```
 
 ---
 
@@ -257,7 +245,7 @@ docker exec ahsan-se3r-postgres-1 psql -U ahsan -d price_comparison -c \
     sees the agent but mangles quotes in a multi-line script. Windows' binary
     driven from Git Bash gets both right:
     ```bash
-    /c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes root@2.28.103.13 'bash -s' <<'EOF'
+    /c/Windows/System32/OpenSSH/ssh.exe -o BatchMode=yes <user>@<server> 'bash -s' <<'EOF'
     ...
     EOF
     ```
@@ -1014,12 +1002,8 @@ no untranslated English in the Arabic table.
 
 ## Known limitations
 
-1. **No backups.** Hetzner backups are off and nothing dumps the database. A
-   lost disk, a mistaken command or a lapsed payment loses every account and
-   every merchant listing. The biggest operational gap by far. **The owner
-   decided on 2026-09-14 to enable them once there are customers and stores**,
-   while the data is test accounts and a re-scrapable catalogue. Enable them
-   before the first real shop signs up, not after.
+1. **Backups and disaster recovery** are tracked in the private operations
+   note, not in this public file.
 2. **One product has more than one price.** See the warning at the top.
 3. **No merchants at all.** See the warning at the top.
 4. **Prices are refreshed every ~6 hours, not live** -- when a store's run
@@ -1089,11 +1073,7 @@ no untranslated English in the Arabic table.
 Deployment is done (see [Production](#production)). What is not done is the
 part that matters the day something goes wrong:
 
-- **Turn on backups** -- deferred by the owner until the first real shop
-  signs up (see Known limitations). Hetzner server page → Backups → **Enable** (~$1.30/mo,
-  daily, seven kept). Then add an **off-server** copy: a nightly `pg_dump` sent
-  somewhere outside Hetzner. Hetzner's backups live in the same account as the
-  server, so they do not survive losing the account.
+- **Backups** -- see the private operations note.
 - **`ssh-add -D`** on the laptop when not deploying, so the key goes back
   behind its passphrase. (Uptime monitoring, Brevo anonymous tracking and
   two-factor login are done, 2026-09-14.)
@@ -1132,9 +1112,9 @@ they compound:
 
 - **More scraped stores.** Every additional Shopify store in Jordan directly
   attacks the "one comparable product" problem.
-- **Message the shops.** Jado 0791757546 · Flick +962 7 8608 0010 · Platinum
-  (needs identifying). WhatsApp gets answered, email mostly doesn't. You could
-  not do this before deploying; now you can.
+- **Message the shops** (contact numbers are in the private note). WhatsApp
+  gets answered, email mostly doesn't. You could not do this before deploying;
+  now you can.
 
 ### 3. Instrument what the taps tell you
 
