@@ -9,7 +9,7 @@ pydantic-settings==2.5.2
 # JWT. PyJWT, not python-jose: the latter's last release was 2021 and it
 # carries five advisories including PYSEC-2025-185, which has no fix. It also
 # pulled in `ecdsa`, itself unfixed. This module signs every token we issue.
-PyJWT[crypto]==2.13.0
+PyJWT[crypto]==2.15.0
 
 # Password hashing. bcrypt is used directly -- passlib was declared but never
 # imported, which meant the real dependency was only present transitively and
@@ -33,4 +33,4 @@ python-multipart==0.0.32
 # script) inert, and what drops EXIF -- shop photos are taken on phones and
 # carry GPS coordinates, which is exactly the personal data this project
 # stores nowhere else.
-Pillow==12.3.0
+Pillow==13.0.0
