@@ -283,7 +283,12 @@ def run_job(db: Session, job: ScrapeJob) -> None:
     from app.services.notifications import process_alerts
     from app.services.scrapers import STORES, store_by_code
 
+    from app.config import get_settings
+
     codes = [c for c in (job.store_codes or "").split(",") if c]
+    # A full run (no stores named) reads SCRAPE_STORES when it is set -- see
+    # config.scrape_stores.
+    codes = codes or [c.strip() for c in get_settings().scrape_stores.split(",") if c.strip()]
     targets = [store_by_code(c) for c in codes] if codes else list(STORES)
     targets = [t for t in targets if t]
 

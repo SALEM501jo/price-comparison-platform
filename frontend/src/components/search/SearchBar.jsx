@@ -14,11 +14,15 @@ import SearchSuggestions from './SearchSuggestions';
 // NOT translated: they are product names, and a shopper types "iPhone 15"
 // into the box in either language. Rendering them in Arabic script would
 // produce a chip that does not match anything in the catalogue.
-const EXAMPLES = [
-  'iPhone 15 128GB Black',
-  'MacBook Air M2 256GB',
-  'Galaxy S24 128GB',
-];
+//
+// EACH ONE LEADS TO A PRODUCT TWO SHOPS SELL, checked against the live search
+// on 2026-10-09. The old three (iPhone 15, MacBook Air M2, Galaxy S24) each
+// found one shop or none, so the first thing a visitor tried on a price
+// comparison site showed nothing to compare. Only five products have two
+// prices today; when that changes, pick from /products/deals and re-check.
+//
+// SHORT ON PURPOSE: the three have to share one line on a 360px phone.
+const EXAMPLES = ['iPhone 16', 'iPhone 17 Pro', 'Vivobook 15 i7'];
 
 export default function SearchBar({ initialQuery = '', showExamples = false }) {
   const [query, setQuery] = useState(initialQuery);
@@ -97,8 +101,12 @@ export default function SearchBar({ initialQuery = '', showExamples = false }) {
       </form>
 
       {showExamples && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <span className="text-gray-400 dark:text-gray-500">
+        <div className="mt-3 flex flex-nowrap items-center gap-1.5 overflow-x-auto text-xs sm:flex-wrap sm:gap-2 sm:text-sm">
+          {/* ONE LINE ON A PHONE. Wrapped, the chips took two rows and pushed
+              the page down for three words of hint; so below `sm` they are
+              smaller and never wrap, and the row scrolls sideways as the last
+              resort on a screen too narrow to hold them. */}
+          <span className="shrink-0 text-gray-400 dark:text-gray-500">
             {t('search.try')}
           </span>
           {EXAMPLES.map((example) => (
@@ -107,7 +115,7 @@ export default function SearchBar({ initialQuery = '', showExamples = false }) {
               type="button"
               dir="ltr"
               onClick={() => submit(example)}
-              className="inline-flex min-h-11 items-center rounded-full bg-gray-100 px-4 text-gray-600 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full bg-gray-100 px-2.5 text-gray-600 sm:px-4 transition hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               {example}
             </button>

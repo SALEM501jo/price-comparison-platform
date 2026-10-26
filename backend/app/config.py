@@ -97,6 +97,13 @@ class Settings(BaseSettings):
     # than hidden in a server's .env.
     scrape_interval_hours: int = 0
 
+    # Which stores a FULL run reads (the schedule, "scrape all" in the admin
+    # panel): comma-separated store codes, empty for every store. Exists
+    # because Shopify refuses the server: with SCRAPE_STORES=leaders the
+    # schedule reads the store it can reach and stops knocking on the ones
+    # that answer 429. A run that names its stores is not affected.
+    scrape_stores: str = ""
+
     # Price-alert emails one run may send. They share the mail provider's
     # daily quota (Brevo's free tier is 300/day) with verification and reset
     # mail, which must never be starved by a burst of alerts. The remainder

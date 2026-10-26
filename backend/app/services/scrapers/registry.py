@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from app.services.scrapers.base import StoreConfig, StoreScraper
 from app.services.scrapers.shopify import ShopifyScraper
+from app.services.scrapers.woocommerce import WooCommerceScraper
 
 # No store below sets max_products. Every run reads each catalogue to its end,
 # and the default in StoreConfig is a runaway guard far above what any of them
@@ -68,10 +69,30 @@ STORES: tuple[StoreConfig, ...] = (
         # Phones are the overlap with SmartBuy. The bulk of this catalogue is
         # televisions and white goods, which no category rule covers yet.
     ),
+    StoreConfig(
+        code="leaders",
+        name="Leaders Center",
+        # The first store NOT on Shopify, which has refused the production
+        # server since 2026-09-30. Its Store API answers the server normally
+        # (checked 2026-10-26), and robots.txt disallows only cart, checkout,
+        # account and search pages.
+        host="leaders.jo",
+        platform="woocommerce",
+        delay_seconds=2.0,
+        # WooCommerce category ids, not Shopify handles (see woocommerce.py):
+        # 7958 mobiles (50), 965 laptops (62), 614 computer monitors (4), as
+        # counted 2026-10-26. The other ~2,500 products are kitchen and home
+        # appliances, so reading these three is ~3 pages instead of ~27.
+        # Names are ARABIC: the engine places 103 of 115 in a category but
+        # often misses brand and model, so these match other shops' English
+        # listings less precisely until app/matching/arabic.py learns more.
+        collections=("7958", "965", "614"),
+    ),
 )
 
 ADAPTERS: dict[str, type[StoreScraper]] = {
     "shopify": ShopifyScraper,
+    "woocommerce": WooCommerceScraper,
 }
 
 # The SSRF allowlist. Derived, never hand-maintained -- a hand-written second
